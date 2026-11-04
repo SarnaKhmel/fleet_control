@@ -69,3 +69,14 @@ export function rowRuns(cells: Iterable<ReconCell>): [number, number, number][] 
   }
   return runs;
 }
+
+/** The cell a point lies in. */
+export function cellOf(grid: ReconGrid, point: LatLng): ReconCell {
+  const { east, north } = toMetersFrom(grid.origin, point);
+  return [Math.floor(east / grid.cellM), Math.floor(north / grid.cellM)];
+}
+
+/** Cells whose centers lie within `radiusM` of `center` (what an observer there sees all around). */
+export function circleCells(grid: ReconGrid, center: LatLng, radiusM: number): ReconCell[] {
+  return coneCells(grid, center, 0, 360, radiusM);
+}

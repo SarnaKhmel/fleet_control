@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { offsetLatLng, toMetersFrom } from './area.js';
-import { coneCells, rowRuns, runRing, type ReconGrid } from './recon.js';
+import { cellOf, circleCells, coneCells, rowRuns, runRing, type ReconGrid } from './recon.js';
 
 const grid: ReconGrid = { origin: { lat: 50, lng: 30 }, cellM: 100 };
 
@@ -41,5 +41,26 @@ describe('runRing', () => {
   it('outlines the run in meters from the origin', () => {
     const ring = runRing(grid, 2, -1, 1).map((p) => toMetersFrom(grid.origin, p));
     expect(ring.map(({ east, north }) => [Math.round(east), Math.round(north)])).toEqual([[-100, 200], [200, 200], [200, 300], [-100, 300], [-100, 200]]);
+  });
+});
+
+describe('cellOf', () => {
+  it('finds the cell a point lies in, west and south of the origin too', () => {
+    expect(cellOf(grid, offsetLatLng(grid.origin, 50, 150))).toEqual([0, 1]);
+    expect(cellOf(grid, offsetLatLng(grid.origin, -50, -250))).toEqual([-1, -3]);
+  });
+});
+
+describe('circleCells', () => {
+  it('sees all around within the radius', () => {
+    const cells = circleCells(grid, grid.origin, 2000);
+    // A circle of 2 km covers 12.6 square km: about 1257 cells of 100 m.
+    expect(cells.length).toBeGreaterThan(1200);
+    expect(cells.length).toBeLessThan(1320);
+    const has = (x: number, y: number) => cells.some(([cx, cy]) => cx === x && cy === y);
+    expect(has(0, 19)).toBe(true); // 1950 m north
+    expect(has(-20, -1)).toBe(true); // 1950 m west
+    expect(has(0, 20)).toBe(false); // 2050 m north
+    expect(has(15, 15)).toBe(false); // 2192 m to the north-east
   });
 });
