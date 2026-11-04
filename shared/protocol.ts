@@ -3,7 +3,7 @@
 // validated with the guards below before it is used.
 
 export const DRONE_COUNT = 3;
-export const MISSION_DEFAULT_AREA_KM = 200;
+export const MISSION_DEFAULT_AREA_KM = 50;
 export const MISSION_MAX_AREA_KM = 500;
 export const CLUSTER_MAX_RADIUS_M = 5000;
 /** Launch site altitude above sea level, meters. Drones take off from here. */
@@ -14,7 +14,7 @@ export interface LatLng {
   lng: number;
 }
 
-/** Mission zone: a rectangle in meters around a center (default 200 × 200 km). */
+/** Mission zone: a rectangle in meters around a center (default 50 × 50 km). */
 export interface MissionArea {
   center: LatLng;
   widthKm: number;
