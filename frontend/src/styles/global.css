@@ -1106,3 +1106,69 @@ body,
   outline-offset: 3px;
   border-radius: 4px;
 }
+
+/* Drone status: boot progress and connection state, shown at the top of the mission section. */
+.drone-status {
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.drone-status-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.drone-status-count {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.drone-status ul {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.drone-status-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+}
+
+.drone-state {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.drone-state.is-idle {
+  color: var(--accent);
+}
+
+.drone-state.is-connecting {
+  color: var(--warning);
+}
+
+.boot-bar {
+  height: 4px;
+  margin-top: 0.2rem;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.boot-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}

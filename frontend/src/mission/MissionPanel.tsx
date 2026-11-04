@@ -3,7 +3,51 @@ import { useTranslation } from 'react-i18next';
 import { DRONE_COUNT, type ClientMessage } from '../../../shared/protocol';
 import { useLocationStore } from '../location/locationStore';
 import { sendClientMessage } from './missionSocket';
-import { effectiveCenter, layoutFrom, startProblem, useMissionStore, type LayoutKind } from './missionStore';
+import { effectiveCenter, layoutFrom, startProblem, useMissionStore, type DroneView, type LayoutKind, type MissionPhase } from './missionStore';
+
+interface DroneStatusListProps {
+  drones: Record<string, DroneView>;
+  phase: MissionPhase;
+}
+
+// Boot progress and connection state of the three drones, always visible while a mission is in play.
+function DroneStatusList({ drones, phase }: DroneStatusListProps) {
+  const { t } = useTranslation();
+  const rows = Array.from({ length: DRONE_COUNT }, (_, i) => {
+    const id = `drone-${i + 1}`;
+    // The callsign is fixed by the schedule (BA-01…BA-03); the drone is only a status until it is online.
+    const drone = drones[id];
+    return { id, callsign: `BA-0${i + 1}`, status: drone?.status ?? null, progress: drone?.progress ?? 0 };
+  });
+  const online = rows.filter((r) => r.status === 'idle').length;
+  if (phase !== 'running' && online === 0) return null;
+  return (
+    <section className="drone-status" aria-label={t('mission.drones')}>
+      <div className="drone-status-head">
+        <span>{t('mission.drones')}</span>
+        <span className="drone-status-count">{t('mission.online', { count: online, total: DRONE_COUNT })}</span>
+      </div>
+      <ul>
+        {rows.map((row) => {
+          const progress = row.status === 'idle' ? 100 : row.status ? row.progress : 0;
+          return (
+            <li key={row.id}>
+              <div className="drone-status-line">
+                <strong>{row.callsign}</strong>
+                <span className={`drone-state is-${row.status ?? 'offline'}`}>
+                  {row.status ? t(`mission.status.${row.status}`) : t('mission.status.offline')}
+                </span>
+              </div>
+              <div className="boot-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
+                <span style={{ width: `${progress}%` }} />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
 
 export function MissionPanel() {
   const { t } = useTranslation();
@@ -31,10 +75,11 @@ export function MissionPanel() {
     if (send({ type: 'mission_start', area, layout })) state.markStarting();
   }
 
-  const drones = Object.entries(state.drones);
 
   return (
     <div className="mission-panel">
+
+      <DroneStatusList drones={state.drones} phase={state.phase} />
 
       <fieldset>
         <legend>{t('mission.area')}</legend>
@@ -114,15 +159,6 @@ export function MissionPanel() {
         </p>
       )}
 
-      {drones.length > 0 && (
-        <ul className="roster">
-          {drones.map(([id, d]) => (
-            <li key={id}>
-              <strong>{d.callsign}</strong> {t(`mission.status.${d.status}`)} {d.status === 'booting' ? `${d.progress}%` : ''}
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

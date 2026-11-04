@@ -121,7 +121,8 @@
     "backToZone": "Back to mission zone",
     "drones": "Drones",
     "move": "Move drones to a point",
-    "moveOn": "Moving: click the map (stop)"
+    "moveOn": "Moving: click the map (stop)",
+    "online": "Online {{count}}/{{total}}"
   },
   "sidebar": {
     "label": "Side panel",
