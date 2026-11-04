@@ -42,8 +42,6 @@ export function MapView() {
   const markerRef = useRef<Marker | null>(null);
   const startMarkersRef = useRef<Marker[]>([]);
   const missionPoints = useMissionStore((state) => state.points);
-  const drones = useMissionStore((state) => state.drones);
-  const symbolStyle = useSymbolStyleStore((state) => state.style);
   const droneMarkersRef = useRef<Marker[]>([]);
   const styleRef = useRef<string | null>(null);
   const theme = useThemeStore((state) => state.theme);
@@ -228,15 +226,31 @@ export function MapView() {
     startMarkersRef.current = syncStartMarkers(map, startMarkersRef.current, missionPoints);
   }, [missionPoints]);
 
-  // Drones with a known position, drawn as NATO symbols or in our own style.
-  const selectedIds = useSelectionStore((state) => state.selectedIds);
+  // Drones with a known position, drawn as NATO symbols or in our own style, and their paths.
+  // Positions change many times a second, so the map follows the stores directly instead of
+  // re-rendering this component on every update (tasks/tech.md, section 6).
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    droneMarkersRef.current = syncDroneMarkers(map, droneMarkersRef.current, drones, symbolStyle);
-    // Paths need the style; until it loads, the style.load handler draws them.
-    if (map.isStyleLoaded()) syncWaypoints(map, drones, theme);
-  }, [drones, symbolStyle, selectedIds, theme]);
+    const sync = () => {
+      const { drones } = useMissionStore.getState();
+      droneMarkersRef.current = syncDroneMarkers(map, droneMarkersRef.current, drones, useSymbolStyleStore.getState().style);
+      // Paths need the style; until it loads, the style.load handler draws them.
+      if (map.isStyleLoaded()) syncWaypoints(map, drones, useThemeStore.getState().theme);
+    };
+    sync();
+    const unsubscribe = [
+      useMissionStore.subscribe((state, previous) => {
+        if (state.drones !== previous.drones) sync();
+      }),
+      useSelectionStore.subscribe((state, previous) => {
+        if (state.selectedIds !== previous.selectedIds) sync();
+      }),
+      useSymbolStyleStore.subscribe(sync),
+      useThemeStore.subscribe(sync),
+    ];
+    return () => unsubscribe.forEach((stop) => stop());
+  }, []);
 
   // Approximate front line follows its switch, the loaded zones and the theme.
   const frontEnabled = useFrontLineStore((state) => state.enabled);

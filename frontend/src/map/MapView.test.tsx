@@ -1,8 +1,9 @@
+import { Profiler } from 'react';
 import { act, render } from '@testing-library/react';
 import { MapView } from './MapView';
 import { useThemeStore } from '../theme/themeStore';
 import { useLocationStore } from '../location/locationStore';
-import { mapInstances } from '../test/maplibreMock';
+import { mapInstances, markerInstances } from '../test/maplibreMock';
 import { useMapViewStore } from './mapStyles';
 import { useMapIssueStore } from './mapIssue';
 import { useMapScaleStore } from './mapScaleStore';
@@ -78,6 +79,28 @@ describe('MapView', () => {
     });
     expect(useMissionStore.getState().routePoints).toEqual([{ lat: 50.2, lng: 30.3 }]);
     useMissionStore.setState({ phase: 'idle', routeMode: false, routePoints: [] });
+  });
+
+  it('moves a drone marker on a position update without re-rendering the map component', () => {
+    useMissionStore.setState({ phase: 'running', drones: {} });
+    let renders = 0;
+    render(
+      <Profiler id="map" onRender={() => renders++}>
+        <MapView />
+      </Profiler>,
+    );
+    act(() => {
+      useMissionStore.getState().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30, altitude_amsl_m: 150 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
+    });
+    const marker = markerInstances.at(-1)!;
+    expect(marker.lngLat).toEqual([30, 50]);
+    const before = renders;
+    act(() => {
+      useMissionStore.getState().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 0, speedMs: 10, altitudeM: 210, batteryPct: 99, crabDeg: 0, origin: null, tasks: [] });
+    });
+    expect(marker.lngLat).toEqual([30.1, 50.1]);
+    expect(renders).toBe(before);
+    useMissionStore.setState({ phase: 'idle', drones: {} });
   });
 
   it('switches the basemap style when the theme changes', () => {
