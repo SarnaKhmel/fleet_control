@@ -56,7 +56,8 @@ export interface DroneTelemetry {
 export type ClientMessage =
   | { type: 'mission_start'; area: MissionArea; layout: StartLayout }
   | { type: 'mission_reset' }
-  | { type: 'move'; droneIds: string[]; target: LatLng };
+  | { type: 'move'; droneIds: string[]; target: LatLng }
+  | { type: 'heading'; droneIds: string[]; headingDeg: number };
 
 // ---- Server → client ----
 
@@ -129,6 +130,9 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
   }
   if (message.type === 'move' && isDroneIds(message.droneIds) && isLatLng(message.target)) {
     return { type: 'move', droneIds: message.droneIds, target: message.target };
+  }
+  if (message.type === 'heading' && isDroneIds(message.droneIds) && isFiniteNumber(message.headingDeg) && message.headingDeg >= 0 && message.headingDeg < 360) {
+    return { type: 'heading', droneIds: message.droneIds, headingDeg: message.headingDeg };
   }
   return null;
 }

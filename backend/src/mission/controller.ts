@@ -2,7 +2,7 @@ import type { ClientMessage, LatLng, MissionArea, ServerMessage, StartLayout } f
 import { BOOT_MS, buildSchedule, CONNECT_MS, DroneSchedule, resolveStarts } from './schedule.js';
 import { buildTelemetry } from './telemetry.js';
 import { droneStateAt } from './schedule.js';
-import { CLIMB_RATE_MS, DRONE_SPEED_MS, formationTargets, GROUND_AMSL_M, HOVER_ALT_M, stepToward, TICK_MS } from './kinematics.js';
+import { advanceAlong, CLIMB_RATE_MS, DRONE_SPEED_MS, formationTargets, GROUND_AMSL_M, HOVER_ALT_M, stepToward, TICK_MS } from './kinematics.js';
 
 // Interval between "booting" progress messages, simulated ms.
 export const PROGRESS_STEP_MS = 1000;
@@ -18,6 +18,8 @@ interface DroneState {
   position: LatLng;
   heading: number;
   target: LatLng | null;
+  /** Course in degrees when flying a heading instead of a target. */
+  course: number | null;
   altitudeM: number;
 }
 
@@ -55,7 +57,7 @@ export function createMissionController(
       broadcast({ type: 'drone_boot', droneId: entry.droneId, status: 'connecting', progress: 0 }),
     );
     later(entry.startAtMs + BOOT_MS + CONNECT_MS, () => {
-      drones.set(entry.droneId, { position: entry.start, heading: 0, target: null, altitudeM: GROUND_AMSL_M });
+      drones.set(entry.droneId, { position: entry.start, heading: 0, target: null, course: null, altitudeM: GROUND_AMSL_M });
       broadcast({ type: 'drone_online', telemetry: buildTelemetry(entry, now()) });
     });
   }
@@ -65,19 +67,24 @@ export function createMissionController(
     for (const [droneId, drone] of drones) {
       const climbing = drone.altitudeM < GROUND_AMSL_M + HOVER_ALT_M;
       if (climbing) drone.altitudeM = Math.min(GROUND_AMSL_M + HOVER_ALT_M, drone.altitudeM + CLIMB_RATE_MS * (TICK_MS / 1000));
-      if (!drone.target && !climbing) continue;
+      const moving = drone.target !== null || drone.course !== null;
+      if (!moving && !climbing) continue;
+      const stepM = DRONE_SPEED_MS * (TICK_MS / 1000);
       if (drone.target) {
-        const step = stepToward(drone.position, drone.target, DRONE_SPEED_MS * (TICK_MS / 1000));
+        const step = stepToward(drone.position, drone.target, stepM);
         drone.position = step.position;
         drone.heading = step.heading;
         if (step.arrived) drone.target = null;
+      } else if (drone.course !== null) {
+        drone.position = advanceAlong(drone.position, drone.course, stepM);
+        drone.heading = drone.course;
       }
       broadcast({
         type: 'position',
         droneId,
         position: drone.position,
         heading: drone.heading,
-        speedMs: drone.target ? DRONE_SPEED_MS : 0,
+        speedMs: drone.target || drone.course !== null ? DRONE_SPEED_MS : 0,
         altitudeM: drone.altitudeM,
       });
     }
@@ -88,8 +95,21 @@ export function createMissionController(
     const targets = formationTargets(target, online.length);
     online.forEach((id, i) => {
       const drone = drones.get(id);
-      if (drone) drone.target = targets[i];
+      if (drone) {
+        drone.target = targets[i];
+        drone.course = null;
+      }
     });
+  }
+
+  function setHeading(droneIds: string[], headingDeg: number) {
+    for (const id of droneIds) {
+      const drone = drones.get(id);
+      if (drone) {
+        drone.course = headingDeg;
+        drone.target = null;
+      }
+    }
   }
 
   function start(area: MissionArea, layout: StartLayout) {
@@ -146,7 +166,8 @@ export function createMissionController(
       else if (message.type === 'mission_reset') {
         stop();
         broadcast({ type: 'mission_reset' });
-      } else if (running) move(message.droneIds, message.target);
+      } else if (running && message.type === 'move') move(message.droneIds, message.target);
+      else if (running && message.type === 'heading') setHeading(message.droneIds, message.headingDeg);
     },
     dispose: stop,
   };

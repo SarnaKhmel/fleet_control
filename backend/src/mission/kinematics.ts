@@ -26,3 +26,9 @@ export function stepToward(from: LatLng, to: LatLng, maxStepM: number): { positi
 export function formationTargets(center: LatLng, count: number): LatLng[] {
   return Array.from({ length: count }, (_, i) => offsetLatLng(center, (i - (count - 1) / 2) * FORMATION_SPACING_M, 0));
 }
+
+/** A point `distanceM` meters from `from` along a bearing (degrees clockwise from north). */
+export function advanceAlong(from: LatLng, headingDeg: number, distanceM: number): LatLng {
+  const rad = (headingDeg * Math.PI) / 180;
+  return offsetLatLng(from, distanceM * Math.sin(rad), distanceM * Math.cos(rad));
+}

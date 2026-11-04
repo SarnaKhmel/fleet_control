@@ -40,4 +40,10 @@ describe('parseClientMessage', () => {
     expect(parseClientMessage({ ...move, droneIds: ['a', 'b', 'c', 'd'] })).toBeNull();
     expect(parseClientMessage({ ...move, target: { lat: 99, lng: 0 } })).toBeNull();
   });
+
+  it('accepts a heading command and rejects an out-of-range heading', () => {
+    const heading = { type: 'heading', droneIds: ['drone-1'], headingDeg: 45 };
+    expect(parseClientMessage(heading)).toEqual(heading);
+    expect(parseClientMessage({ ...heading, headingDeg: 360 })).toBeNull();
+  });
 });

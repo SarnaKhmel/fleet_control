@@ -108,4 +108,19 @@ describe('mission controller', () => {
     expect(snap.type === 'mission_snapshot' && snap.drones.map((d) => d.callsign)).toEqual(['BA-01', 'BA-02', 'BA-03']);
     mission.dispose();
   });
+
+  it('flies a drone on a heading until it is given something else', () => {
+    const mission = createMissionController((m) => sent.push(m));
+    mission.handle({ type: 'mission_start', area, layout: single });
+    vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
+    sent = [];
+    mission.handle({ type: 'heading', droneIds: ['drone-1'], headingDeg: 0 });
+    vi.advanceTimersByTime(3000);
+    const moves = sent.filter((m) => m.type === 'position' && m.droneId === 'drone-1');
+    expect(moves.length).toBeGreaterThanOrEqual(3);
+    const last = moves[moves.length - 1];
+    expect(last.type === 'position' && last.position.lat).toBeGreaterThan(50);
+    expect(last.type === 'position' && last.heading).toBe(0);
+    mission.dispose();
+  });
 });
