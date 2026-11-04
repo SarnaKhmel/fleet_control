@@ -25,7 +25,7 @@ import { fitMissionZone } from '../mission/zoneView';
 import { areaRing } from '../../../shared/mission/area';
 import { useSymbolStyleStore } from '../mission/symbolStyle';
 import { useFrontLineStore } from '../frontline/frontLine';
-import { CONTROL_POINT_SIDC, natoElement } from '../symbology/nato';
+import { locationPinElement } from './locationPin';
 
 function applyBuildingVisibility(map: MapLibreMap, on: boolean) {
   if (map.getLayer(BUILDINGS_LAYER_ID)) {
@@ -160,8 +160,10 @@ export function MapView() {
       );
     });
     registerViewReset(() => {
+      // Back to the selected location if there is one, otherwise to the default center.
+      const home = useLocationStore.getState().selected ?? DEFAULT_CENTER;
       map.easeTo({
-        center: [DEFAULT_CENTER.lng, DEFAULT_CENTER.lat],
+        center: [home.lng, home.lat],
         zoom: DEFAULT_ZOOM,
         bearing: 0,
         pitch: useMapViewStore.getState().buildings3d ? TILT_3D_PITCH : 0,
@@ -273,7 +275,7 @@ export function MapView() {
     if (markerRef.current) {
       markerRef.current.setLngLat(lngLat);
     } else {
-      markerRef.current = new Marker({ element: natoElement(CONTROL_POINT_SIDC, 28), anchor: 'center' })
+      markerRef.current = new Marker({ element: locationPinElement(), anchor: 'bottom' })
         .setLngLat(lngLat)
         .addTo(map);
     }
