@@ -17,7 +17,7 @@ import { syncMissionArea } from '../mission/missionLayer';
 import { effectiveCenter, useMissionStore } from '../mission/missionStore';
 import { syncStartMarkers } from '../mission/startMarkers';
 import { syncDroneMarkers } from '../mission/droneMarkers';
-import { moveOnlineDrones } from '../mission/missionSocket';
+import { headOnlineDronesToward, moveOnlineDrones } from '../mission/missionSocket';
 import { dronesInScreenBox, useSelectionStore, type ScreenPoint } from '../mission/selection';
 import { boxesOverlap, boxOf, registerZoneFitter, zoneBoxOf } from '../mission/zoneView';
 import { registerViewReset } from './viewReset';
@@ -136,6 +136,8 @@ export function MapView() {
       if (mission.drawing) mission.drawClick(point);
       else if (mission.picking) mission.addPoint(point);
       else if (mission.moveMode) moveOnlineDrones(point);
+      // Shift+click with drones selected sets their course toward the clicked point.
+      else if (event.originalEvent.shiftKey && useSelectionStore.getState().selectedIds.length > 0) headOnlineDronesToward(point);
       else if (useSelectionStore.getState().selectedIds.length > 0) useSelectionStore.getState().clear();
       else useLocationStore.getState().select(point);
     });
