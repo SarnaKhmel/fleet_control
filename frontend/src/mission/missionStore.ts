@@ -38,6 +38,8 @@ export interface MissionState {
   drawing: boolean;
   drawAnchor: LatLng | null;
   drawCursor: LatLng | null;
+  /** The operator has chosen the zone (drawn it or set its size or center). The default is not a choice. */
+  zoneChosen: boolean;
   /** Whether the zone is at least partly on screen (set by the map). */
   zoneVisible: boolean;
   phase: MissionPhase;
@@ -95,12 +97,13 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   drawing: false,
   drawAnchor: null,
   drawCursor: null,
+  zoneChosen: false,
   zoneVisible: true,
   phase: 'idle',
   drones: {},
   error: null,
-  setCenter: (center) => set({ center }),
-  setSize: (widthKm, heightKm) => set({ widthKm, heightKm }),
+  setCenter: (center) => set({ center, zoneChosen: true }),
+  setSize: (widthKm, heightKm) => set({ widthKm, heightKm, zoneChosen: true }),
   setLayoutKind: (layoutKind) => set({ layoutKind, points: [] }),
   setClusterRadius: (clusterRadiusM) => set({ clusterRadiusM }),
   setPicking: (picking) => set({ picking }),
@@ -113,7 +116,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
       return;
     }
     const zone = areaFromCorners(drawAnchor, point, MISSION_MAX_AREA_KM);
-    set({ ...zone, drawing: false, drawAnchor: null, drawCursor: null });
+    set({ ...zone, zoneChosen: true, drawing: false, drawAnchor: null, drawCursor: null });
   },
   setDrawCursor: (drawCursor) => set({ drawCursor }),
   setZoneVisible: (zoneVisible) => set({ zoneVisible }),

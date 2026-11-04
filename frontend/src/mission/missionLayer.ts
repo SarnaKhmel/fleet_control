@@ -28,11 +28,11 @@ export function removeMissionArea(map: MapLibreMap): void {
 }
 
 /**
- * Draws the zone only while it is being drawn or while a mission runs.
- * Before the start the zone exists in the state (for validation) but is not on the map.
+ * Draws the zone once it is chosen (drawn, or sized or centered), while it is being drawn, and while a
+ * mission runs. The untouched default zone stays off the map until the operator chooses it.
  */
 export function syncMissionArea(map: MapLibreMap, state: MissionState, theme: Theme): void {
-  if (!state.drawing && state.phase !== 'running') {
+  if (!state.drawing && state.phase !== 'running' && !state.zoneChosen) {
     removeMissionArea(map);
     return;
   }

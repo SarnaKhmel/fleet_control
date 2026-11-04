@@ -212,6 +212,7 @@ export function MapView() {
   const missionCenter = useMissionStore((state) => state.center);
   const missionPhase = useMissionStore((state) => state.phase);
   const missionDrawing = useMissionStore((state) => state.drawing);
+  const missionChosen = useMissionStore((state) => state.zoneChosen);
   // When a mission starts, bring its zone into view so the operator sees it.
   useEffect(() => {
     if (missionPhase === 'running') fitMissionZone();
@@ -227,7 +228,7 @@ export function MapView() {
     const run = () => syncMissionArea(map, useMissionStore.getState(), theme);
     if (map.isStyleLoaded()) run();
     else map.once('idle', run);
-  }, [missionCenter, missionWidth, missionHeight, missionPhase, missionDrawing, drawCursor, drawAnchor, theme]);
+  }, [missionCenter, missionWidth, missionHeight, missionPhase, missionDrawing, missionChosen, drawCursor, drawAnchor, theme]);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
