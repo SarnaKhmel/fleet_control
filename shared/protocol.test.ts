@@ -52,4 +52,23 @@ describe('parseClientMessage', () => {
     expect(parseClientMessage(route)).toEqual(route);
     expect(parseClientMessage({ ...route, points: [] })).toBeNull();
   });
+
+  it('accepts a move that appends to the tasks and rejects a non-boolean append', () => {
+    const move = { type: 'move', droneIds: ['drone-1'], target: { lat: 50.4, lng: 30.5 }, append: true };
+    expect(parseClientMessage(move)).toEqual(move);
+    expect(parseClientMessage({ ...move, append: false })).toEqual({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.4, lng: 30.5 } });
+    expect(parseClientMessage({ ...move, append: 'yes' })).toBeNull();
+  });
+
+  it('accepts hold for a list of drones', () => {
+    expect(parseClientMessage({ type: 'hold', droneIds: ['drone-1'] })).toEqual({ type: 'hold', droneIds: ['drone-1'] });
+    expect(parseClientMessage({ type: 'hold', droneIds: [] })).toBeNull();
+  });
+
+  it('accepts remove_task with a whole index inside the task limit', () => {
+    const remove = { type: 'remove_task', droneId: 'drone-1', index: 2 };
+    expect(parseClientMessage(remove)).toEqual(remove);
+    for (const index of [-1, 1.5, 10, '0', undefined]) expect(parseClientMessage({ ...remove, index })).toBeNull();
+    expect(parseClientMessage({ ...remove, droneId: '' })).toBeNull();
+  });
 });

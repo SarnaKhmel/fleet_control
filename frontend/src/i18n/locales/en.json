@@ -163,6 +163,10 @@
     "speed": "Ground speed",
     "crab": "Crab angle",
     "battery": "Battery",
-    "position": "Position"
+    "position": "Position",
+    "tasks": "Tasks",
+    "tasksEmpty": "No tasks. Click the map to send the drone, Ctrl+click to add a point.",
+    "taskRemove": "Remove task {{n}}",
+    "tasksClear": "Clear all"
   }
 }

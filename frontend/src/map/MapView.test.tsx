@@ -8,7 +8,14 @@ import { useMapIssueStore } from './mapIssue';
 import { useMapScaleStore } from './mapScaleStore';
 import { useMissionStore } from '../mission/missionStore';
 
+import { useSelectionStore } from '../mission/selection';
+import { moveOnlineDrones } from '../mission/missionSocket';
+
 vi.mock('maplibre-gl', () => import('../test/maplibreMock'));
+vi.mock('../mission/missionSocket', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../mission/missionSocket')>()),
+  moveOnlineDrones: vi.fn(),
+}));
 
 describe('MapView', () => {
   beforeEach(() => {
@@ -47,6 +54,18 @@ describe('MapView', () => {
     });
     expect(useMissionStore.getState().routePoints).toEqual([{ lat: 50.1, lng: 30.2 }]);
     useMissionStore.setState({ phase: 'idle', routeMode: false, routePoints: [] });
+  });
+
+  it('with drones selected, a click replaces their tasks and Ctrl+click appends to them', () => {
+    useMissionStore.setState({ phase: 'running', picking: false, drawing: false, routeMode: false, moveMode: false });
+    useSelectionStore.setState({ selectedIds: ['drone-1'] });
+    render(<MapView />);
+    act(() => mapInstances[0].emit('click', { lngLat: { lat: 50.1, lng: 30.2 }, originalEvent: { target: document.body } } as never));
+    expect(moveOnlineDrones).toHaveBeenLastCalledWith({ lat: 50.1, lng: 30.2 }, false);
+    act(() => mapInstances[0].emit('click', { lngLat: { lat: 50.3, lng: 30.4 }, originalEvent: { target: document.body, ctrlKey: true } } as never));
+    expect(moveOnlineDrones).toHaveBeenLastCalledWith({ lat: 50.3, lng: 30.4 }, true);
+    useSelectionStore.setState({ selectedIds: [] });
+    useMissionStore.setState({ phase: 'idle' });
   });
 
   it('adds control points after a start made with start-point picking left on', () => {

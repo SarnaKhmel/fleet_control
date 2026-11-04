@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { GROUND_AMSL_M } from '../../../shared/protocol';
 import { Accordion } from '../sidebar/Accordion';
 import type { DroneView } from '../mission/missionStore';
+import { clearDroneTasks, removeDroneTask } from '../mission/missionSocket';
 
 interface DroneDetailsProps {
   droneId: string;
@@ -38,6 +39,35 @@ export function DroneDetails({ droneId, drone, defaultOpen }: DroneDetailsProps)
           {online && drone?.position ? `${drone.position.lat.toFixed(5)}, ${drone.position.lng.toFixed(5)}` : '—'}
         </dd>
       </dl>
+      {online && (
+        <section className="drone-tasks" aria-label={t('drone.tasks')}>
+          <h4>{t('drone.tasks')}</h4>
+          {drone!.tasks.length === 0 ? (
+            <p className="muted">{t('drone.tasksEmpty')}</p>
+          ) : (
+            <>
+              <ol>
+                {drone!.tasks.map((point, index) => (
+                  <li key={`${index}-${point.lat}-${point.lng}`}>
+                    <span>{`${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`}</span>
+                    <button
+                      type="button"
+                      aria-label={t('drone.taskRemove', { n: index + 1 })}
+                      title={t('drone.taskRemove', { n: index + 1 })}
+                      onClick={() => removeDroneTask(droneId, index)}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ol>
+              <button type="button" onClick={() => clearDroneTasks(droneId)}>
+                {t('drone.tasksClear')}
+              </button>
+            </>
+          )}
+        </section>
+      )}
     </Accordion>
   );
 }

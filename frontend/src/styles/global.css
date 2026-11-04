@@ -1204,6 +1204,30 @@ body,
   text-align: right;
 }
 
+/* A drone's task list in the right panel: numbered points, each with a remove button. */
+.drone-tasks h4 {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.drone-tasks ol {
+  margin: 0 0 0.5rem;
+  padding-left: 1.25rem;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.drone-tasks li > span {
+  display: inline-block;
+  min-width: 10.5rem;
+}
+
+.drone-tasks li button {
+  padding: 0 0.4rem;
+  line-height: 1.2;
+}
+
 /* Route control points: square tags labelled K1, K2, … (start points are round and numbered). */
 .mission-control-marker {
   min-width: 26px;

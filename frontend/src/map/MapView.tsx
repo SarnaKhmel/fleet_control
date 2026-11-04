@@ -17,6 +17,7 @@ import { syncMissionArea } from '../mission/missionLayer';
 import { effectiveCenter, useMissionStore } from '../mission/missionStore';
 import { syncStartMarkers } from '../mission/startMarkers';
 import { syncDroneMarkers } from '../mission/droneMarkers';
+import { syncWaypoints } from '../mission/waypointLayer';
 import { headOnlineDronesToward, moveOnlineDrones } from '../mission/missionSocket';
 import { dronesInScreenBox, useSelectionStore, type ScreenPoint } from '../mission/selection';
 import { boxesOverlap, boxOf, registerZoneFitter, zoneBoxOf } from '../mission/zoneView';
@@ -68,6 +69,7 @@ export function MapView() {
       addBuildingsLayer(map, current);
       addBordersLayer(map, current);
       syncMissionArea(map, useMissionStore.getState(), current);
+      syncWaypoints(map, useMissionStore.getState().drones, current);
       const front = useFrontLineStore.getState();
       syncFrontLine(map, { enabled: front.enabled, zones: front.zones, theme: current });
       map.setPitch(useMapViewStore.getState().buildings3d ? TILT_3D_PITCH : 0);
@@ -136,6 +138,7 @@ export function MapView() {
       const target = event.originalEvent?.target;
       if (target instanceof Element && target.closest('.maplibregl-marker')) return;
       const point = { lat: event.lngLat.lat, lng: event.lngLat.lng };
+      const append = !!(event.originalEvent?.ctrlKey || event.originalEvent?.metaKey);
       const mission = useMissionStore.getState();
       debugLog('map click', {
         point,
@@ -147,11 +150,12 @@ export function MapView() {
       if (mission.drawing) mission.drawClick(point);
       else if (mission.picking) mission.addPoint(point);
       else if (mission.routeMode) mission.addRoutePoint(point);
-      else if (mission.moveMode) moveOnlineDrones(point);
+      // Ctrl+click (Cmd+click on a Mac) appends the point to the drones' tasks instead of replacing them.
+      else if (mission.moveMode) moveOnlineDrones(point, append);
       // Shift+click with drones selected sets their course toward the clicked point.
       else if (event.originalEvent?.shiftKey && useSelectionStore.getState().selectedIds.length > 0) headOnlineDronesToward(point);
       // With drones selected, a plain click sends them to that point (Esc clears the selection).
-      else if (useSelectionStore.getState().selectedIds.length > 0) moveOnlineDrones(point);
+      else if (useSelectionStore.getState().selectedIds.length > 0) moveOnlineDrones(point, append);
       else useLocationStore.getState().select(point);
     });
     // Tell the UI whether the mission zone is still on screen, and register the "back to zone" action.
@@ -230,7 +234,9 @@ export function MapView() {
     const map = mapRef.current;
     if (!map) return;
     droneMarkersRef.current = syncDroneMarkers(map, droneMarkersRef.current, drones, symbolStyle);
-  }, [drones, symbolStyle, selectedIds]);
+    // Paths need the style; until it loads, the style.load handler draws them.
+    if (map.isStyleLoaded()) syncWaypoints(map, drones, theme);
+  }, [drones, symbolStyle, selectedIds, theme]);
 
   // Approximate front line follows its switch, the loaded zones and the theme.
   const frontEnabled = useFrontLineStore((state) => state.enabled);

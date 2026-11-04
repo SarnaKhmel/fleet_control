@@ -56,7 +56,12 @@ export interface DroneTelemetry {
 export type ClientMessage =
   | { type: 'mission_start'; area: MissionArea; layout: StartLayout }
   | { type: 'mission_reset' }
-  | { type: 'move'; droneIds: string[]; target: LatLng }
+  /** Without `append` the target replaces the drones' tasks; with it, the target goes to the end of them. */
+  | { type: 'move'; droneIds: string[]; target: LatLng; append?: boolean }
+  /** Drops all tasks: the drones hover where they are. */
+  | { type: 'hold'; droneIds: string[] }
+  /** Drops one task (0 = the current one) from a drone's list. */
+  | { type: 'remove_task'; droneId: string; index: number }
   | { type: 'heading'; droneIds: string[]; headingDeg: number }
   | { type: 'wind'; speedMs: number; fromDeg: number }
   | { type: 'route'; droneId: string; points: LatLng[] };
@@ -77,13 +82,17 @@ export interface SnapshotDrone {
   speedMs: number;
   batteryPct: number;
   crabDeg: number;
+  /** Where the drone set off for its current task; null without tasks. */
+  origin: LatLng | null;
+  /** Points the drone still has to fly to, the current one first. */
+  tasks: LatLng[];
 }
 
 export type ServerMessage =
   | { type: 'mission_snapshot'; running: boolean; drones: SnapshotDrone[] }
   | { type: 'drone_boot'; droneId: string; status: 'booting' | 'connecting'; progress: number }
   | { type: 'drone_online'; telemetry: DroneTelemetry }
-  | { type: 'position'; droneId: string; position: LatLng; heading: number; speedMs: number; altitudeM: number; batteryPct: number; crabDeg: number }
+  | { type: 'position'; droneId: string; position: LatLng; heading: number; speedMs: number; altitudeM: number; batteryPct: number; crabDeg: number; origin: LatLng | null; tasks: LatLng[] }
   | { type: 'mission_error'; reason: MissionErrorReason }
   | { type: 'mission_reset' };
 
@@ -122,9 +131,12 @@ export function isStartLayout(value: unknown): value is StartLayout {
 }
 
 /** Returns the parsed client message, or null for anything malformed or unknown. */
-/** Control points for one drone's route: 1 to 10 valid coordinates. */
+/** Longest task list a drone keeps (a route has at most this many control points). */
+export const MAX_TASKS = 10;
+
+/** Control points for one drone's route: 1 to MAX_TASKS valid coordinates. */
 export function isLatLngList(value: unknown): value is LatLng[] {
-  return Array.isArray(value) && value.length >= 1 && value.length <= 10 && value.every(isLatLng);
+  return Array.isArray(value) && value.length >= 1 && value.length <= MAX_TASKS && value.every(isLatLng);
 }
 
 export function isDroneIds(value: unknown): value is string[] {
@@ -138,8 +150,14 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
   if (message.type === 'mission_start' && isMissionArea(message.area) && isStartLayout(message.layout)) {
     return { type: 'mission_start', area: message.area, layout: message.layout };
   }
-  if (message.type === 'move' && isDroneIds(message.droneIds) && isLatLng(message.target)) {
-    return { type: 'move', droneIds: message.droneIds, target: message.target };
+  if (message.type === 'move' && isDroneIds(message.droneIds) && isLatLng(message.target) && (message.append === undefined || typeof message.append === 'boolean')) {
+    return message.append ? { type: 'move', droneIds: message.droneIds, target: message.target, append: true } : { type: 'move', droneIds: message.droneIds, target: message.target };
+  }
+  if (message.type === 'hold' && isDroneIds(message.droneIds)) {
+    return { type: 'hold', droneIds: message.droneIds };
+  }
+  if (message.type === 'remove_task' && typeof message.droneId === 'string' && message.droneId.length > 0 && message.droneId.length <= 64 && Number.isInteger(message.index) && (message.index as number) >= 0 && (message.index as number) < MAX_TASKS) {
+    return { type: 'remove_task', droneId: message.droneId, index: message.index as number };
   }
   if (message.type === 'route' && typeof message.droneId === 'string' && message.droneId.length > 0 && isLatLngList(message.points)) {
     return { type: 'route', droneId: message.droneId, points: message.points };

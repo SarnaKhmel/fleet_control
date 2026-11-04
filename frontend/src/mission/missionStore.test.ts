@@ -32,7 +32,7 @@ describe('mission store', () => {
 
   it('applies boot messages to the roster without a position', () => {
     store().apply({ type: 'drone_boot', droneId: 'drone-1', status: 'booting', progress: 40 });
-    expect(store().drones['drone-1']).toEqual({ callsign: 'drone-1', status: 'booting', progress: 40, position: null, heading: null, altitudeM: null, speedMs: 0, batteryPct: 100, crabDeg: 0 });
+    expect(store().drones['drone-1']).toEqual({ callsign: 'drone-1', status: 'booting', progress: 40, position: null, heading: null, altitudeM: null, speedMs: 0, batteryPct: 100, crabDeg: 0, origin: null, tasks: [] });
   });
 
   it('takes the position and heading from the first telemetry', () => {
@@ -86,8 +86,8 @@ describe('mission store', () => {
 
   it('moves a known drone on position messages', () => {
     store().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
-    store().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 90, speedMs: 10, altitudeM: 210, batteryPct: 97, crabDeg: -4 });
-    expect(store().drones['drone-1']).toMatchObject({ position: { lat: 50.1, lng: 30.1 }, heading: 90 });
+    store().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 90, speedMs: 10, altitudeM: 210, batteryPct: 97, crabDeg: -4, origin: { lat: 50, lng: 30 }, tasks: [{ lat: 50.2, lng: 30.2 }] });
+    expect(store().drones['drone-1']).toMatchObject({ position: { lat: 50.1, lng: 30.1 }, heading: 90, origin: { lat: 50, lng: 30 }, tasks: [{ lat: 50.2, lng: 30.2 }] });
   });
 
   it('fixes the zone, layout and start points once the mission runs', () => {
@@ -109,7 +109,7 @@ describe('mission store', () => {
     store().apply({
       type: 'mission_snapshot',
       running: true,
-      drones: [{ droneId: 'drone-1', callsign: 'BA-01', status: 'idle', progress: 100, position: { lat: 50, lng: 30 }, heading: 10, altitudeM: 210, speedMs: 0, batteryPct: 99, crabDeg: 0 }],
+      drones: [{ droneId: 'drone-1', callsign: 'BA-01', status: 'idle', progress: 100, position: { lat: 50, lng: 30 }, heading: 10, altitudeM: 210, speedMs: 0, batteryPct: 99, crabDeg: 0, origin: null, tasks: [] }],
     });
     expect(store().phase).toBe('running');
     expect(store().drones['drone-1']).toMatchObject({ callsign: 'BA-01', status: 'idle', altitudeM: 210 });

@@ -74,16 +74,30 @@ export function sendClientMessage(message: ClientMessage): boolean {
   return true;
 }
 
-/** Sends a move for the selected online drones, or for all online drones when none is selected. */
-export function moveOnlineDrones(target: LatLng): number {
+/**
+ * Sends a move for the selected online drones, or for all online drones when none is selected.
+ * With `append` the point goes to the end of each drone's tasks instead of replacing them.
+ */
+export function moveOnlineDrones(target: LatLng, append = false): number {
   const online = Object.entries(useMissionStore.getState().drones)
     .filter(([, drone]) => drone.status === 'idle')
     .map(([id]) => id);
   const selected = useSelectionStore.getState().selectedIds;
   const droneIds = selected.length > 0 ? online.filter((id) => selected.includes(id)) : online;
-  debugLog('move click', { target, selected, online, sending: droneIds });
+  debugLog('move click', { target, append, selected, online, sending: droneIds });
   if (droneIds.length === 0) return 0;
-  return sendClientMessage({ type: 'move', droneIds, target }) ? droneIds.length : 0;
+  const message: ClientMessage = append ? { type: 'move', droneIds, target, append } : { type: 'move', droneIds, target };
+  return sendClientMessage(message) ? droneIds.length : 0;
+}
+
+/** Drops one task from a drone's list (0 = the current one). */
+export function removeDroneTask(droneId: string, index: number): boolean {
+  return sendClientMessage({ type: 'remove_task', droneId, index });
+}
+
+/** Drops all of a drone's tasks: it hovers where it is. */
+export function clearDroneTasks(droneId: string): boolean {
+  return sendClientMessage({ type: 'hold', droneIds: [droneId] });
 }
 
 /**
