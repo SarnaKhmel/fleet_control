@@ -5,6 +5,46 @@
   "header": {
     "language": "Language",
     "switchToLight": "Light theme",
-    "switchToDark": "Dark theme"
+    "switchToDark": "Dark theme",
+    "coordinates": "Coordinates",
+    "coordinatesPlaceholder": "50.45, 30.52 or city name",
+    "go": "Go",
+    "coordinatesInvalid": "Enter coordinates (lat, lng) or a city name",
+    "mapView": "Map view",
+    "mapAuto": "Map: by theme",
+    "mapLandscape": "Map: landscape",
+    "buildings3dOn": "3D buildings: on",
+    "buildings3dOff": "3D buildings: off",
+    "cityNotFound": "City not found",
+    "geocodeError": "Search failed, try again"
+  },
+  "map": {
+    "label": "Map"
+  },
+  "location": {
+    "title": "Location",
+    "hint": "Click the map to choose a location.",
+    "clear": "Clear",
+    "save": "Save",
+    "saved": "Saved locations",
+    "remove": "Remove",
+    "noSaved": "No saved locations yet.",
+    "ground": "Ground elevation: {{m}} m"
+  },
+  "wind": {
+    "title": "Wind",
+    "label": "{{speed}} m/s toward {{dir}} ({{deg}}°)",
+    "loading": "Loading wind…",
+    "unavailable": "Wind unavailable"
+  },
+  "compass": {
+    "N": "N",
+    "NE": "NE",
+    "E": "E",
+    "SE": "SE",
+    "S": "S",
+    "SW": "SW",
+    "W": "W",
+    "NW": "NW"
   }
 }
