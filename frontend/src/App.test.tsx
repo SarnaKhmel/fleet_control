@@ -47,8 +47,10 @@ describe('App', () => {
 
     act(() => {
       mapInstances[0].emit('click', { lngLat: { lat: 50.5, lng: 30.25 } });
+      mapInstances[0].emit('idle', {} as never);
     });
     expect(screen.getByText('50.50000, 30.25000')).toBeTruthy();
+    expect(screen.getByText('Ground elevation: 180 m')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
     expect(screen.getByText('Click the map to choose a location.')).toBeTruthy();

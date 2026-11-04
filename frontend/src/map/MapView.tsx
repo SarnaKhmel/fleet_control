@@ -7,6 +7,7 @@ import { useThemeStore } from '../theme/themeStore';
 import { useLocationStore } from '../location/locationStore';
 import { DEFAULT_CENTER, DEFAULT_ZOOM, mapStyleFor, useMapViewStore } from './mapStyles';
 import { addBuildingsLayer, BUILDINGS_LAYER_ID, BUILDING_COLORS, TILT_3D_PITCH } from './buildings';
+import { addTerrain, groundElevationAt } from './terrain';
 import { CONTROL_POINT_SIDC, natoElement } from '../symbology/nato';
 
 function applyBuildingVisibility(map: MapLibreMap, on: boolean) {
@@ -39,6 +40,7 @@ export function MapView() {
     // Style changes (theme, map view) drop custom layers, so re-add them on every style load.
     map.on('style.load', () => {
       const current = useThemeStore.getState().theme;
+      addTerrain(map);
       addBuildingsLayer(map, current);
       map.setPitch(useMapViewStore.getState().buildings3d ? TILT_3D_PITCH : 0);
       applyBuildingVisibility(map, useMapViewStore.getState().buildings3d);
@@ -94,6 +96,11 @@ export function MapView() {
       markerRef.current = null;
       return;
     }
+    // Terrain tiles load asynchronously: read the elevation now and again once the map is idle.
+    const readGround = () => useLocationStore.getState().setGround(groundElevationAt(map, selected));
+    readGround();
+    map.once('idle', readGround);
+
     const lngLat: [number, number] = [selected.lng, selected.lat];
     if (markerRef.current) {
       markerRef.current.setLngLat(lngLat);

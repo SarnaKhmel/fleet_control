@@ -28,7 +28,8 @@
     "save": "Save",
     "saved": "Saved locations",
     "remove": "Remove",
-    "noSaved": "No saved locations yet."
+    "noSaved": "No saved locations yet.",
+    "ground": "Ground elevation: {{m}} m"
   },
   "wind": {
     "title": "Wind",

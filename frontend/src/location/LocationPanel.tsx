@@ -4,6 +4,7 @@ import { formatLatLng, useLocationStore } from './locationStore';
 export function LocationPanel() {
   const { t } = useTranslation();
   const selected = useLocationStore((state) => state.selected);
+  const groundM = useLocationStore((state) => state.groundM);
   const saved = useLocationStore((state) => state.saved);
   const { clear, save, choose, removeSaved } = useLocationStore.getState();
 
@@ -13,6 +14,7 @@ export function LocationPanel() {
       {selected ? (
         <>
           <p className="location-coords">{formatLatLng(selected)}</p>
+          {groundM !== null && <p className="muted">{t('location.ground', { m: Math.round(groundM) })}</p>}
           <div className="location-actions">
             <button type="button" onClick={save}>
               {t('location.save')}

@@ -10,6 +10,8 @@ export class FakeMap {
   lastFlyTo: { center: [number, number]; zoom: number } | null = null;
   layers: Record<string, { id: string; visibility?: string; color?: string }> = {};
   pitch = 0;
+  sources: Record<string, object> = {};
+  terrain: object | null = null;
 
   constructor(options: { style: string }) {
     this.style = options.style;
@@ -24,6 +26,21 @@ export class FakeMap {
   }
   setStyle(style: string) {
     this.style = style;
+  }
+  getSource(id: string) {
+    return this.sources[id];
+  }
+  addSource(id: string, spec: object) {
+    this.sources[id] = spec;
+  }
+  setTerrain(terrain: object | null) {
+    this.terrain = terrain;
+  }
+  queryTerrainElevation(_lngLat: [number, number]) {
+    return 180;
+  }
+  once(event: string, handler: Handler) {
+    return this.on(event, handler);
   }
   getLayer(id: string) {
     return this.layers[id];

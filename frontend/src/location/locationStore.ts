@@ -10,6 +10,9 @@ export const SAVED_LOCATIONS_KEY = 'fleet.savedLocations';
 
 interface LocationState {
   selected: LatLng | null;
+  /** Terrain elevation at `selected` in meters above sea level, once known. */
+  groundM: number | null;
+  setGround: (meters: number | null) => void;
   /** Bumps when a location is chosen outside the map (header, saved list): the map flies there. */
   focusTick: number;
   saved: LatLng[];
@@ -30,11 +33,13 @@ export const useLocationStore = create<LocationState>()(
   persist(
     (set, get) => ({
       selected: null,
+      groundM: null,
+      setGround: (groundM) => set({ groundM }),
       focusTick: 0,
       saved: [],
-      select: (point) => set({ selected: point }),
-      choose: (point) => set({ selected: point, focusTick: get().focusTick + 1 }),
-      clear: () => set({ selected: null }),
+      select: (point) => set({ selected: point, groundM: null }),
+      choose: (point) => set({ selected: point, groundM: null, focusTick: get().focusTick + 1 }),
+      clear: () => set({ selected: null, groundM: null }),
       save: () => {
         const { selected, saved } = get();
         if (!selected || saved.some((item) => sameSpot(item, selected))) return;
