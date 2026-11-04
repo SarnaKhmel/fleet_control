@@ -337,3 +337,16 @@ body,
   outline: 3px solid var(--warning);
   outline-offset: 2px;
 }
+
+.map-issue {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 0.5rem 0.9rem;
+  background: var(--panel);
+  color: var(--warning);
+  border: 1px solid var(--warning);
+  border-radius: 6px;
+}

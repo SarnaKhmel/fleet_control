@@ -4,6 +4,7 @@ import { useThemeStore } from '../theme/themeStore';
 import { useLocationStore } from '../location/locationStore';
 import { mapInstances } from '../test/maplibreMock';
 import { useMapViewStore } from './mapStyles';
+import { useMapIssueStore } from './mapIssue';
 
 vi.mock('maplibre-gl', () => import('../test/maplibreMock'));
 
@@ -62,5 +63,29 @@ describe('3D buildings', () => {
     act(() => useMapViewStore.getState().setBuildings3d(false));
     expect(mapInstances[0].getLayer('3d-buildings')?.visibility).toBe('none');
     expect(mapInstances[0].pitch).toBe(0);
+  });
+
+  it('shows a banner when terrain fails, and clears it on the next style load', () => {
+    render(<MapView />);
+    act(() => mapInstances[0].emit('error', { sourceId: 'terrain-dem', error: new Error('x') } as never));
+    expect(useMapIssueStore.getState().issue).toBe('terrain');
+    act(() => mapInstances[0].emit('style.load', {} as never));
+    expect(useMapIssueStore.getState().issue).toBeNull();
+  });
+
+  it('flags a style failure and ignores tile errors', () => {
+    render(<MapView />);
+    act(() => mapInstances[0].emit('error', { sourceId: 'openmaptiles', error: new Error('tile') } as never));
+    expect(useMapIssueStore.getState().issue).toBeNull();
+    act(() => mapInstances[0].emit('error', { error: new Error('style') } as never));
+    expect(useMapIssueStore.getState().issue).toBe('style');
+    useMapIssueStore.setState({ issue: null });
+  });
+
+  it('refreshes ground elevation on idle', () => {
+    render(<MapView />);
+    act(() => useLocationStore.getState().select({ lat: 50, lng: 30 }));
+    act(() => mapInstances[0].emit('idle', {} as never));
+    expect(useLocationStore.getState().groundM).toBe(180);
   });
 });

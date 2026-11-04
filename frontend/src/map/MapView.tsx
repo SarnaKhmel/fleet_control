@@ -7,7 +7,8 @@ import { useThemeStore } from '../theme/themeStore';
 import { useLocationStore } from '../location/locationStore';
 import { DEFAULT_CENTER, DEFAULT_ZOOM, mapStyleFor, useMapViewStore } from './mapStyles';
 import { addBuildingsLayer, BUILDINGS_LAYER_ID, BUILDING_COLORS, TILT_3D_PITCH } from './buildings';
-import { addTerrain, groundElevationAt } from './terrain';
+import { addTerrain, groundElevationAt, TERRAIN_SOURCE_ID } from './terrain';
+import { useMapIssueStore } from './mapIssue';
 import { CONTROL_POINT_SIDC, natoElement } from '../symbology/nato';
 
 function applyBuildingVisibility(map: MapLibreMap, on: boolean) {
@@ -39,11 +40,23 @@ export function MapView() {
     });
     // Style changes (theme, map view) drop custom layers, so re-add them on every style load.
     map.on('style.load', () => {
+      useMapIssueStore.getState().setIssue(null);
       const current = useThemeStore.getState().theme;
       addTerrain(map);
       addBuildingsLayer(map, current);
       map.setPitch(useMapViewStore.getState().buildings3d ? TILT_3D_PITCH : 0);
       applyBuildingVisibility(map, useMapViewStore.getState().buildings3d);
+    });
+    // Elevation is re-read after every idle, so it follows the map once tiles arrive.
+    map.on('idle', () => {
+      const point = useLocationStore.getState().selected;
+      if (point) useLocationStore.getState().setGround(groundElevationAt(map, point));
+    });
+    map.on('error', (event) => {
+      // MapLibre reports the failing source; errors without one come from the style itself.
+      const sourceId = (event as { sourceId?: string }).sourceId;
+      if (sourceId === TERRAIN_SOURCE_ID) useMapIssueStore.getState().setIssue('terrain');
+      else if (!sourceId) useMapIssueStore.getState().setIssue('style');
     });
     map.on('click', (event) => {
       useLocationStore.getState().select({ lat: event.lngLat.lat, lng: event.lngLat.lng });
@@ -96,10 +109,8 @@ export function MapView() {
       markerRef.current = null;
       return;
     }
-    // Terrain tiles load asynchronously: read the elevation now and again once the map is idle.
-    const readGround = () => useLocationStore.getState().setGround(groundElevationAt(map, selected));
-    readGround();
-    map.once('idle', readGround);
+    // Read now; the idle handler keeps it current once terrain tiles arrive.
+    useLocationStore.getState().setGround(groundElevationAt(map, selected));
 
     const lngLat: [number, number] = [selected.lng, selected.lat];
     if (markerRef.current) {

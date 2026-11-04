@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useLocationStore } from '../location/locationStore';
-import { startWindSync, WIND_DEBOUNCE_MS } from './windSync';
+import { clearWindCache, startWindSync, syncWindAt, WIND_DEBOUNCE_MS } from './windSync';
 
 describe('wind debounce', () => {
   beforeEach(() => {
@@ -32,5 +32,21 @@ describe('wind debounce', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0][0])).toContain('latitude=3');
+  });
+});
+
+describe('wind cache', () => {
+  beforeEach(() => clearWindCache());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('reuses a recent reading for the same place', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ current: { wind_speed_10m: 4, wind_direction_10m: 90 } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await syncWindAt({ lat: 50.4501, lng: 30.5234 });
+    await syncWindAt({ lat: 50.4502, lng: 30.5235 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
