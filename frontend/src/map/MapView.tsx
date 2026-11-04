@@ -137,7 +137,7 @@ export function MapView() {
       else if (mission.picking) mission.addPoint(point);
       else if (mission.moveMode) moveOnlineDrones(point);
       // Shift+click with drones selected sets their course toward the clicked point.
-      else if (event.originalEvent.shiftKey && useSelectionStore.getState().selectedIds.length > 0) headOnlineDronesToward(point);
+      else if (event.originalEvent?.shiftKey && useSelectionStore.getState().selectedIds.length > 0) headOnlineDronesToward(point);
       else if (useSelectionStore.getState().selectedIds.length > 0) useSelectionStore.getState().clear();
       else useLocationStore.getState().select(point);
     });
