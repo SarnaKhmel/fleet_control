@@ -25,6 +25,11 @@ describe('parseServerMessage', () => {
     expect(parseServerMessage(JSON.stringify(warning))).toEqual(warning);
   });
 
+  it('accepts new seen ground', () => {
+    const recon = { type: 'recon_cells', grid: { origin: { lat: 50, lng: 30 }, cellM: 100 }, cells: [[0, 1]] };
+    expect(parseServerMessage(JSON.stringify(recon))).toEqual(recon);
+  });
+
   it('drops unknown types, bad JSON and non-strings', () => {
     expect(parseServerMessage(JSON.stringify({ type: 'move' }))).toBeNull();
     expect(parseServerMessage('{not json')).toBeNull();

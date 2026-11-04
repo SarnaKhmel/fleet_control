@@ -11,6 +11,7 @@ import { turnNorthUp } from './viewReset';
 import { useMissionStore } from '../mission/missionStore';
 import { WAYPOINT_SOURCE_ID } from '../mission/waypointLayer';
 import { CAMERA_SOURCE_ID } from '../mission/cameraLayer';
+import { RECON_SOURCE_ID } from '../mission/reconLayer';
 
 import { useSelectionStore } from '../mission/selection';
 import { moveOnlineDrones } from '../mission/missionSocket';
@@ -121,7 +122,20 @@ describe('MapView', () => {
     expect(map.getSource(WAYPOINT_SOURCE_ID)).toBeTruthy();
     expect(map.getLayer('drone-waypoints-line')).toBeTruthy();
     expect(map.getSource(CAMERA_SOURCE_ID)).toBeTruthy();
+    expect(map.getSource(RECON_SOURCE_ID)).toBeTruthy();
     loaded.mockRestore();
+  });
+
+  it('draws newly seen ground as it arrives', () => {
+    useMissionStore.setState({ phase: 'running', drones: {}, reconGrid: null, reconCells: [] });
+    render(<MapView />);
+    const map = mapInstances[0];
+    const setData = vi.fn();
+    map.sources[RECON_SOURCE_ID] = { setData };
+    map.layers['recon-area-fill'] = { id: 'recon-area-fill' };
+    act(() => useMissionStore.getState().apply({ type: 'recon_cells', grid: { origin: { lat: 50, lng: 30 }, cellM: 100 }, cells: [[0, 0], [1, 0]] }));
+    expect(setData).toHaveBeenLastCalledWith(expect.objectContaining({ features: [expect.objectContaining({ geometry: expect.objectContaining({ type: 'Polygon' }) })] }));
+    useMissionStore.setState({ phase: 'idle', drones: {}, reconGrid: null, reconCells: [] });
   });
 
   it('updates drone paths while map tiles are still loading', () => {

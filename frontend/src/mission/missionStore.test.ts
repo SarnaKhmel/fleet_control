@@ -148,6 +148,20 @@ describe('mission store', () => {
     expect(store().drones['drone-1']).toMatchObject({ status: 'destroyed', cause: 'collision' });
   });
 
+  it('collects the seen ground, takes it whole from a snapshot and forgets it on reset or a new start', () => {
+    const grid = { origin: { lat: 50, lng: 30 }, cellM: 100 };
+    store().apply({ type: 'recon_cells', grid, cells: [[0, 1], [0, 2]] });
+    store().apply({ type: 'recon_cells', grid, cells: [[1, 2]] });
+    expect(store()).toMatchObject({ reconGrid: grid, reconCells: [[0, 1], [0, 2], [1, 2]] });
+    store().apply({ type: 'mission_snapshot', running: true, droneCount: 3, drones: [], recon: { grid, cells: [[7, 7]] } });
+    expect(store().reconCells).toEqual([[7, 7]]);
+    store().apply({ type: 'mission_reset' });
+    expect(store()).toMatchObject({ reconGrid: null, reconCells: [] });
+    store().apply({ type: 'recon_cells', grid, cells: [[0, 1]] });
+    store().markStarting();
+    expect(store()).toMatchObject({ reconGrid: null, reconCells: [] });
+  });
+
   it('treats missing or malformed task lists from the server as empty', () => {
     store().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
     store().apply({ type: 'drone_tasks', droneId: 'drone-1', trail: 'x', tasks: [{ lat: 'a' }] } as never);

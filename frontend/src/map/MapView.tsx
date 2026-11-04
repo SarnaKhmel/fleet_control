@@ -20,6 +20,7 @@ import { syncDroneMarkers } from '../mission/droneMarkers';
 import { addWaypointLayer, syncWaypoints } from '../mission/waypointLayer';
 import { addCameraLayer, syncCamera } from '../mission/cameraLayer';
 import { addRangeLayer, syncRange } from '../mission/rangeLayer';
+import { addReconLayer, syncRecon } from '../mission/reconLayer';
 import { useWindStore } from '../wind/windStore';
 import { syncTaskMarkers } from '../mission/taskMarkers';
 import { headOnlineDronesToward, moveOnlineDrones } from '../mission/missionSocket';
@@ -72,6 +73,9 @@ export function MapView() {
       syncMissionArea(map, useMissionStore.getState(), current);
       const { drones } = useMissionStore.getState();
       const { selectedIds } = useSelectionStore.getState();
+      const { reconGrid, reconCells } = useMissionStore.getState();
+      addReconLayer(map, current);
+      syncRecon(map, reconGrid, reconCells, current);
       addCameraLayer(map, current);
       syncCamera(map, drones, selectedIds, current);
       addRangeLayer(map, current);
@@ -258,6 +262,14 @@ export function MapView() {
       useThemeStore.subscribe(sync),
       useWindStore.subscribe((state, previous) => {
         if (state.wind !== previous.wind) sync();
+      }),
+      // The seen ground changes about once a second while drones fly; it has its own layer and update.
+      useMissionStore.subscribe((state, previous) => {
+        if (state.reconCells !== previous.reconCells) syncRecon(map, state.reconGrid, state.reconCells, useThemeStore.getState().theme);
+      }),
+      useThemeStore.subscribe((state) => {
+        const { reconGrid, reconCells } = useMissionStore.getState();
+        syncRecon(map, reconGrid, reconCells, state.theme);
       }),
     ];
     return () => unsubscribe.forEach((stop) => stop());

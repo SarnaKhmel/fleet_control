@@ -16,6 +16,7 @@ import {
   type StartLayout,
 } from '../../../shared/protocol';
 import { areaFromCorners, areaRing, isInsideArea } from '../../../shared/mission/area';
+import type { ReconCell, ReconGrid } from '../../../shared/mission/recon';
 import { DEFAULT_CENTER } from '../map/mapStyles';
 import { useLocationStore } from '../location/locationStore';
 
@@ -72,6 +73,10 @@ export interface MissionState {
   zoneVisible: boolean;
   phase: MissionPhase;
   drones: Record<string, DroneView>;
+  /** Grid of the ground the drone cameras have seen; null until the server sends some. */
+  reconGrid: ReconGrid | null;
+  /** Cells seen so far, each once (the server sends only new ones). */
+  reconCells: ReconCell[];
   error: MissionErrorReason | null;
   setCenter: (center: LatLng | null) => void;
   setSize: (widthKm: number, heightKm: number) => void;
@@ -143,6 +148,8 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   zoneVisible: true,
   phase: 'idle',
   drones: {},
+  reconGrid: null,
+  reconCells: [],
   error: null,
   setCenter: (center) => (locked(get) ? undefined : set({ center, zoneChosen: true })),
   setSize: (widthKm, heightKm) => (locked(get) ? undefined : set({ widthKm, heightKm, zoneChosen: true })),
@@ -177,7 +184,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   },
   clearPoints: () => (locked(get) ? undefined : set({ points: [] })),
   // Setup modes end with the start: their buttons lock, and a left-on mode would swallow every map click.
-  markStarting: () => set({ phase: 'running', drones: {}, error: null, picking: false, drawing: false, drawAnchor: null, drawCursor: null }),
+  markStarting: () => set({ phase: 'running', drones: {}, reconGrid: null, reconCells: [], error: null, picking: false, drawing: false, drawAnchor: null, drawCursor: null }),
   apply: (message) => {
     switch (message.type) {
       case 'drone_boot': {
@@ -285,6 +292,9 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
         set({ drones: { ...get().drones, [message.droneId]: { ...drone, status: message.status, cause: message.cause ?? null } } });
         return;
       }
+      case 'recon_cells':
+        set({ reconGrid: message.grid, reconCells: [...get().reconCells, ...message.cells] });
+        return;
       case 'mission_snapshot': {
         const drones: Record<string, DroneView> = {};
         for (const d of message.drones) {
@@ -308,14 +318,21 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
           };
         }
         // A running mission's fleet size is the server's; when none runs, keep the operator's choice.
-        set({ phase: message.running ? 'running' : 'idle', drones, error: null, ...(message.running ? { droneCount: message.droneCount } : {}) });
+        set({
+          phase: message.running ? 'running' : 'idle',
+          drones,
+          error: null,
+          reconGrid: message.recon?.grid ?? null,
+          reconCells: message.recon?.cells ?? [],
+          ...(message.running ? { droneCount: message.droneCount } : {}),
+        });
         return;
       }
       case 'mission_error':
         set({ phase: 'idle', error: message.reason });
         return;
       case 'mission_reset':
-        set({ phase: 'idle', drones: {}, error: null });
+        set({ phase: 'idle', drones: {}, reconGrid: null, reconCells: [], error: null });
         return;
     }
   },
