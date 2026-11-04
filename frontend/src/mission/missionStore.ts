@@ -183,6 +183,21 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
         });
         return;
       }
+      case 'mission_snapshot': {
+        const drones: Record<string, DroneView> = {};
+        for (const d of message.drones) {
+          drones[d.droneId] = {
+            callsign: d.callsign,
+            status: d.status,
+            progress: d.progress,
+            position: d.position,
+            heading: d.heading,
+            altitudeM: d.altitudeM,
+          };
+        }
+        set({ phase: message.running ? 'running' : 'idle', drones, error: null });
+        return;
+      }
       case 'mission_error':
         set({ phase: 'idle', error: message.reason });
         return;

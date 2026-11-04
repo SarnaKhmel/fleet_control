@@ -85,4 +85,17 @@ describe('mission store', () => {
     expect(store().points).toHaveLength(1);
     expect(store().drawing).toBe(false);
   });
+
+  it('adopts the server snapshot after a reconnect', () => {
+    store().apply({
+      type: 'mission_snapshot',
+      running: true,
+      drones: [{ droneId: 'drone-1', callsign: 'BA-01', status: 'idle', progress: 100, position: { lat: 50, lng: 30 }, heading: 10, altitudeM: 210 }],
+    });
+    expect(store().phase).toBe('running');
+    expect(store().drones['drone-1']).toMatchObject({ callsign: 'BA-01', status: 'idle', altitudeM: 210 });
+    store().apply({ type: 'mission_snapshot', running: false, drones: [] });
+    expect(store().phase).toBe('idle');
+    expect(store().drones).toEqual({});
+  });
 });

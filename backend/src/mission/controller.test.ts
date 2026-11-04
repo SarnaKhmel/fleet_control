@@ -97,4 +97,15 @@ describe('mission controller', () => {
     expect(last && last.type === 'position' && last.altitudeM).toBe(210);
     mission.dispose();
   });
+
+  it('gives a snapshot of a running mission and an empty one when idle', () => {
+    const mission = createMissionController((m) => sent.push(m));
+    expect(mission.snapshot()).toEqual({ type: 'mission_snapshot', running: false, drones: [] });
+    mission.handle({ type: 'mission_start', area, layout: single });
+    vi.advanceTimersByTime(BOOT_MS + CONNECT_MS + 2000);
+    const snap = mission.snapshot();
+    expect(snap.type === 'mission_snapshot' && snap.running).toBe(true);
+    expect(snap.type === 'mission_snapshot' && snap.drones.map((d) => d.callsign)).toEqual(['BA-01', 'BA-02', 'BA-03']);
+    mission.dispose();
+  });
 });

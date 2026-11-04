@@ -62,7 +62,19 @@ export type ClientMessage =
 
 export type MissionErrorReason = 'outside_area' | 'already_running';
 
+/** One drone as seen by a client that connects in the middle of a mission. */
+export interface SnapshotDrone {
+  droneId: string;
+  callsign: string;
+  status: 'booting' | 'connecting' | 'idle';
+  progress: number;
+  position: LatLng | null;
+  heading: number | null;
+  altitudeM: number | null;
+}
+
 export type ServerMessage =
+  | { type: 'mission_snapshot'; running: boolean; drones: SnapshotDrone[] }
   | { type: 'drone_boot'; droneId: string; status: 'booting' | 'connecting'; progress: number }
   | { type: 'drone_online'; telemetry: DroneTelemetry }
   | { type: 'position'; droneId: string; position: LatLng; heading: number; speedMs: number; altitudeM: number }

@@ -17,6 +17,8 @@ export function createServer(port = DEFAULT_PORT): WebSocketServer {
   const mission = createMissionController(broadcast);
 
   wss.on('connection', (socket) => {
+    // A client that connects or reconnects during a mission gets the current state first.
+    socket.send(JSON.stringify(mission.snapshot()));
     socket.on('message', (raw) => {
       let parsed: unknown;
       try {
