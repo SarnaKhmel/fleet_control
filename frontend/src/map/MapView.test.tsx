@@ -5,6 +5,7 @@ import { useLocationStore } from '../location/locationStore';
 import { mapInstances } from '../test/maplibreMock';
 import { useMapViewStore } from './mapStyles';
 import { useMapIssueStore } from './mapIssue';
+import { useMapScaleStore } from './mapScaleStore';
 
 vi.mock('maplibre-gl', () => import('../test/maplibreMock'));
 
@@ -87,5 +88,11 @@ describe('3D buildings', () => {
     act(() => useLocationStore.getState().select({ lat: 50, lng: 30 }));
     act(() => mapInstances[0].emit('idle', {} as never));
     expect(useLocationStore.getState().groundM).toBe(180);
+  });
+
+  it('reports the scale from the map center on creation', () => {
+    useMapScaleStore.setState({ metersPerPx: null });
+    render(<MapView />);
+    expect(useMapScaleStore.getState().metersPerPx).toBeGreaterThan(0);
   });
 });
