@@ -36,6 +36,15 @@ export class FakeMap {
   getCenter() {
     return { lat: 50, lng: 30 };
   }
+  bounds = { west: 29, east: 31, south: 49, north: 51 };
+  getBounds() {
+    const b = this.bounds;
+    return { getWest: () => b.west, getEast: () => b.east, getSouth: () => b.south, getNorth: () => b.north };
+  }
+  fitBounds(_bounds: unknown, _options?: unknown) {
+    this.fitted = true;
+  }
+  fitted = false;
   addSource(id: string, spec: object) {
     this.sources[id] = spec;
   }
@@ -78,16 +87,27 @@ export class FakeMap {
   remove() {}
 }
 
+export const markerInstances: Marker[] = [];
+
 export class Marker {
   lngLat: [number, number] | null = null;
+  added = false;
+  element: HTMLElement | undefined;
+  constructor(options?: { element?: HTMLElement }) {
+    this.element = options?.element;
+    markerInstances.push(this);
+  }
   setLngLat(lngLat: [number, number]) {
     this.lngLat = lngLat;
     return this;
   }
   addTo() {
+    this.added = true;
     return this;
   }
-  remove() {}
+  remove() {
+    this.added = false;
+  }
 }
 
 export { FakeMap as Map };

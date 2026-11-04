@@ -16,14 +16,18 @@
     "buildings3dOn": "3D buildings: on",
     "buildings3dOff": "3D buildings: off",
     "cityNotFound": "City not found",
-    "geocodeError": "Search failed, try again"
+    "geocodeError": "Search failed, try again",
+    "symbols": "Drone symbols",
+    "symbolsNato": "Drones: NATO",
+    "symbolsCustom": "Drones: own style"
   },
   "map": {
     "label": "Map",
     "issue": {
       "style": "Map is unavailable. Check your connection and reload.",
       "terrain": "Terrain is unavailable: elevation is not shown."
-    }
+    },
+    "resetView": "Default view"
   },
   "location": {
     "title": "Location",
@@ -39,7 +43,11 @@
     "title": "Wind",
     "label": "{{speed}} m/s toward {{dir}} ({{deg}}°)",
     "loading": "Loading wind…",
-    "unavailable": "Wind unavailable"
+    "unavailable": "Wind unavailable",
+    "temperature": "Air temperature",
+    "humidity": "Relative humidity",
+    "tempValue": "{{value}}°C",
+    "humidityValue": "{{value}}%"
   },
   "compass": {
     "N": "N",
@@ -53,7 +61,9 @@
   },
   "menu": {
     "open": "Menu",
-    "legend": "Legend"
+    "legend": "Legend",
+    "title": "Menu",
+    "close": "Close"
   },
   "legend": {
     "title": "Legend",
@@ -71,5 +81,62 @@
     "off": "Front line: off",
     "source": "Approximate, based on DeepStateMap.live",
     "approximate": "Hand-traced zones, not survey data. Not the real front line."
+  },
+  "mission": {
+    "title": "Mission",
+    "area": "Mission area",
+    "width": "Width, km",
+    "height": "Height, km",
+    "useLocation": "Center on selected location",
+    "layout": "Start layout",
+    "layoutSingle": "All from one point",
+    "layoutCluster": "Cluster around a point",
+    "layoutSeparate": "Each from its own point",
+    "radius": "Cluster radius, m",
+    "pick": "Pick start points on map",
+    "pickingOn": "Picking: click the map (stop)",
+    "picked": "Points: {{count}} of {{need}}",
+    "clearPoints": "Clear points",
+    "start": "Start mission",
+    "reset": "Reset mission",
+    "notConnected": "Not connected to the server",
+    "problem": {
+      "incomplete": "Pick the start points.",
+      "outside": "Start points must be inside the mission area."
+    },
+    "error": {
+      "outside_area": "A start point is outside the mission area.",
+      "already_running": "A mission is already running. Reset first."
+    },
+    "status": {
+      "offline": "offline",
+      "booting": "booting",
+      "connecting": "connecting",
+      "idle": "online"
+    },
+    "draw": "Draw zone on map",
+    "drawingOn": "Drawing: click the map (stop)",
+    "drawFirst": "Click the first corner.",
+    "drawSecond": "Click the opposite corner.",
+    "backToZone": "Back to mission zone"
+  },
+  "sidebar": {
+    "label": "Side panel",
+    "wind": "Wind",
+    "mission": "Mission",
+    "location": "Location",
+    "collapse": "Collapse panel",
+    "expand": "Expand panel"
+  },
+  "settings": {
+    "open": "Settings",
+    "title": "Settings",
+    "close": "Close settings",
+    "general": "General",
+    "theme": "Theme",
+    "map": "Map",
+    "buildings": "3D buildings",
+    "frontLine": "Front line",
+    "drones": "Drones"
   }
 }

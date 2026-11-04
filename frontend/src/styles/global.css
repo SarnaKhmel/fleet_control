@@ -232,9 +232,6 @@ body,
   gap: 0.75rem;
 }
 
-.burger {
-  position: relative;
-}
 
 .burger-button {
   display: flex;
@@ -255,29 +252,8 @@ body,
   border-radius: 1px;
 }
 
-.burger-menu {
-  position: absolute;
-  top: calc(100% + 0.5rem);
-  left: 0;
-  z-index: 2;
-  min-width: 12rem;
-  padding: 0.4rem;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
 
-.burger-menu a {
-  display: block;
-  padding: 0.4rem 0.6rem;
-  color: var(--fg);
-  text-decoration: none;
-  border-radius: 4px;
-}
 
-.burger-menu a:hover {
-  background: var(--bg);
-}
 
 .legend {
   max-width: 40rem;
@@ -395,4 +371,723 @@ body,
   height: 6px;
   border: 2px solid var(--fg);
   border-top: none;
+}
+
+.mission-panel {
+  position: absolute;
+  left: 1rem;
+  top: 8.5rem;
+  z-index: 1;
+  width: 15rem;
+  max-height: calc(100% - 12rem);
+  overflow: auto;
+  padding: 0.6rem 0.8rem;
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.mission-panel h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+}
+
+.mission-panel fieldset {
+  margin: 0 0 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.mission-panel legend {
+  padding: 0 0.2rem;
+  color: var(--muted);
+}
+
+.mission-panel input,
+.mission-panel select,
+.mission-panel button {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.25rem 0.4rem;
+}
+
+.mission-panel button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.mission-panel button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.mission-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.roster {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+}
+
+.mission-start-marker {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--bg);
+  border: 2px solid var(--fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+/* Own drone style: a round marker, colored by status, with a heading arrow and the callsign. */
+.drone-marker {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 2px solid var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drone-marker.is-idle {
+  border-color: var(--accent);
+}
+
+.drone-marker.is-connecting {
+  border-color: var(--warning);
+}
+
+.drone-marker-arrow {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  margin-left: -4px;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 8px solid var(--fg);
+  transform-origin: 50% 21px;
+}
+
+.drone-marker-label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 2px;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  color: var(--fg);
+  background: var(--panel);
+  padding: 0 3px;
+  border-radius: 3px;
+}
+
+.zone-return {
+  position: absolute;
+  top: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  background: var(--panel);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+
+
+/* Layout: left side panel (accordions) next to the map. */
+.workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.sidebar {
+  width: 17rem;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  overflow: auto;
+  background: var(--panel);
+  color: var(--fg);
+  border-right: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+.sidebar.is-collapsed {
+  width: auto;
+}
+
+.sidebar-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sidebar-toggle,
+.view-reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.view-reset:hover,
+.sidebar-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.accordion {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.accordion-head {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background: none;
+  color: var(--fg);
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  text-align: left;
+}
+
+.accordion-summary {
+  flex: 1;
+  color: var(--muted);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accordion-body {
+  padding: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.accordion-body[hidden] {
+  display: none;
+}
+
+/* Panels rendered inside the sidebar take the sidebar's layout instead of floating on the map. */
+.sidebar .wind-compass,
+.sidebar .mission-panel,
+.sidebar .location-content {
+  position: static;
+  width: auto;
+  max-height: none;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+}
+
+.sidebar .location-content .location-actions,
+.sidebar .mission-actions {
+  margin-top: 0.4rem;
+}
+
+/* The side panel floats over the map: expanding or collapsing it does not resize the map. */
+.workspace {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.map-area {
+  position: absolute;
+  inset: 0;
+}
+
+.sidebar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 3;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.25);
+}
+
+/* ---- Side panel: a quiet, layered look. Tokens only, no hard-coded colors. ---- */
+.sidebar {
+  width: 18rem;
+  padding: 0;
+  gap: 0;
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-right: 1px solid var(--border);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  transition: width 0.2s ease;
+}
+
+.sidebar.is-collapsed {
+  width: 3rem;
+}
+
+.sidebar-top {
+  padding: 0.6rem 0.6rem 0.5rem;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--border);
+  justify-content: flex-start;
+}
+
+.sidebar-top .view-reset {
+  margin-left: auto;
+}
+
+.sidebar.is-collapsed .sidebar-top {
+  flex-direction: column;
+  padding: 0.6rem 0.4rem;
+}
+
+.sidebar-toggle,
+.view-reset {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  border-color: transparent;
+  background: transparent;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.sidebar-toggle:hover,
+.view-reset:hover {
+  background: var(--bg);
+  border-color: var(--border);
+  color: var(--accent);
+}
+
+.sidebar-toggle:focus-visible,
+.view-reset:focus-visible,
+.sidebar button:focus-visible,
+.sidebar input:focus-visible,
+.sidebar select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.accordion {
+  border: none;
+  border-radius: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.accordion-head {
+  padding: 0.75rem 0.9rem;
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.accordion-head:hover {
+  color: var(--fg);
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+}
+
+.accordion-title {
+  flex: none;
+}
+
+.accordion-summary {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.78rem;
+  color: var(--fg);
+}
+
+.accordion-chevron {
+  flex: none;
+  transition: transform 0.2s ease;
+}
+
+.accordion.is-open .accordion-chevron {
+  transform: rotate(180deg);
+}
+
+.accordion-body {
+  padding: 0.25rem 0.9rem 0.9rem;
+  border-top: none;
+}
+
+.sidebar fieldset {
+  margin: 0 0 0.75rem;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sidebar legend {
+  padding: 0;
+  margin-bottom: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.sidebar label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.sidebar input,
+.sidebar select {
+  height: 2rem;
+  padding: 0 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar button {
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.sidebar button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sidebar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sidebar button[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sidebar .btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.sidebar .btn-primary:hover:not(:disabled) {
+  background: var(--fg);
+  border-color: var(--fg);
+  color: var(--bg);
+}
+
+.sidebar .mission-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.sidebar .mission-panel .muted,
+.sidebar .location-content .muted {
+  font-size: 0.75rem;
+}
+
+.sidebar .wind-compass {
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.6rem;
+}
+
+.sidebar .wind-compass-text {
+  font-size: 0.8125rem;
+}
+
+.sidebar .roster {
+  margin-top: 0.6rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+}
+
+.sidebar .roster li {
+  padding: 0.25rem 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar .location-coords {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.sidebar .saved-list button:first-child {
+  border: none;
+  background: transparent;
+  padding: 0.3rem 0.4rem;
+  min-height: 0;
+}
+
+.sidebar .saved-list button:first-child:hover {
+  background: var(--bg);
+}
+
+.sidebar .mission-actions button {
+  white-space: nowrap;
+  padding: 0 0.5rem;
+}
+
+/* Menu drawer: full height, same surface as the side panel. */
+.nav-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.nav-drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 20;
+  width: 18rem;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--panel) 96%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--fg);
+  border-right: 1px solid var(--border);
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.3);
+}
+
+.nav-drawer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-drawer-head h2 {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem;
+}
+
+.nav-list a {
+  display: block;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  color: var(--fg);
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.nav-list a:hover {
+  background: var(--bg);
+  color: var(--accent);
+}
+
+.nav-list a:focus-visible,
+.nav-drawer button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sidebar .wind-climate {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar .wind-climate > span {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+/* Header gear and the settings drawer on the right. */
+.gear-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.gear-button:hover,
+.gear-button[aria-expanded='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+
+.settings-group {
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.settings-group h3 {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.settings-row select,
+.settings-row button {
+  min-height: 2rem;
+  padding: 0 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings-row button:hover,
+.settings-row select:hover {
+  border-color: var(--accent);
+}
+
+.settings-row button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Right-side settings panel: same surface and layout as the left side panel. */
+.sidebar.sidebar-right {
+  left: auto;
+  right: 0;
+  border-right: none;
+  border-left: 1px solid var(--border);
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.25);
+}
+
+.sidebar-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sidebar-right .sidebar-top {
+  justify-content: space-between;
+}
+
+.sidebar-right .settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.sidebar-right .settings-row span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.sidebar-right .settings-row select,
+.sidebar-right .settings-row button {
+  min-height: 2rem;
+  padding: 0 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.sidebar-right .settings-row button:hover,
+.sidebar-right .settings-row select:hover {
+  border-color: var(--accent);
+}
+
+.sidebar-right .settings-row button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
 }
