@@ -7,6 +7,7 @@
   --muted: #8a99b3;
   --accent: #4ea1ff;
   --symbol-bg: #e6edf7;
+  --warning: #f5a524;
 }
 
 :root[data-theme='light'] {
@@ -17,6 +18,7 @@
   --muted: #5b6b85;
   --accent: #1f6feb;
   --symbol-bg: #ffffff;
+  --warning: #d97706;
 }
 
 body {
@@ -329,4 +331,9 @@ body,
   color: var(--accent);
   font-size: 1.5rem;
   line-height: 1;
+}
+
+.legend-symbol.is-engaged {
+  outline: 3px solid var(--warning);
+  outline-offset: 2px;
 }

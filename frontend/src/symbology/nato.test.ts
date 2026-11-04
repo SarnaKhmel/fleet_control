@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CONTROL_POINT_SIDC, DRONE_SIDC, natoSymbol, targetSidc } from './nato';
+import { CONTROL_POINT_SIDC, DRONE_SIDC, natoSymbol, targetHighlight, targetSidc } from './nato';
 
 describe('NATO symbology', () => {
   it('builds a valid symbol for the drone', () => {
@@ -32,5 +32,12 @@ describe('NATO symbology', () => {
 describe('control point', () => {
   it('uses a valid generic control point symbol', () => {
     expect(natoSymbol(CONTROL_POINT_SIDC).isValid()).toBe(true);
+  });
+});
+
+describe('target states are distinguishable', () => {
+  it('engaged has a visual cue that confirmed does not', () => {
+    expect(targetHighlight('engaged')).toBe('engaged');
+    expect(targetHighlight('confirmed')).toBeNull();
   });
 });
