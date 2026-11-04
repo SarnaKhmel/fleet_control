@@ -1,5 +1,6 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { isAirborne, type LatLng } from '../../../shared/protocol';
+import { CAMERA_FOV_DEG, CAMERA_RANGE_M } from '../../../shared/mission/recon';
 import { offsetLatLng } from '../../../shared/mission/area';
 import type { Theme } from '../theme/themeStore';
 import type { DroneView } from './missionStore';
@@ -10,10 +11,8 @@ import { WAYPOINT_COLORS } from './waypointLayer';
 export const CAMERA_SOURCE_ID = 'drone-camera';
 export const CAMERA_FILL_ID = 'drone-camera-fill';
 export const CAMERA_LINE_ID = 'drone-camera-line';
-/** Horizontal field of view of the simulated camera, degrees. */
-export const CAMERA_FOV_DEG = 60;
-/** How far the simulated camera can make out a target, meters. */
-export const CAMERA_RANGE_M = 1500;
+// The camera's field of view and range are shared with the simulator, which marks what it sees.
+export { CAMERA_FOV_DEG, CAMERA_RANGE_M };
 // Points on the far arc: enough for a smooth edge at any zoom.
 const ARC_STEPS = 16;
 
