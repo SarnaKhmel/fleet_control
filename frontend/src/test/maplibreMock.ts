@@ -7,6 +7,7 @@ export const mapInstances: FakeMap[] = [];
 export class FakeMap {
   style: string;
   handlers: Record<string, Handler[]> = {};
+  lastFlyTo: { center: [number, number]; zoom: number } | null = null;
 
   constructor(options: { style: string }) {
     this.style = options.style;
@@ -21,6 +22,12 @@ export class FakeMap {
   }
   setStyle(style: string) {
     this.style = style;
+  }
+  flyTo(options: { center: [number, number]; zoom: number }) {
+    this.lastFlyTo = options;
+  }
+  getZoom() {
+    return 10;
   }
   remove() {}
 }

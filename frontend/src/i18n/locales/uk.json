@@ -5,7 +5,14 @@
   "header": {
     "language": "Мова",
     "switchToLight": "Світла тема",
-    "switchToDark": "Темна тема"
+    "switchToDark": "Темна тема",
+    "coordinates": "Координати",
+    "coordinatesPlaceholder": "50.45010, 30.52340",
+    "go": "Перейти",
+    "coordinatesInvalid": "Введіть широту, довготу, напр. 50.45, 30.52",
+    "mapView": "Вигляд карти",
+    "mapAuto": "Карта: за темою",
+    "mapLandscape": "Карта: ландшафт"
   },
   "map": {
     "label": "Карта"
@@ -13,7 +20,11 @@
   "location": {
     "title": "Локація",
     "hint": "Клацніть на карту, щоб обрати локацію.",
-    "clear": "Зняти"
+    "clear": "Зняти",
+    "save": "Зберегти",
+    "saved": "Збережені локації",
+    "remove": "Видалити",
+    "noSaved": "Поки немає збережених локацій."
   },
   "wind": {
     "title": "Вітер",

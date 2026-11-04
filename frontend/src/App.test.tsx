@@ -11,7 +11,7 @@ describe('App', () => {
   beforeEach(async () => {
     await i18n.changeLanguage('en');
     useThemeStore.setState({ theme: 'dark' });
-    useLocationStore.setState({ selected: null });
+    useLocationStore.setState({ selected: null, saved: [], focusTick: 0 });
     mapInstances.length = 0;
   });
 
@@ -51,5 +51,30 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
     expect(screen.getByText('Click the map to choose a location.')).toBeTruthy();
+  });
+
+  it('chooses a location from the header, saves it and selects it again later', () => {
+    render(<App />);
+    const input = screen.getByLabelText('Coordinates');
+
+    fireEvent.change(input, { target: { value: '50.1, 30.2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }));
+    expect(screen.getByText('50.10000, 30.20000')).toBeTruthy();
+    expect(mapInstances[0].lastFlyTo?.center).toEqual([30.2, 50.1]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(useLocationStore.getState().saved).toEqual([{ lat: 50.1, lng: 30.2 }]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    fireEvent.click(screen.getByRole('button', { name: '50.10000, 30.20000' }));
+    expect(document.querySelector('.location-coords')?.textContent).toBe('50.10000, 30.20000');
+  });
+
+  it('rejects invalid coordinates in the header', () => {
+    render(<App />);
+    fireEvent.change(screen.getByLabelText('Coordinates'), { target: { value: 'north' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }));
+    expect(screen.getByRole('alert').textContent).toBe('Enter lat, lng, e.g. 50.45, 30.52');
+    expect(useLocationStore.getState().selected).toBeNull();
   });
 });

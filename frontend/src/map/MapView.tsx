@@ -5,7 +5,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import './mapWorker';
 import { useThemeStore } from '../theme/themeStore';
 import { useLocationStore } from '../location/locationStore';
-import { DEFAULT_CENTER, DEFAULT_ZOOM, mapStyleFor } from './mapStyles';
+import { DEFAULT_CENTER, DEFAULT_ZOOM, mapStyleFor, useMapViewStore } from './mapStyles';
 import { CONTROL_POINT_SIDC, natoElement } from '../symbology/nato';
 
 export function MapView() {
@@ -15,11 +15,13 @@ export function MapView() {
   const markerRef = useRef<Marker | null>(null);
   const styleRef = useRef<string | null>(null);
   const theme = useThemeStore((state) => state.theme);
+  const view = useMapViewStore((state) => state.view);
   const selected = useLocationStore((state) => state.selected);
+  const focusTick = useLocationStore((state) => state.focusTick);
 
   // Create the map once; clicking it selects a location.
   useEffect(() => {
-    const style = mapStyleFor(useThemeStore.getState().theme);
+    const style = mapStyleFor(useThemeStore.getState().theme, useMapViewStore.getState().view);
     const map = new MapLibreMap({
       container: containerRef.current!,
       style,
@@ -38,13 +40,20 @@ export function MapView() {
     };
   }, []);
 
-  // Switch the basemap when the theme changes; skip if the style is already loaded.
+  // Switch the basemap when the theme or the map view changes; skip if the style is already loaded.
   useEffect(() => {
-    const style = mapStyleFor(theme);
+    const style = mapStyleFor(theme, view);
     if (!mapRef.current || styleRef.current === style) return;
     mapRef.current.setStyle(style);
     styleRef.current = style;
-  }, [theme]);
+  }, [theme, view]);
+
+  // Fly to a location chosen from the header or the saved list (not on plain map clicks).
+  useEffect(() => {
+    const point = useLocationStore.getState().selected;
+    if (!focusTick || !point || !mapRef.current) return;
+    mapRef.current.flyTo({ center: [point.lng, point.lat], zoom: Math.max(mapRef.current.getZoom(), 12) });
+  }, [focusTick]);
 
   // Show the marker for the selected location.
   useEffect(() => {

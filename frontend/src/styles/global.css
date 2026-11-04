@@ -6,6 +6,7 @@
   --fg: #e6edf7;
   --muted: #8a99b3;
   --accent: #4ea1ff;
+  --symbol-bg: #e6edf7;
 }
 
 :root[data-theme='light'] {
@@ -15,6 +16,7 @@
   --fg: #0f1728;
   --muted: #5b6b85;
   --accent: #1f6feb;
+  --symbol-bg: #ffffff;
 }
 
 body {
@@ -137,10 +139,66 @@ body,
   transition: transform 0.3s ease;
 }
 
-/* NATO symbols are drawn in black; a light chip keeps them readable on dark maps. */
+/* NATO symbols are drawn in black; a light chip keeps them readable on any map. */
 .nato-symbol {
-  background: var(--fg);
+  background: var(--symbol-bg);
   border-radius: 4px;
   padding: 2px;
   line-height: 0;
+}
+
+.coords-form {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.coords-form input {
+  width: 13rem;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.3rem 0.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.coords-form input[aria-invalid='true'] {
+  border-color: var(--danger, #e5484d);
+}
+
+.form-error {
+  color: var(--danger, #e5484d);
+  font-size: 0.8rem;
+}
+
+.location-panel h3 {
+  margin: 0.75rem 0 0.4rem;
+  font-size: 0.9rem;
+}
+
+.location-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.saved-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.saved-list li {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.saved-list li button:first-child {
+  flex: 1;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
 }

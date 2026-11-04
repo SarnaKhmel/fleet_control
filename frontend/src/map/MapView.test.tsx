@@ -3,6 +3,7 @@ import { MapView } from './MapView';
 import { useThemeStore } from '../theme/themeStore';
 import { useLocationStore } from '../location/locationStore';
 import { mapInstances } from '../test/maplibreMock';
+import { useMapViewStore } from './mapStyles';
 
 vi.mock('maplibre-gl', () => import('../test/maplibreMock'));
 
@@ -11,12 +12,13 @@ describe('MapView', () => {
     mapInstances.length = 0;
     useThemeStore.setState({ theme: 'dark' });
     useLocationStore.setState({ selected: null });
+    useMapViewStore.setState({ view: 'auto' });
   });
 
   it('creates the map with the dark style by default', () => {
     render(<MapView />);
     expect(mapInstances).toHaveLength(1);
-    expect(mapInstances[0].style).toBe('https://tiles.openfreemap.org/styles/dark');
+    expect(mapInstances[0].style).toBe('https://tiles.openfreemap.org/styles/fiord');
   });
 
   it('selects a location when the map is clicked', () => {
@@ -31,5 +33,11 @@ describe('MapView', () => {
     render(<MapView />);
     act(() => useThemeStore.getState().setTheme('light'));
     expect(mapInstances[0].style).toBe('https://tiles.openfreemap.org/styles/positron');
+  });
+
+  it('switches to the landscape style when the map view changes', () => {
+    render(<MapView />);
+    act(() => useMapViewStore.getState().setView('landscape'));
+    expect(mapInstances[0].style).toBe('https://tiles.openfreemap.org/styles/bright');
   });
 });
