@@ -33,7 +33,9 @@
   },
   "wind": {
     "title": "Wind",
-    "label": "{{speed}} m/s toward {{dir}} ({{deg}}°)"
+    "label": "{{speed}} m/s toward {{dir}} ({{deg}}°)",
+    "loading": "Loading wind…",
+    "unavailable": "Wind unavailable"
   },
   "compass": {
     "N": "N",

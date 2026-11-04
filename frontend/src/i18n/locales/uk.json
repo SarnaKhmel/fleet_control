@@ -33,7 +33,9 @@
   },
   "wind": {
     "title": "Вітер",
-    "label": "{{speed}} м/с на {{dir}} ({{deg}}°)"
+    "label": "{{speed}} м/с на {{dir}} ({{deg}}°)",
+    "loading": "Завантаження вітру…",
+    "unavailable": "Вітер недоступний"
   },
   "compass": {
     "N": "Пн",

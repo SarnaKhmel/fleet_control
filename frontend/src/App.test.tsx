@@ -73,6 +73,20 @@ describe('App', () => {
     expect(document.querySelector('.location-coords')?.textContent).toBe('50.10000, 30.20000');
   });
 
+  it('updates the wind to the wind at the selected location', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ current: { wind_speed_10m: 5, wind_direction_10m: 90 } }) }),
+    );
+    render(<App />);
+    act(() => {
+      mapInstances[0].emit('click', { lngLat: { lat: 50.5, lng: 30.25 } });
+    });
+    // From the east (90) → blows toward the west (270).
+    expect(await screen.findByText('5.0 m/s toward W (270°)')).toBeTruthy();
+    vi.unstubAllGlobals();
+  });
+
   it('finds a city by name through the header search', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [{ lat: '50.4501', lon: '30.5234' }] }));
     render(<App />);

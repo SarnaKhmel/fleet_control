@@ -116,15 +116,15 @@ body,
   margin: 0;
 }
 
-.wind-indicator {
+.wind-compass {
   position: absolute;
+  top: 1rem;
   left: 1rem;
-  bottom: 1rem;
   z-index: 1;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.4rem 0.75rem;
+  padding: 0.4rem 0.75rem 0.4rem 0.4rem;
   background: var(--panel);
   color: var(--fg);
   border: 1px solid var(--border);
@@ -132,11 +132,32 @@ body,
   font-variant-numeric: tabular-nums;
 }
 
-.wind-arrow {
-  display: inline-block;
-  font-size: 1.25rem;
-  line-height: 1;
-  transition: transform 0.3s ease;
+.wind-compass-dial {
+  width: 56px;
+  height: 56px;
+  flex: none;
+}
+
+.wind-compass-dial circle {
+  fill: var(--bg);
+  stroke: var(--border);
+  stroke-width: 2;
+}
+
+.wind-compass-dial text {
+  fill: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wind-compass-dial line {
+  stroke: var(--accent);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.wind-compass-dial polygon {
+  fill: var(--accent);
 }
 
 /* NATO symbols are drawn in black; a light chip keeps them readable on any map. */
