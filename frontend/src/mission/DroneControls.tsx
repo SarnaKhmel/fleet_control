@@ -1,4 +1,4 @@
-import { callsignOf, droneIdOf, GROUND_AMSL_M } from '../../../shared/protocol';
+import { callsignOf, droneIdOf, GROUND_AMSL_M, isAirborne, takesCommands } from '../../../shared/protocol';
 import { useTranslation } from 'react-i18next';
 import { useMissionStore } from './missionStore';
 import { useSelectionStore } from './selection';
@@ -15,7 +15,9 @@ function DroneStatusRow({ droneId, index }: { droneId: string; index: number }) 
     const altitudeM = s.drones[droneId]?.altitudeM;
     return altitudeM == null ? null : Math.round(altitudeM - GROUND_AMSL_M);
   });
-  const progress = status === 'idle' ? 100 : status ? bootProgress : 0;
+  const online = status !== null && status !== 'booting' && status !== 'connecting';
+  const progress = online ? 100 : status ? bootProgress : 0;
+  const label = status ? t(`mission.status.${status}`) : t('mission.status.offline');
   return (
     <li>
       <button
@@ -31,7 +33,7 @@ function DroneStatusRow({ droneId, index }: { droneId: string; index: number }) 
           {/* The callsign is fixed by the schedule (BA-01, BA-02, …); the drone is only a status until it is online. */}
           <strong>{callsignOf(index)}</strong>
           <span className={`drone-state is-${status ?? 'offline'}`}>
-            {status === 'idle' && heightM !== null ? `${heightM} m` : status ? t(`mission.status.${status}`) : t('mission.status.offline')}
+            {isAirborne(status) && heightM !== null ? `${label} · ${heightM} m` : label}
           </span>
         </div>
         <div className="boot-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
@@ -47,7 +49,8 @@ export function DroneStatusList() {
   const { t } = useTranslation();
   const phase = useMissionStore((s) => s.phase);
   const droneCount = useMissionStore((s) => s.droneCount);
-  const online = useMissionStore((s) => Object.values(s.drones).filter((d) => d.status === 'idle').length);
+  // Online: the drones that still take commands, in the air or on the ground.
+  const online = useMissionStore((s) => Object.values(s.drones).filter((d) => takesCommands(d.status)).length);
   // Drones exist only while a mission runs; before the start or after a reset the list is hidden.
   if (phase !== 'running') return null;
   return (

@@ -45,6 +45,26 @@ export type StartLayout =
 
 export type DroneStatus = 'offline' | 'booting' | 'connecting' | 'idle' | 'moving' | 'engaging' | 'returning' | 'lost_link';
 
+/**
+ * State of an online drone, set by the server:
+ * - `idle`: hovering in the air with nothing to do; `moving`: flying its tasks or a course;
+ * - `landing`: coming down where it is; `landed`: on the ground, drawing power only for its link;
+ * - `lost_link`: its battery ran out on the ground: intact, but silent;
+ * - `destroyed`: its battery ran out in the air and it fell.
+ * The last two are final: such a drone keeps its spot, path and tasks on the map and takes no commands.
+ */
+export type FlightStatus = 'idle' | 'moving' | 'landing' | 'landed' | 'lost_link' | 'destroyed';
+
+/** True for an online drone that still takes commands (everything but lost link and destroyed). */
+export function takesCommands(status: string | null | undefined): boolean {
+  return status === 'idle' || status === 'moving' || status === 'landing' || status === 'landed';
+}
+
+/** True for an online drone that is off the ground. */
+export function isAirborne(status: string | null | undefined): boolean {
+  return status === 'idle' || status === 'moving' || status === 'landing';
+}
+
 /** Full telemetry snapshot (tasks/tech.md section 3). Units are in field names. */
 export interface DroneTelemetry {
   meta: { timestamp: string; drone_id: string; callsign: string };
@@ -76,6 +96,8 @@ export type ClientMessage =
   | { type: 'move'; droneIds: string[]; target: LatLng; append?: boolean }
   /** Drops all tasks: the drones hover where they are. */
   | { type: 'hold'; droneIds: string[] }
+  /** Lands the drones where they are; their tasks are dropped. A later move takes them up again. */
+  | { type: 'land'; droneIds: string[] }
   /** Drops one task (0 = the current one) from a drone's list. */
   | { type: 'remove_task'; droneId: string; index: number }
   /** Moves one task of a drone's list to another point. */
@@ -92,8 +114,7 @@ export type MissionErrorReason = 'outside_area' | 'already_running';
 export interface SnapshotDrone {
   droneId: string;
   callsign: string;
-  /** `lost_link`: the battery ran out and the drone came down where its position shows. */
-  status: 'booting' | 'connecting' | 'idle' | 'lost_link';
+  status: 'booting' | 'connecting' | FlightStatus;
   progress: number;
   position: LatLng | null;
   heading: number | null;
@@ -115,8 +136,8 @@ export type ServerMessage =
   | { type: 'position'; droneId: string; position: LatLng; heading: number; speedMs: number; altitudeM: number; batteryPct: number; crabDeg: number; }
   /** A drone's task list and flown path. Sent only when they change; positions do not carry them. */
   | { type: 'drone_tasks'; droneId: string; trail: LatLng[]; tasks: LatLng[] }
-  /** The drone's battery ran out: it came down at its last position and takes no more commands. */
-  | { type: 'drone_lost'; droneId: string }
+  /** An online drone's state changed (see FlightStatus). Sent only on a change. */
+  | { type: 'drone_status'; droneId: string; status: FlightStatus }
   | { type: 'mission_error'; reason: MissionErrorReason }
   | { type: 'mission_reset' };
 
@@ -191,6 +212,9 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
   }
   if (message.type === 'hold' && isDroneIds(message.droneIds)) {
     return { type: 'hold', droneIds: message.droneIds };
+  }
+  if (message.type === 'land' && isDroneIds(message.droneIds)) {
+    return { type: 'land', droneIds: message.droneIds };
   }
   if (message.type === 'remove_task' && isDroneId(message.droneId) && isTaskIndex(message.index)) {
     return { type: 'remove_task', droneId: message.droneId, index: message.index };

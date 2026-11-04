@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseServerMessage } from './missionSocket';
+import { landableSelected, parseServerMessage } from './missionSocket';
 
 describe('parseServerMessage', () => {
   it('accepts known server messages', () => {
@@ -15,13 +15,21 @@ describe('parseServerMessage', () => {
     expect(parseServerMessage(JSON.stringify(tasks))).toEqual(tasks);
   });
 
-  it('accepts the loss of a drone', () => {
-    expect(parseServerMessage(JSON.stringify({ type: 'drone_lost', droneId: 'drone-1' }))).toEqual({ type: 'drone_lost', droneId: 'drone-1' });
+  it('accepts drone status changes', () => {
+    const status = { type: 'drone_status', droneId: 'drone-1', status: 'landed' };
+    expect(parseServerMessage(JSON.stringify(status))).toEqual(status);
   });
 
   it('drops unknown types, bad JSON and non-strings', () => {
     expect(parseServerMessage(JSON.stringify({ type: 'move' }))).toBeNull();
     expect(parseServerMessage('{not json')).toBeNull();
     expect(parseServerMessage(42)).toBeNull();
+  });
+});
+
+describe('landableSelected', () => {
+  it('picks the selected drones in the air that are not already coming down', () => {
+    const drones = { a: { status: 'idle' }, b: { status: 'moving' }, c: { status: 'landing' }, d: { status: 'landed' }, e: { status: 'destroyed' }, f: { status: 'idle' } };
+    expect(landableSelected(drones, ['a', 'b', 'c', 'd', 'e', 'missing'])).toEqual(['a', 'b']);
   });
 });

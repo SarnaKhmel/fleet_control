@@ -1,12 +1,12 @@
 import type { ClientMessage, ServerMessage } from '../../../shared/protocol';
 import { useMissionStore } from './missionStore';
 import { useSelectionStore } from './selection';
-import type { LatLng } from '../../../shared/protocol';
+import { takesCommands, type LatLng } from '../../../shared/protocol';
 import { toMetersFrom } from '../../../shared/mission/area';
 import { useWindStore } from '../wind/windStore';
 import { debugLog } from '../log';
 
-const SERVER_TYPES = new Set(['mission_snapshot', 'drone_boot', 'drone_online', 'position', 'drone_tasks', 'drone_lost', 'mission_error', 'mission_reset']);
+const SERVER_TYPES = new Set(['mission_snapshot', 'drone_boot', 'drone_online', 'position', 'drone_tasks', 'drone_status', 'mission_error', 'mission_reset']);
 
 /** Parses a server message, or null for anything unknown or malformed. Trust boundary for the client. */
 export function parseServerMessage(raw: unknown): ServerMessage | null {
@@ -80,7 +80,7 @@ export function sendClientMessage(message: ClientMessage): boolean {
  */
 export function moveOnlineDrones(target: LatLng, append = false): number {
   const online = Object.entries(useMissionStore.getState().drones)
-    .filter(([, drone]) => drone.status === 'idle')
+    .filter(([, drone]) => takesCommands(drone.status))
     .map(([id]) => id);
   const selected = useSelectionStore.getState().selectedIds;
   const droneIds = online.filter((id) => selected.includes(id));
@@ -100,6 +100,18 @@ export function updateDroneTask(droneId: string, index: number, point: LatLng): 
   return sendClientMessage({ type: 'update_task', droneId, index, point });
 }
 
+/** Selected drones that can be landed: online and in the air, not already coming down. */
+export function landableSelected(drones: Record<string, { status: string }>, selectedIds: string[]): string[] {
+  return selectedIds.filter((id) => drones[id]?.status === 'idle' || drones[id]?.status === 'moving');
+}
+
+/** Lands the selected drones that are in the air. Returns how many were sent. */
+export function landSelectedDrones(): number {
+  const droneIds = landableSelected(useMissionStore.getState().drones, useSelectionStore.getState().selectedIds);
+  if (droneIds.length === 0) return 0;
+  return sendClientMessage({ type: 'land', droneIds }) ? droneIds.length : 0;
+}
+
 /** Drops all of a drone's tasks: it hovers where it is. */
 export function clearDroneTasks(droneId: string): boolean {
   return sendClientMessage({ type: 'hold', droneIds: [droneId] });
@@ -113,7 +125,7 @@ export function headOnlineDronesToward(target: LatLng): number {
   const drones = useMissionStore.getState().drones;
   const ids = useSelectionStore
     .getState()
-    .selectedIds.filter((id) => drones[id]?.status === 'idle' && drones[id]?.position);
+    .selectedIds.filter((id) => takesCommands(drones[id]?.status) && drones[id]?.position);
   if (ids.length === 0) return 0;
   const from = drones[ids[0]].position;
   if (!from) return 0;

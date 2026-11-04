@@ -1,5 +1,5 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import type { LatLng } from '../../../shared/protocol';
+import { isAirborne, type LatLng } from '../../../shared/protocol';
 import { offsetLatLng } from '../../../shared/mission/area';
 import type { Theme } from '../theme/themeStore';
 import type { DroneView } from './missionStore';
@@ -33,8 +33,8 @@ export function cameraFeatures(drones: Record<string, DroneView>, selectedIds: s
   const features = [];
   for (const droneId of selectedIds) {
     const drone = drones[droneId];
-    // A drone that lost its link has come down: there is no camera picture to show.
-    if (!drone?.position || drone.heading === null || drone.status === 'lost_link') continue;
+    // A drone on the ground (landed, lost, destroyed) has no view ahead to show.
+    if (!drone?.position || drone.heading === null || !isAirborne(drone.status)) continue;
     // The nose is turned into the wind by the crab angle; the camera looks where the drone goes.
     const ring = cameraSector(drone.position, drone.heading - drone.crabDeg).map((p) => [p.lng, p.lat]);
     features.push({ type: 'Feature', properties: { droneId }, geometry: { type: 'Polygon', coordinates: [ring] } });

@@ -11,8 +11,10 @@ export const SIM_TIME_SCALE = 10;
 // Takeoff: drones climb from the ground to a hover altitude, then keep it until they are given a move.
 export const HOVER_ALT_M = 60;
 export const CLIMB_RATE_MS = 3;
-// Simulated battery use: a full charge lasts about 40 minutes of mission time.
+// Simulated battery use in the air (flying or hovering): a full charge lasts about 40 minutes of mission time.
 export const BATTERY_DRAIN_PER_TICK = 100 / (40 * 60);
+// On the ground the drone powers only its link to the operator: 20 times less.
+export const BATTERY_LINK_DRAIN_PER_TICK = BATTERY_DRAIN_PER_TICK / 20;
 
 // Spacing between drones flying to one target, so they do not stack on the same point.
 export const FORMATION_SPACING_M = 150;

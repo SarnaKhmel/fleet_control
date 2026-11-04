@@ -513,7 +513,10 @@ body,
   justify-content: center;
 }
 
-.drone-marker.is-idle {
+.drone-marker.is-idle,
+.drone-marker.is-moving,
+.drone-marker.is-landing,
+.drone-marker.is-landed {
   border-color: var(--accent);
 }
 
@@ -533,8 +536,29 @@ body,
   opacity: 0.6;
 }
 
-.drone-marker.is-lost_link .drone-marker-arrow {
+.drone-marker.is-lost_link .drone-marker-arrow,
+.drone-marker.is-destroyed .drone-marker-arrow,
+.drone-marker.is-landed .drone-marker-arrow {
   display: none;
+}
+
+/* On the ground: a filled marker, so it reads apart from the drones in the air. */
+.drone-marker.is-landed,
+.drone-marker.is-landing {
+  background: color-mix(in srgb, var(--accent) 25%, var(--panel));
+}
+
+/* Destroyed (fell with an empty battery): a red dashed marker with a cross where it fell. */
+.drone-marker.is-destroyed {
+  border-color: var(--danger);
+  border-style: dashed;
+  opacity: 0.7;
+}
+
+.drone-marker.is-destroyed::after {
+  content: '✕';
+  color: var(--danger);
+  font-weight: 700;
 }
 
 /* NATO symbols keep their frame; the battery and lost-link state show as a ring around them. */
@@ -546,9 +570,14 @@ body,
   box-shadow: 0 0 0 3px var(--danger);
 }
 
-.maplibregl-marker .nato-symbol.is-lost_link {
+.maplibregl-marker .nato-symbol.is-lost_link,
+.maplibregl-marker .nato-symbol.is-destroyed {
   filter: grayscale(1);
   opacity: 0.5;
+}
+
+.maplibregl-marker .nato-symbol.is-destroyed {
+  box-shadow: 0 0 0 3px var(--danger);
 }
 
 .drone-marker-arrow {
@@ -1260,8 +1289,21 @@ body,
   color: var(--warning);
 }
 
-.drone-state.is-lost_link {
+.drone-state.is-lost_link,
+.drone-state.is-destroyed {
   color: var(--danger);
+}
+
+.drone-state.is-moving,
+.drone-state.is-landing,
+.drone-state.is-landed {
+  color: var(--accent);
+}
+
+/* Lands the selected drones: a full-width action at the top of the drone details. */
+.land-selected {
+  width: 100%;
+  margin-bottom: 0.5rem;
 }
 
 /* Highlighted warning at the top of a drone's details: low battery, critical battery, lost link. */

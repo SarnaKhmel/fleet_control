@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { GROUND_AMSL_M } from '../../../shared/protocol';
+import { GROUND_AMSL_M, takesCommands } from '../../../shared/protocol';
 import { Accordion } from '../sidebar/Accordion';
 import { batteryLevel } from '../mission/battery';
 import type { DroneView } from '../mission/missionStore';
@@ -11,10 +11,14 @@ interface DroneDetailsProps {
   defaultOpen: boolean;
 }
 
-/** The warning to highlight for the drone: lost link, else a low or critical battery; null when all is well. */
-function droneAlert(drone: DroneView | undefined): 'lost' | 'low' | 'critical' | null {
+/**
+ * The warning to highlight for the drone: destroyed or lost link, else a low or critical battery;
+ * null when all is well.
+ */
+function droneAlert(drone: DroneView | undefined): 'destroyed' | 'lost' | 'low' | 'critical' | null {
+  if (drone?.status === 'destroyed') return 'destroyed';
   if (drone?.status === 'lost_link') return 'lost';
-  if (drone?.status !== 'idle') return null;
+  if (!drone || !takesCommands(drone.status)) return null;
   const level = batteryLevel(drone.batteryPct);
   return level === 'ok' ? null : level;
 }
@@ -23,12 +27,12 @@ function droneAlert(drone: DroneView | undefined): 'lost' | 'low' | 'critical' |
 export function DroneDetails({ droneId, drone, defaultOpen }: DroneDetailsProps) {
   const { t } = useTranslation();
   const callsign = drone?.callsign ?? droneId;
-  const online = drone?.status === 'idle' && drone.altitudeM !== null;
+  const online = takesCommands(drone?.status) && drone?.altitudeM != null;
   const altitude = online ? `${Math.round(drone!.altitudeM! - GROUND_AMSL_M)} m` : '—';
   const battery = drone ? `${Math.round(drone.batteryPct)}%` : '—';
   const status = drone?.status ? t(`mission.status.${drone.status}`) : t('mission.status.offline');
-  // A drone that lost its link lies where it came down: its spot and unfinished route stay on view.
-  const lost = drone?.status === 'lost_link';
+  // A drone that is out (lost link, destroyed) lies where it came down: its spot and unfinished route stay on view.
+  const lost = drone?.status === 'lost_link' || drone?.status === 'destroyed';
   const alert = droneAlert(drone);
 
   return (

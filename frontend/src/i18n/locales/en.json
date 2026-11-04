@@ -116,8 +116,12 @@
       "offline": "offline",
       "booting": "booting",
       "connecting": "connecting",
-      "idle": "online",
-      "lost_link": "link lost"
+      "idle": "hovering",
+      "lost_link": "link lost",
+      "moving": "moving",
+      "landing": "landing",
+      "landed": "landed",
+      "destroyed": "destroyed"
     },
     "draw": "Draw zone on map",
     "drawingOn": "Drawing: click the map (stop)",
@@ -168,8 +172,11 @@
     "alert": {
       "low": "Low battery: {{pct}}%. Bring the drone back or finish the task.",
       "critical": "Critical battery: {{pct}}%. The drone will lose its link when it runs out.",
-      "lost": "Link lost: the battery ran out. The drone came down at the position shown."
+      "lost": "Link lost: the battery ran out on the ground. The drone is intact at the position shown.",
+      "destroyed": "Destroyed: the battery ran out in the air and the drone fell at the position shown."
     },
-    "tasksUnfinished": "Route it did not finish:"
+    "tasksUnfinished": "Route it did not finish:",
+    "land": "Land ({{count}})",
+    "landHint": "Land the selected drones where they are. A click on the map takes them up again."
   }
 }

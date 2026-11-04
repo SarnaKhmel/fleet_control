@@ -14,9 +14,9 @@ describe('DroneControls', () => {
   });
   afterEach(() => useMissionStore.setState({ phase: 'idle', drones: {} }));
 
-  it('shows each online drone with its height above the ground', () => {
+  it('shows each online drone with its status and, in the air, its height above the ground', () => {
     render(<DroneControls />);
-    expect(screen.getByText('60 m')).toBeTruthy();
+    expect(screen.getByText('hovering · 60 m')).toBeTruthy();
     expect(screen.getByText('Online 1/3')).toBeTruthy();
   });
 
@@ -51,6 +51,21 @@ describe('DroneControls', () => {
     act(() => useMissionStore.getState().apply(position(50.1, 210)));
     expect(renders).toBe(before);
     act(() => useMissionStore.getState().apply(position(50.2, 215)));
-    expect(screen.getByText('65 m')).toBeTruthy();
+    expect(screen.getByText('hovering · 65 m')).toBeTruthy();
+  });
+
+  it('names the state of drones on the ground or out, and counts only those that take commands as online', () => {
+    useMissionStore.setState({
+      drones: {
+        'drone-1': { ...online, status: 'landed', altitudeM: 150 },
+        'drone-2': { ...online, status: 'destroyed', altitudeM: 150 },
+        'drone-3': { ...online, status: 'moving' },
+      },
+    });
+    render(<DroneControls />);
+    expect(screen.getByText('landed')).toBeTruthy();
+    expect(screen.getByText('destroyed')).toBeTruthy();
+    expect(screen.getByText('moving · 60 m')).toBeTruthy();
+    expect(screen.getByText('Online 2/3')).toBeTruthy();
   });
 });

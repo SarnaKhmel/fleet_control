@@ -1,5 +1,6 @@
 import type { Map as MapLibreMap, Marker as MapLibreMarkerType } from 'maplibre-gl';
 import { Marker } from 'maplibre-gl';
+import { takesCommands } from '../../../shared/protocol';
 import { DRONE_SIDC, natoElement } from '../symbology/nato';
 import { batteryLevel } from './battery';
 import type { DroneView } from './missionStore';
@@ -7,11 +8,11 @@ import type { SymbolStyle } from './symbolStyle';
 import { useSelectionStore } from './selection';
 
 /**
- * Classes that color a drone by its state: a drone that lost its link is grey; otherwise a low battery
- * is yellow and a critical one red.
+ * Classes that color a drone by its state: a drone that is out (lost link, destroyed) shows only that;
+ * otherwise a low battery is yellow and a critical one red.
  */
 function stateClasses(drone: DroneView): string[] {
-  if (drone.status === 'lost_link') return ['is-lost_link'];
+  if (!takesCommands(drone.status)) return [`is-${drone.status}`];
   const level = batteryLevel(drone.batteryPct);
   return level === 'ok' ? [] : [`is-battery-${level}`];
 }

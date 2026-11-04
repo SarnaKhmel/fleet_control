@@ -1,12 +1,13 @@
 import type { Map as MapLibreMap, Marker as MapLibreMarkerType } from 'maplibre-gl';
 import { Marker } from 'maplibre-gl';
 import i18n from 'i18next';
+import { takesCommands } from '../../../shared/protocol';
 import type { DroneView } from './missionStore';
 import { removeDroneTask, updateDroneTask } from './missionSocket';
 
 // Task points of the selected drones, numbered in flight order. Drag a point to move the task there;
 // right-click it to drop the task. The server answers with the new list, which moves the markers.
-// The tasks of a drone that lost its link stay on view but are locked: it takes no more commands.
+// The tasks of a drone that is out (lost link, destroyed) stay on view but are locked: it takes no more commands.
 
 interface Entry {
   map: MapLibreMap;
@@ -48,7 +49,7 @@ export function syncTaskMarkers(map: MapLibreMap, drones: Record<string, DroneVi
   for (const droneId of selectedIds) {
     const drone = drones[droneId];
     if (!drone) continue;
-    const locked = drone.status === 'lost_link';
+    const locked = !takesCommands(drone.status);
     drone.tasks.forEach((point, index) => {
       const key = `${droneId}:${index}`;
       seen.add(key);

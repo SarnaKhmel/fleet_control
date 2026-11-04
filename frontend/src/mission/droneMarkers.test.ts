@@ -64,4 +64,12 @@ describe('drone marker state colors', () => {
     expect(low).not.toBe(first);
     expect((low as unknown as { element: HTMLElement }).element.classList.contains('is-battery-low')).toBe(true);
   });
+
+  it('marks landed and destroyed drones by their status', () => {
+    expect(classes({ ...online, status: 'landed' }, 'custom')).toContain('is-landed');
+    const destroyed = { ...online, status: 'destroyed' as const, batteryPct: 0 };
+    expect(classes(destroyed, 'custom')).toContain('is-destroyed');
+    expect(classes(destroyed, 'custom')).not.toContain('is-battery-critical');
+    expect(classes(destroyed, 'nato')).toContain('is-destroyed');
+  });
 });

@@ -1,10 +1,10 @@
-import { MAX_TASKS, type ClientMessage, type LatLng, type MissionArea, type ServerMessage, type SnapshotDrone, type StartLayout } from '../../../shared/protocol.js';
+import { MAX_TASKS, type ClientMessage, type FlightStatus, type LatLng, type MissionArea, type ServerMessage, type SnapshotDrone, type StartLayout } from '../../../shared/protocol.js';
 import { BOOT_MS, buildSchedule, CONNECT_MS, DroneSchedule, resolveStarts } from './schedule.js';
 import { buildTelemetry } from './telemetry.js';
 import { toMetersFrom } from '../../../shared/mission/area.js';
 import { serverLog } from '../log.js';
 import { droneStateAt } from './schedule.js';
-import { bearingTo, BATTERY_DRAIN_PER_TICK, CLIMB_RATE_MS, DRONE_SPEED_MS, formationTargets, GROUND_AMSL_M, HOVER_ALT_M, SIM_TIME_SCALE, TICK_MS, windStep } from './kinematics.js';
+import { bearingTo, BATTERY_DRAIN_PER_TICK, BATTERY_LINK_DRAIN_PER_TICK, CLIMB_RATE_MS, DRONE_SPEED_MS, formationTargets, GROUND_AMSL_M, HOVER_ALT_M, SIM_TIME_SCALE, TICK_MS, windStep } from './kinematics.js';
 
 // Interval between "booting" progress messages, ms: several steps per boot, so the bar moves smoothly.
 export const PROGRESS_STEP_MS = 250;
@@ -30,8 +30,19 @@ interface DroneState {
   batteryPct: number;
   speedMs: number;
   crabDeg: number;
-  /** The battery ran out: the drone lies where it came down, keeps its path and tasks, takes no commands. */
-  lost: boolean;
+  /**
+   * In the air, coming down, on the ground, or out for good: `lost_link` (battery ran out on the ground)
+   * and `destroyed` (ran out in the air) are final. Such a drone keeps its spot, path and tasks.
+   */
+  phase: 'air' | 'landing' | 'landed' | 'lost_link' | 'destroyed';
+  /** The status last sent to clients, so a change is sent once. */
+  status: FlightStatus;
+}
+
+/** The drone's status: its phase, and in the air whether it has somewhere to go. */
+function statusOf(drone: DroneState): FlightStatus {
+  if (drone.phase !== 'air') return drone.phase;
+  return drone.target || drone.course !== null ? 'moving' : 'idle';
 }
 
 // The flown path keeps at most this many points (as many as a task list); the oldest are dropped.
@@ -81,7 +92,7 @@ export function createMissionController(
       broadcast({ type: 'drone_boot', droneId: entry.droneId, status: 'connecting', progress: 0 }),
     );
     later(entry.startAtMs + BOOT_MS + CONNECT_MS, () => {
-      drones.set(entry.droneId, { position: entry.start, heading: 0, target: null, course: null, route: [], trail: [], altitudeM: GROUND_AMSL_M, batteryPct: 100, speedMs: 0, crabDeg: 0, lost: false });
+      drones.set(entry.droneId, { position: entry.start, heading: 0, target: null, course: null, route: [], trail: [], altitudeM: GROUND_AMSL_M, batteryPct: 100, speedMs: 0, crabDeg: 0, phase: 'air', status: 'idle' });
       broadcast({ type: 'drone_online', telemetry: buildTelemetry(entry, now()) });
     });
   }
@@ -89,23 +100,49 @@ export function createMissionController(
   /** The drone, if it is online and can still take commands. */
   function commandable(droneId: string): DroneState | undefined {
     const drone = drones.get(droneId);
-    return drone && !drone.lost ? drone : undefined;
+    return drone && drone.phase !== 'lost_link' && drone.phase !== 'destroyed' ? drone : undefined;
+  }
+
+  /** Sends the drone's status if it changed since the last one sent. */
+  function syncStatus(droneId: string, drone: DroneState) {
+    const status = statusOf(drone);
+    if (status === drone.status) return;
+    drone.status = status;
+    serverLog('status', { droneId, status });
+    broadcast({ type: 'drone_status', droneId, status });
+  }
+
+  /** A grounded or landing drone that is given somewhere to go takes off again. */
+  function takeOff(drone: DroneState) {
+    drone.phase = 'air';
+  }
+
+  /** Lands the drones where they are: their tasks are dropped, their flown path ends at the landing spot. */
+  function land(droneIds: string[]) {
+    serverLog('land', { droneIds });
+    for (const id of droneIds) {
+      const drone = commandable(id);
+      if (!drone || drone.phase !== 'air') continue;
+      drone.phase = 'landing';
+      setTasks(id, drone, [], true);
+    }
   }
 
   /**
-   * Empty battery: the drone comes down where it is. Its flown path ends at that spot and its remaining
-   * tasks stay, so the operator sees where it fell and where it was going until the mission ends.
+   * Empty battery: the drone is out for good where it is, `destroyed` if it fell from the air, `lost_link`
+   * if it was on the ground. Its flown path ends at that spot and its remaining tasks stay, so the operator
+   * sees where it ended and where it was going until the mission ends.
    */
-  function loseDrone(droneId: string, drone: DroneState) {
-    serverLog('drone lost', { droneId, position: drone.position });
-    drone.lost = true;
+  function goDown(droneId: string, drone: DroneState, phase: 'lost_link' | 'destroyed') {
+    serverLog(phase === 'destroyed' ? 'drone destroyed' : 'drone lost link', { droneId, position: drone.position });
+    drone.phase = phase;
     drone.speedMs = 0;
     drone.crabDeg = 0;
     drone.altitudeM = GROUND_AMSL_M;
     drone.trail = withTrailPoint(drone.trail, drone.position);
     report(droneId, drone);
     reportTasks(droneId, drone);
-    broadcast({ type: 'drone_lost', droneId });
+    syncStatus(droneId, drone);
   }
 
   /** True when a step of `stepM` meters reaches the target. */
@@ -114,39 +151,57 @@ export function createMissionController(
     return Math.hypot(east, north) <= stepM;
   }
 
-  /** One simulated second: climbing drones gain altitude; drones with a target take a step toward it. */
+  /**
+   * One simulated second. In the air a drone climbs to hover altitude and steps toward its target or along
+   * its course; a landing drone comes down. The battery drains in the air, flying or hovering, and much
+   * slower on the ground; when it runs out the drone is out for good.
+   */
   function tick() {
+    const dtS = (TICK_MS / 1000) * SIM_TIME_SCALE;
     for (const [droneId, drone] of drones) {
-      if (drone.lost) continue;
-      const climbing = drone.altitudeM < GROUND_AMSL_M + HOVER_ALT_M;
-      if (climbing) drone.altitudeM = Math.min(GROUND_AMSL_M + HOVER_ALT_M, drone.altitudeM + CLIMB_RATE_MS * SIM_TIME_SCALE * (TICK_MS / 1000));
-      const moving = drone.target !== null || drone.course !== null;
-      if (!moving && !climbing) continue;
-      const dtS = (TICK_MS / 1000) * SIM_TIME_SCALE;
-      let crabDeg = 0;
-      // Flying to a target or along a course: the nose is turned into the wind to hold the ground track.
-      const track = drone.target ? bearingTo(drone.position, drone.target) : drone.course;
-      if (track !== null) {
-        const step = windStep(drone.position, track, wind, DRONE_SPEED_MS, dtS);
-        crabDeg = step.crabDeg;
-        if (drone.target && distanceReached(drone.position, drone.target, step.groundSpeedMs * dtS)) {
-          drone.position = drone.target;
-          serverLog('reached', { droneId, point: drone.target, remainingRoute: drone.route.length });
-          // Reached a control point: it joins the flown path, and the drone goes on to the next one, if any.
-          drone.trail = withTrailPoint(drone.trail, drone.position);
-          drone.target = drone.route.shift() ?? null;
-          reportTasks(droneId, drone);
-        } else {
-          drone.position = step.position;
-        }
-        drone.heading = step.heading;
+      if (drone.phase === 'lost_link' || drone.phase === 'destroyed') continue;
+      if (drone.phase === 'landing') {
+        drone.speedMs = 0;
+        drone.crabDeg = 0;
+        drone.altitudeM = Math.max(GROUND_AMSL_M, drone.altitudeM - CLIMB_RATE_MS * dtS);
+        if (drone.altitudeM === GROUND_AMSL_M) drone.phase = 'landed';
+      } else if (drone.phase === 'air') {
+        flyStep(droneId, drone, dtS);
       }
-      drone.speedMs = drone.target || drone.course !== null ? DRONE_SPEED_MS : 0;
-      drone.crabDeg = crabDeg;
-      drone.batteryPct = Math.max(0, drone.batteryPct - BATTERY_DRAIN_PER_TICK * SIM_TIME_SCALE);
-      if (drone.batteryPct === 0) loseDrone(droneId, drone);
-      else report(droneId, drone);
+      const drain = drone.phase === 'landed' ? BATTERY_LINK_DRAIN_PER_TICK : BATTERY_DRAIN_PER_TICK;
+      drone.batteryPct = Math.max(0, drone.batteryPct - drain * SIM_TIME_SCALE);
+      if (drone.batteryPct === 0) {
+        goDown(droneId, drone, drone.phase === 'landed' ? 'lost_link' : 'destroyed');
+        continue;
+      }
+      report(droneId, drone);
+      syncStatus(droneId, drone);
     }
+  }
+
+  /** A drone in the air: climbs to hover altitude and takes a step toward its target or along its course. */
+  function flyStep(droneId: string, drone: DroneState, dtS: number) {
+    if (drone.altitudeM < GROUND_AMSL_M + HOVER_ALT_M) drone.altitudeM = Math.min(GROUND_AMSL_M + HOVER_ALT_M, drone.altitudeM + CLIMB_RATE_MS * dtS);
+    let crabDeg = 0;
+    // Flying to a target or along a course: the nose is turned into the wind to hold the ground track.
+    const track = drone.target ? bearingTo(drone.position, drone.target) : drone.course;
+    if (track !== null) {
+      const step = windStep(drone.position, track, wind, DRONE_SPEED_MS, dtS);
+      crabDeg = step.crabDeg;
+      if (drone.target && distanceReached(drone.position, drone.target, step.groundSpeedMs * dtS)) {
+        drone.position = drone.target;
+        serverLog('reached', { droneId, point: drone.target, remainingRoute: drone.route.length });
+        // Reached a control point: it joins the flown path, and the drone goes on to the next one, if any.
+        drone.trail = withTrailPoint(drone.trail, drone.position);
+        drone.target = drone.route.shift() ?? null;
+        reportTasks(droneId, drone);
+      } else {
+        drone.position = step.position;
+      }
+      drone.heading = step.heading;
+    }
+    drone.speedMs = drone.target || drone.course !== null ? DRONE_SPEED_MS : 0;
+    drone.crabDeg = crabDeg;
   }
 
   /** Sends the drone's position and flight state (many times a second across the fleet: kept small). */
@@ -194,6 +249,7 @@ export function createMissionController(
     const targets = formationTargets(target, online.length);
     online.forEach((id, i) => {
       const drone = drones.get(id)!;
+      takeOff(drone);
       // A drone flying a course has no tasks to append to: the point becomes its only task.
       const current = append && drone.course === null ? tasksOf(drone) : [];
       if (current.length >= MAX_TASKS) return;
@@ -208,7 +264,9 @@ export function createMissionController(
 
   function setRoute(droneId: string, points: LatLng[]) {
     const drone = commandable(droneId);
-    if (drone) setTasks(droneId, drone, points);
+    if (!drone) return;
+    takeOff(drone);
+    setTasks(droneId, drone, points);
   }
 
   /** Drops one task; dropping the current one sends the drone on to the next from where it is. */
@@ -254,6 +312,7 @@ export function createMissionController(
     for (const id of droneIds) {
       const drone = commandable(id);
       if (drone) {
+        takeOff(drone);
         drone.course = headingDeg;
         drone.target = null;
         drone.route = [];
@@ -302,7 +361,7 @@ export function createMissionController(
       list.push({
         droneId: entry.droneId,
         callsign: entry.callsign,
-        status: live?.lost ? 'lost_link' : (state.status as 'booting' | 'connecting' | 'idle'),
+        status: live ? live.status : (state.status as 'booting' | 'connecting' | 'idle'),
         progress: state.progress,
         position: live?.position ?? null,
         heading: live?.heading ?? null,
@@ -331,7 +390,10 @@ export function createMissionController(
       else if (running && message.type === 'remove_task') removeTask(message.droneId, message.index);
       else if (running && message.type === 'update_task') updateTask(message.droneId, message.index, message.point);
       else if (running && message.type === 'heading') setHeading(message.droneIds, message.headingDeg);
+      else if (running && message.type === 'land') land(message.droneIds);
       else if (running && message.type === 'route') setRoute(message.droneId, message.points);
+      // A command can start or stop a drone (idle <-> moving, landing): its new status goes out now.
+      for (const [id, drone] of drones) syncStatus(id, drone);
     },
     dispose: stop,
   };

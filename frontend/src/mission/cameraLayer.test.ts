@@ -43,8 +43,9 @@ describe('camera view', () => {
     expect(ids).toEqual(['drone-1', 'drone-2']);
   });
 
-  it('shows no camera for a drone that lost its link', () => {
-    expect(cameraFeatures({ 'drone-1': { ...drone, status: 'lost_link' } }, ['drone-1']).features).toEqual([]);
+  it('shows the camera only for drones in the air', () => {
+    const at = (status: DroneView['status']) => cameraFeatures({ 'drone-1': { ...drone, status } }, ['drone-1']).features.length;
+    expect(['idle', 'moving', 'landing', 'landed', 'lost_link', 'destroyed'].map((s) => at(s as DroneView['status']))).toEqual([1, 1, 1, 0, 0, 0]);
   });
 
   it('adds the fill and outline once, fills them and follows the theme', () => {

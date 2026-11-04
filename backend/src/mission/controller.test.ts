@@ -121,57 +121,128 @@ describe('mission controller', () => {
     mission.dispose();
   });
 
-  describe('empty battery', () => {
-    // A long flight: the drone runs dry long before it reaches the far points.
-    function flyUntilEmpty() {
+  describe('drone status', () => {
+    const lastOf = <T extends ServerMessage['type']>(type: T) => sent.filter((m) => m.type === type).at(-1) as Extract<ServerMessage, { type: T }>;
+    const statuses = () => sent.filter((m) => m.type === 'drone_status').map((m) => (m.type === 'drone_status' ? m.status : ''));
+    const statusOf = (mission: ReturnType<typeof createMissionController>) => {
+      const snap = mission.snapshot();
+      return snap.type === 'mission_snapshot' ? snap.drones[0] : undefined;
+    };
+    function online() {
       const mission = createMissionController((m) => sent.push(m));
       mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1 });
       vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
-      mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 51, lng: 30 } });
-      mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 52, lng: 30 }, append: true });
       sent = [];
-      vi.advanceTimersByTime(10 * 60_000);
       return mission;
     }
-    const lastOf = <T extends ServerMessage['type']>(type: T) => sent.filter((m) => m.type === type).at(-1) as Extract<ServerMessage, { type: T }>;
 
-    it('brings the drone down where it ran dry and reports it lost once', () => {
-      const mission = flyUntilEmpty();
-      expect(sent.filter((m) => m.type === 'drone_lost')).toEqual([{ type: 'drone_lost', droneId: 'drone-1' }]);
-      const crash = lastOf('position');
-      expect(crash.batteryPct).toBe(0);
-      expect(crash.speedMs).toBe(0);
-      expect(crash.altitudeM).toBe(150);
-      // It lies there: no more positions after the loss.
-      expect(sent.findIndex((m) => m.type === 'drone_lost')).toBeGreaterThan(sent.lastIndexOf(crash));
+    it('is moving while it flies its tasks and idle once they are done, sent once per change', () => {
+      const mission = online();
+      mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.005, lng: 30 } });
+      expect(statuses()).toEqual(['moving']);
+      vi.advanceTimersByTime(30_000);
+      expect(statuses()).toEqual(['moving', 'idle']);
+      expect(statusOf(mission)?.status).toBe('idle');
       mission.dispose();
     });
 
-    it('keeps the path flown up to the crash and the tasks it did not reach', () => {
-      const mission = flyUntilEmpty();
-      const crash = lastOf('position').position;
-      const tasks = lastOf('drone_tasks');
-      expect(tasks.trail.at(-1)).toEqual(crash);
-      expect(tasks.tasks).toEqual([{ lat: 51, lng: 30 }, { lat: 52, lng: 30 }]);
-      const snap = mission.snapshot();
-      const drone = snap.type === 'mission_snapshot' ? snap.drones[0] : undefined;
-      expect(drone?.status).toBe('lost_link');
-      expect(drone?.position).toEqual(crash);
-      expect(drone?.tasks).toHaveLength(2);
+    it('drains the battery while hovering, too', () => {
+      const mission = online();
+      vi.advanceTimersByTime(60_000);
+      expect(lastOf('position').batteryPct).toBeLessThan(96);
       mission.dispose();
     });
 
-    it('takes no more commands', () => {
-      const mission = flyUntilEmpty();
-      sent = [];
-      mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50, lng: 30 } });
-      mission.handle({ type: 'hold', droneIds: ['drone-1'] });
-      mission.handle({ type: 'remove_task', droneId: 'drone-1', index: 0 });
-      mission.handle({ type: 'update_task', droneId: 'drone-1', index: 0, point: { lat: 50, lng: 30 } });
-      mission.handle({ type: 'heading', droneIds: ['drone-1'], headingDeg: 90 });
-      vi.advanceTimersByTime(5000);
-      expect(sent).toEqual([]);
+    it('lands where it is: drops its tasks, ends its path there and comes down to the ground', () => {
+      const mission = online();
+      mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 51, lng: 30 } });
+      vi.advanceTimersByTime(10_000);
+      mission.handle({ type: 'land', droneIds: ['drone-1'] });
+      const spot = lastOf('position').position;
+      expect(statuses().at(-1)).toBe('landing');
+      expect(lastOf('drone_tasks')).toMatchObject({ tasks: [], trail: [{ lat: 50, lng: 30 }, spot] });
+      vi.advanceTimersByTime(10_000);
+      expect(statuses()).toEqual(['moving', 'landing', 'landed']);
+      expect(lastOf('position')).toMatchObject({ position: spot, altitudeM: 150, speedMs: 0 });
       mission.dispose();
+    });
+
+    it('draws 20 times less power on the ground', () => {
+      const mission = online();
+      mission.handle({ type: 'land', droneIds: ['drone-1'] });
+      vi.advanceTimersByTime(10_000);
+      const before = lastOf('position').batteryPct;
+      vi.advanceTimersByTime(60_000);
+      const groundUse = before - lastOf('position').batteryPct;
+      // In the air a minute of real time (10 simulated) uses 25 %; on the ground 1.25 %.
+      expect(groundUse).toBeCloseTo(1.25, 5);
+      mission.dispose();
+    });
+
+    it('takes off again when a landed drone is given a point', () => {
+      const mission = online();
+      mission.handle({ type: 'land', droneIds: ['drone-1'] });
+      vi.advanceTimersByTime(10_000);
+      mission.handle({ type: 'land', droneIds: ['drone-1'] }); // already down: nothing changes
+      mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.05, lng: 30 } });
+      vi.advanceTimersByTime(3000);
+      expect(statuses()).toEqual(['landing', 'landed', 'moving']);
+      expect(lastOf('position').altitudeM).toBeGreaterThan(150);
+      mission.dispose();
+    });
+
+    describe('empty battery', () => {
+      // A long flight: the drone runs dry long before it reaches the far points.
+      function flyUntilEmpty() {
+        const mission = online();
+        mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 51, lng: 30 } });
+        mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 52, lng: 30 }, append: true });
+        vi.advanceTimersByTime(10 * 60_000);
+        return mission;
+      }
+
+      it('in the air: the drone falls where it ran dry and is destroyed', () => {
+        const mission = flyUntilEmpty();
+        expect(statuses()).toEqual(['moving', 'destroyed']);
+        const crash = lastOf('position');
+        expect(crash).toMatchObject({ batteryPct: 0, speedMs: 0, altitudeM: 150 });
+        // It lies there: no more positions after the fall.
+        expect(sent.findIndex((m) => m.type === 'drone_status' && m.status === 'destroyed')).toBeGreaterThan(sent.lastIndexOf(crash));
+        mission.dispose();
+      });
+
+      it('in the air: keeps the path flown up to the crash and the tasks it did not reach', () => {
+        const mission = flyUntilEmpty();
+        const crash = lastOf('position').position;
+        expect(lastOf('drone_tasks').trail.at(-1)).toEqual(crash);
+        expect(lastOf('drone_tasks').tasks).toEqual([{ lat: 51, lng: 30 }, { lat: 52, lng: 30 }]);
+        expect(statusOf(mission)).toMatchObject({ status: 'destroyed', position: crash });
+        expect(statusOf(mission)?.tasks).toHaveLength(2);
+        mission.dispose();
+      });
+
+      it('on the ground: the drone stays intact but loses its link', () => {
+        const mission = online();
+        mission.handle({ type: 'land', droneIds: ['drone-1'] });
+        vi.advanceTimersByTime(90 * 60_000);
+        expect(statuses()).toEqual(['landing', 'landed', 'lost_link']);
+        expect(statusOf(mission)?.status).toBe('lost_link');
+        mission.dispose();
+      });
+
+      it('takes no more commands once destroyed', () => {
+        const mission = flyUntilEmpty();
+        sent = [];
+        mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50, lng: 30 } });
+        mission.handle({ type: 'hold', droneIds: ['drone-1'] });
+        mission.handle({ type: 'land', droneIds: ['drone-1'] });
+        mission.handle({ type: 'remove_task', droneId: 'drone-1', index: 0 });
+        mission.handle({ type: 'update_task', droneId: 'drone-1', index: 0, point: { lat: 50, lng: 30 } });
+        mission.handle({ type: 'heading', droneIds: ['drone-1'], headingDeg: 90 });
+        vi.advanceTimersByTime(5000);
+        expect(sent).toEqual([]);
+        mission.dispose();
+      });
     });
   });
 

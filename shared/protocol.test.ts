@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_DRONES, MAX_TASKS, parseClientMessage } from './protocol';
+import { isAirborne, MAX_DRONES, MAX_TASKS, parseClientMessage, takesCommands } from './protocol';
 
 const area = { center: { lat: 50, lng: 30 }, widthKm: 200, heightKm: 200 };
 
@@ -73,6 +73,18 @@ describe('parseClientMessage', () => {
   it('accepts hold for a list of drones', () => {
     expect(parseClientMessage({ type: 'hold', droneIds: ['drone-1'] })).toEqual({ type: 'hold', droneIds: ['drone-1'] });
     expect(parseClientMessage({ type: 'hold', droneIds: [] })).toBeNull();
+  });
+
+  it('accepts land for a list of drones', () => {
+    expect(parseClientMessage({ type: 'land', droneIds: ['drone-1', 'drone-2'] })).toEqual({ type: 'land', droneIds: ['drone-1', 'drone-2'] });
+    expect(parseClientMessage({ type: 'land', droneIds: [] })).toBeNull();
+    expect(parseClientMessage({ type: 'land', droneIds: [7] })).toBeNull();
+    expect(parseClientMessage({ type: 'land', droneIds: Array.from({ length: MAX_DRONES + 1 }, (_, i) => `drone-${i}`) })).toBeNull();
+  });
+
+  it('tells which drones take commands and which are in the air', () => {
+    expect(['idle', 'moving', 'landing', 'landed', 'lost_link', 'destroyed', 'booting', null].map(takesCommands)).toEqual([true, true, true, true, false, false, false, false]);
+    expect(['idle', 'moving', 'landing', 'landed', 'lost_link', 'destroyed', 'booting', null].map(isAirborne)).toEqual([true, true, true, false, false, false, false, false]);
   });
 
   it('accepts remove_task with a whole index inside the task limit', () => {

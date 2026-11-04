@@ -67,4 +67,19 @@ describe('DroneDetails', () => {
     expect(screen.queryByRole('button', { name: 'Remove task 1' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Clear all' })).toBeNull();
   });
+
+  it('shows a destroyed drone with where it fell', () => {
+    render(<DroneDetails droneId="drone-1" drone={{ ...drone, status: 'destroyed', batteryPct: 0, speedMs: 0 }} defaultOpen />);
+    expect(screen.getByRole('alert').textContent).toContain('Destroyed');
+    expect(screen.getByRole('alert').className).toContain('is-destroyed');
+    expect(screen.getByText('destroyed')).toBeTruthy();
+    expect(screen.getByText('50.10000, 30.20000')).toBeTruthy();
+  });
+
+  it('keeps warning about the battery of a landed drone, which still takes commands', () => {
+    render(<DroneDetails droneId="drone-1" drone={{ ...drone, status: 'landed', altitudeM: 150, batteryPct: 20 }} defaultOpen />);
+    expect(screen.getByText('landed')).toBeTruthy();
+    expect(screen.getByRole('alert').className).toContain('is-low');
+    expect(screen.getByText('0 m · 20%')).toBeTruthy();
+  });
 });

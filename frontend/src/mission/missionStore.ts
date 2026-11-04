@@ -5,6 +5,7 @@ import {
   isLatLng,
   MISSION_DEFAULT_AREA_KM,
   MISSION_MAX_AREA_KM,
+  type FlightStatus,
   type LatLng,
   type MissionErrorReason,
   type ServerMessage,
@@ -19,8 +20,8 @@ export type MissionPhase = 'idle' | 'running';
 
 export interface DroneView {
   callsign: string;
-  /** `lost_link`: the battery ran out; the drone lies at `position` and keeps its path and tasks for the map. */
-  status: 'booting' | 'connecting' | 'idle' | 'lost_link';
+  /** Boot steps, then the server's FlightStatus once online. */
+  status: 'booting' | 'connecting' | FlightStatus;
   progress: number;
   /** Known once the drone is online; null while it is still booting. */
   position: LatLng | null;
@@ -240,10 +241,10 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
         });
         return;
       }
-      case 'drone_lost': {
+      case 'drone_status': {
         const drone = get().drones[message.droneId];
         if (!drone) return;
-        set({ drones: { ...get().drones, [message.droneId]: { ...drone, status: 'lost_link', speedMs: 0 } } });
+        set({ drones: { ...get().drones, [message.droneId]: { ...drone, status: message.status } } });
         return;
       }
       case 'mission_snapshot': {
