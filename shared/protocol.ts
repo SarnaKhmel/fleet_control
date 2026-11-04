@@ -6,6 +6,8 @@ export const DRONE_COUNT = 3;
 export const MISSION_DEFAULT_AREA_KM = 200;
 export const MISSION_MAX_AREA_KM = 500;
 export const CLUSTER_MAX_RADIUS_M = 5000;
+/** Launch site altitude above sea level, meters. Drones take off from here. */
+export const GROUND_AMSL_M = 150;
 
 export interface LatLng {
   lat: number;
@@ -63,7 +65,7 @@ export type MissionErrorReason = 'outside_area' | 'already_running';
 export type ServerMessage =
   | { type: 'drone_boot'; droneId: string; status: 'booting' | 'connecting'; progress: number }
   | { type: 'drone_online'; telemetry: DroneTelemetry }
-  | { type: 'position'; droneId: string; position: LatLng; heading: number; speedMs: number }
+  | { type: 'position'; droneId: string; position: LatLng; heading: number; speedMs: number; altitudeM: number }
   | { type: 'mission_error'; reason: MissionErrorReason }
   | { type: 'mission_reset' };
 

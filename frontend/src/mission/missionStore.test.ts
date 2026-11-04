@@ -32,7 +32,7 @@ describe('mission store', () => {
 
   it('applies boot messages to the roster without a position', () => {
     store().apply({ type: 'drone_boot', droneId: 'drone-1', status: 'booting', progress: 40 });
-    expect(store().drones['drone-1']).toEqual({ callsign: 'drone-1', status: 'booting', progress: 40, position: null, heading: null });
+    expect(store().drones['drone-1']).toEqual({ callsign: 'drone-1', status: 'booting', progress: 40, position: null, heading: null, altitudeM: null });
   });
 
   it('takes the position and heading from the first telemetry', () => {
@@ -67,7 +67,7 @@ describe('mission store', () => {
 
   it('moves a known drone on position messages', () => {
     store().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30 }, heading_deg: 0 } } } as never);
-    store().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 90, speedMs: 10 });
+    store().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 90, speedMs: 10, altitudeM: 210 });
     expect(store().drones['drone-1']).toMatchObject({ position: { lat: 50.1, lng: 30.1 }, heading: 90 });
   });
 

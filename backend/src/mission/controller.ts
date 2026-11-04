@@ -1,7 +1,7 @@
 import type { ClientMessage, LatLng, MissionArea, ServerMessage, StartLayout } from '../../../shared/protocol.js';
 import { BOOT_MS, buildSchedule, CONNECT_MS, DroneSchedule, resolveStarts } from './schedule.js';
 import { buildTelemetry } from './telemetry.js';
-import { DRONE_SPEED_MS, formationTargets, stepToward, TICK_MS } from './kinematics.js';
+import { CLIMB_RATE_MS, DRONE_SPEED_MS, formationTargets, GROUND_AMSL_M, HOVER_ALT_M, stepToward, TICK_MS } from './kinematics.js';
 
 // Interval between "booting" progress messages, simulated ms.
 export const PROGRESS_STEP_MS = 1000;
@@ -15,6 +15,7 @@ interface DroneState {
   position: LatLng;
   heading: number;
   target: LatLng | null;
+  altitudeM: number;
 }
 
 /**
@@ -49,20 +50,31 @@ export function createMissionController(
       broadcast({ type: 'drone_boot', droneId: entry.droneId, status: 'connecting', progress: 0 }),
     );
     later(entry.startAtMs + BOOT_MS + CONNECT_MS, () => {
-      drones.set(entry.droneId, { position: entry.start, heading: 0, target: null });
+      drones.set(entry.droneId, { position: entry.start, heading: 0, target: null, altitudeM: GROUND_AMSL_M });
       broadcast({ type: 'drone_online', telemetry: buildTelemetry(entry, now()) });
     });
   }
 
-  /** One simulated second: every drone with a target takes a step toward it. */
+  /** One simulated second: climbing drones gain altitude; drones with a target take a step toward it. */
   function tick() {
     for (const [droneId, drone] of drones) {
-      if (!drone.target) continue;
-      const step = stepToward(drone.position, drone.target, DRONE_SPEED_MS * (TICK_MS / 1000));
-      drone.position = step.position;
-      drone.heading = step.heading;
-      if (step.arrived) drone.target = null;
-      broadcast({ type: 'position', droneId, position: drone.position, heading: drone.heading, speedMs: drone.target ? DRONE_SPEED_MS : 0 });
+      const climbing = drone.altitudeM < GROUND_AMSL_M + HOVER_ALT_M;
+      if (climbing) drone.altitudeM = Math.min(GROUND_AMSL_M + HOVER_ALT_M, drone.altitudeM + CLIMB_RATE_MS * (TICK_MS / 1000));
+      if (!drone.target && !climbing) continue;
+      if (drone.target) {
+        const step = stepToward(drone.position, drone.target, DRONE_SPEED_MS * (TICK_MS / 1000));
+        drone.position = step.position;
+        drone.heading = step.heading;
+        if (step.arrived) drone.target = null;
+      }
+      broadcast({
+        type: 'position',
+        droneId,
+        position: drone.position,
+        heading: drone.heading,
+        speedMs: drone.target ? DRONE_SPEED_MS : 0,
+        altitudeM: drone.altitudeM,
+      });
     }
   }
 

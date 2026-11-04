@@ -67,9 +67,9 @@ describe('mission controller', () => {
     sent = [];
     mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.02, lng: 30 } });
     vi.advanceTimersByTime(3000);
-    const positions = sent.filter((m) => m.type === 'position');
-    expect(positions.length).toBe(3);
-    const last = positions[2];
+    const positions = sent.filter((m) => m.type === 'position' && m.droneId === 'drone-1');
+    expect(positions.length).toBeGreaterThanOrEqual(3);
+    const last = positions[positions.length - 1];
     expect(last.type === 'position' && last.position.lat).toBeGreaterThan(50.0);
     mission.dispose();
   });
@@ -80,6 +80,21 @@ describe('mission controller', () => {
     mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.02, lng: 30 } });
     vi.advanceTimersByTime(3000);
     expect(sent.some((m) => m.type === 'position')).toBe(false);
+    mission.dispose();
+  });
+
+  it('climbs an online drone to hover altitude before it is given a move', () => {
+    const mission = createMissionController((m) => sent.push(m));
+    mission.handle({ type: 'mission_start', area, layout: single });
+    vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
+    sent = [];
+    vi.advanceTimersByTime(5000);
+    const altitudes = sent.filter((m) => m.type === 'position').map((m) => (m.type === 'position' ? m.altitudeM : 0));
+    expect(altitudes.length).toBeGreaterThan(0);
+    expect(altitudes[altitudes.length - 1]).toBeGreaterThan(150);
+    vi.advanceTimersByTime(60_000);
+    const last = sent.filter((m) => m.type === 'position').at(-1);
+    expect(last && last.type === 'position' && last.altitudeM).toBe(210);
     mission.dispose();
   });
 });

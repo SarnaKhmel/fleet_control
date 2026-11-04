@@ -21,6 +21,8 @@ export interface DroneView {
   progress: number;
   /** Known once the drone is online; null while it is still booting. */
   position: LatLng | null;
+  /** Altitude above sea level, meters; null until online. */
+  altitudeM: number | null;
   heading: number | null;
 }
 
@@ -146,6 +148,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
               progress: message.progress,
               position: null,
               heading: null,
+              altitudeM: null,
             },
           },
         });
@@ -164,6 +167,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
                 lng: message.telemetry.position_and_kinematics.gps.longitude,
               },
               heading: message.telemetry.position_and_kinematics.heading_deg,
+              altitudeM: message.telemetry.position_and_kinematics.gps.altitude_amsl_m,
             },
           },
         });
@@ -174,7 +178,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
         set({
           drones: {
             ...get().drones,
-            [message.droneId]: { ...drone, position: message.position, heading: message.heading },
+            [message.droneId]: { ...drone, position: message.position, heading: message.heading, altitudeM: message.altitudeM },
           },
         });
         return;

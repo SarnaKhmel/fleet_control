@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DRONE_COUNT, type ClientMessage } from '../../../shared/protocol';
+import { DRONE_COUNT, GROUND_AMSL_M, type ClientMessage } from '../../../shared/protocol';
 import { useLocationStore } from '../location/locationStore';
 import { sendClientMessage } from './missionSocket';
 import { effectiveCenter, layoutFrom, startProblem, useMissionStore, type DroneView, type LayoutKind, type MissionPhase } from './missionStore';
@@ -17,7 +17,7 @@ function DroneStatusList({ drones, phase }: DroneStatusListProps) {
     const id = `drone-${i + 1}`;
     // The callsign is fixed by the schedule (BA-01…BA-03); the drone is only a status until it is online.
     const drone = drones[id];
-    return { id, callsign: `BA-0${i + 1}`, status: drone?.status ?? null, progress: drone?.progress ?? 0 };
+    return { id, callsign: `BA-0${i + 1}`, status: drone?.status ?? null, progress: drone?.progress ?? 0, altitudeM: drone?.altitudeM ?? null };
   });
   const online = rows.filter((r) => r.status === 'idle').length;
   if (phase !== 'running' && online === 0) return null;
@@ -35,7 +35,11 @@ function DroneStatusList({ drones, phase }: DroneStatusListProps) {
               <div className="drone-status-line">
                 <strong>{row.callsign}</strong>
                 <span className={`drone-state is-${row.status ?? 'offline'}`}>
-                  {row.status ? t(`mission.status.${row.status}`) : t('mission.status.offline')}
+                  {row.status === 'idle' && row.altitudeM !== null
+                    ? `${Math.round(row.altitudeM - GROUND_AMSL_M)} m`
+                    : row.status
+                      ? t(`mission.status.${row.status}`)
+                      : t('mission.status.offline')}
                 </span>
               </div>
               <div className="boot-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>

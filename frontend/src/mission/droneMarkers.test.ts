@@ -5,8 +5,8 @@ import type { DroneView } from './missionStore';
 
 vi.mock('maplibre-gl', () => import('../test/maplibreMock'));
 
-const online: DroneView = { callsign: 'BA-01', status: 'idle', progress: 100, position: { lat: 50, lng: 30 }, heading: 45 };
-const booting: DroneView = { callsign: 'drone-2', status: 'booting', progress: 40, position: null, heading: null };
+const online: DroneView = { callsign: 'BA-01', status: 'idle', progress: 100, position: { lat: 50, lng: 30 }, heading: 45, altitudeM: 150 };
+const booting: DroneView = { callsign: 'drone-2', status: 'booting', progress: 40, position: null, heading: null, altitudeM: null };
 
 describe('drone markers', () => {
   it('draws NATO drones as symbols', () => {
