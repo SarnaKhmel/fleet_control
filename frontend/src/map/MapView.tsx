@@ -235,8 +235,7 @@ export function MapView() {
     const sync = () => {
       const { drones } = useMissionStore.getState();
       droneMarkersRef.current = syncDroneMarkers(map, droneMarkersRef.current, drones, useSymbolStyleStore.getState().style);
-      // Paths need the style; until it loads, the style.load handler draws them.
-      if (map.isStyleLoaded()) syncWaypoints(map, drones, useThemeStore.getState().theme);
+      syncWaypoints(map, drones, useThemeStore.getState().theme);
     };
     sync();
     const unsubscribe = [

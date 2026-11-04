@@ -24,13 +24,18 @@ export function waypointFeatures(drones: Record<string, DroneView>) {
   return { type: 'FeatureCollection', features };
 }
 
-/** Adds the path layers on first use, then only replaces their data and colors. */
+/**
+ * Adds the path layers on first use, then only replaces their data and colors. Once the source exists
+ * it is updated at any time: MapLibre reports the style as not loaded whenever any tiles are loading,
+ * which would hold the paths back most of the time. Only adding the source waits for the style.
+ */
 export function syncWaypoints(map: MapLibreMap, drones: Record<string, DroneView>, theme: Theme): void {
   const data = waypointFeatures(drones);
   const source = map.getSource(WAYPOINT_SOURCE_ID) as { setData?: (d: unknown) => void } | undefined;
   if (source?.setData) {
     source.setData(data);
   } else {
+    if (!map.isStyleLoaded()) return; // the style.load handler adds the source
     map.addSource(WAYPOINT_SOURCE_ID, { type: 'geojson', data: data as never });
     map.addLayer({
       id: WAYPOINT_LINE_ID,

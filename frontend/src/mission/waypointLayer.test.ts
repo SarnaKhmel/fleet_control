@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { FakeMap } from '../test/maplibreMock';
 import type { DroneView } from './missionStore';
 import { syncWaypoints, waypointFeatures, WAYPOINT_LINE_ID, WAYPOINT_POINT_ID, WAYPOINT_SOURCE_ID } from './waypointLayer';
@@ -27,5 +27,24 @@ describe('drone paths', () => {
     expect(map.getSource(WAYPOINT_SOURCE_ID)).toBeTruthy();
     expect(map.getLayer(WAYPOINT_LINE_ID)).toBeTruthy();
     expect(map.getLayer(WAYPOINT_POINT_ID)).toBeTruthy();
+  });
+
+  it('updates the path while map tiles are still loading, once its source exists', () => {
+    // MapLibre reports the style as not loaded while any source loads tiles, which is most of the time.
+    const map = new FakeMap({ style: 'x' });
+    map.isStyleLoaded = () => false;
+    const setData = vi.fn();
+    map.sources[WAYPOINT_SOURCE_ID] = { setData };
+    map.layers[WAYPOINT_LINE_ID] = { id: WAYPOINT_LINE_ID };
+    map.layers[WAYPOINT_POINT_ID] = { id: WAYPOINT_POINT_ID };
+    syncWaypoints(map as never, { 'drone-1': { ...base, tasks: [{ lat: 50.2, lng: 30.2 }] } }, 'dark');
+    expect(setData).toHaveBeenCalledOnce();
+  });
+
+  it('waits for the style before adding its source', () => {
+    const map = new FakeMap({ style: 'x' });
+    map.isStyleLoaded = () => false;
+    syncWaypoints(map as never, {}, 'dark');
+    expect(map.getSource(WAYPOINT_SOURCE_ID)).toBeUndefined();
   });
 });

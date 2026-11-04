@@ -8,6 +8,7 @@ import { useMapViewStore } from './mapStyles';
 import { useMapIssueStore } from './mapIssue';
 import { useMapScaleStore } from './mapScaleStore';
 import { useMissionStore } from '../mission/missionStore';
+import { WAYPOINT_SOURCE_ID } from '../mission/waypointLayer';
 
 import { useSelectionStore } from '../mission/selection';
 import { moveOnlineDrones } from '../mission/missionSocket';
@@ -100,6 +101,23 @@ describe('MapView', () => {
     });
     expect(marker.lngLat).toEqual([30.1, 50.1]);
     expect(renders).toBe(before);
+    useMissionStore.setState({ phase: 'idle', drones: {} });
+  });
+
+  it('updates drone paths while map tiles are still loading', () => {
+    useMissionStore.setState({ phase: 'running', drones: {} });
+    render(<MapView />);
+    const map = mapInstances[0];
+    // The source exists (added on style load), but some tiles are still loading.
+    const setData = vi.fn();
+    map.sources[WAYPOINT_SOURCE_ID] = { setData };
+    map.layers['drone-waypoints-line'] = { id: 'drone-waypoints-line' };
+    map.layers['drone-waypoints-point'] = { id: 'drone-waypoints-point' };
+    map.isStyleLoaded = () => false;
+    act(() => {
+      useMissionStore.getState().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30, altitude_amsl_m: 150 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
+    });
+    expect(setData).toHaveBeenCalled();
     useMissionStore.setState({ phase: 'idle', drones: {} });
   });
 
