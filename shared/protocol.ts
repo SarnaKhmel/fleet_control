@@ -1,4 +1,5 @@
 import type { ReconCell, ReconGrid } from './mission/recon.js';
+import type { MissionUnit } from './mission/units.js';
 
 // WebSocket protocol shared by the simulator (backend) and the dashboard (frontend).
 // Server is the source of truth; the client sends intents only. Every incoming message is
@@ -167,7 +168,13 @@ export interface SnapshotDrone {
 
 export type ServerMessage =
   /** `droneCount` is the size of the running mission's fleet (0 when none runs); `drones` lists those started so far. */
-  | { type: 'mission_snapshot'; running: boolean; droneCount: number; drones: SnapshotDrone[]; recon?: { grid: ReconGrid; cells: ReconCell[] } }
+  /** `units`: the enemy and allied units known so far. */
+  | { type: 'mission_snapshot'; running: boolean; droneCount: number; drones: SnapshotDrone[]; recon?: { grid: ReconGrid; cells: ReconCell[] }; units?: MissionUnit[] }
+  /**
+   * Units newly known or changed (an enemy found, or one in sight that moved): each replaces the one with its id.
+   * An enemy out of sight is not sent: the dashboard keeps it where it was last seen.
+   */
+  | { type: 'units'; units: MissionUnit[] }
   /** Ground the cameras saw for the first time in the last tick, as cells of the grid (only the new ones). */
   | { type: 'recon_cells'; grid: ReconGrid; cells: ReconCell[] }
   | { type: 'drone_boot'; droneId: string; status: 'booting' | 'connecting'; progress: number }

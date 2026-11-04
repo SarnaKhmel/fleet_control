@@ -2,7 +2,9 @@ import { DEFAULT_ALTITUDE_AGL_M, DEFAULT_CRUISE_SPEED_MS, MAX_TASKS, type Client
 import { BOOT_MS, buildSchedule, CONNECT_MS, DroneSchedule, resolveStarts } from './schedule.js';
 import { buildTelemetry } from './telemetry.js';
 import { offsetLatLng, toMetersFrom } from '../../../shared/mission/area.js';
-import { coneCells, RECON_CELL_M, type ReconCell, type ReconGrid } from '../../../shared/mission/recon.js';
+import { cellOf, circleCells, coneCells, RECON_CELL_M, type ReconCell, type ReconGrid } from '../../../shared/mission/recon.js';
+import { ALLY_RECON_RADIUS_M, type MissionUnit, type UnitSource } from '../../../shared/mission/units.js';
+import { generateForces, moveUnit, type ForceUnit } from './forces.js';
 import { NO_TERRAIN, type Terrain } from '../terrain/terrain.js';
 import { NO_BUILDINGS, type Buildings } from '../buildings/buildings.js';
 import { buildingAhead, hitOnStep, WARNING_REAL_S } from './obstacles.js';
@@ -82,6 +84,7 @@ export function createMissionController(
   now: () => string = () => new Date().toISOString(),
   terrain: Terrain = NO_TERRAIN,
   buildings: Buildings = NO_BUILDINGS,
+  placeForces: (area: MissionArea, starts: LatLng[]) => ForceUnit[] = generateForces,
 ): MissionController {
   let timers: ReturnType<typeof setTimeout>[] = [];
   let ticker: ReturnType<typeof setInterval> | undefined;
@@ -96,6 +99,13 @@ export function createMissionController(
   let reconGrid: ReconGrid | null = null;
   const reconSeen = new Set<string>();
   let reconCells: ReconCell[] = [];
+  // The enemy and allies on the ground (all of them, as they really are), what the dashboard knows of them,
+  // and the cells the allies watch all the time.
+  let area: MissionArea | null = null;
+  let starts: LatLng[] = [];
+  let forces: ForceUnit[] = [];
+  const known = new Map<string, MissionUnit>();
+  const allyWatch = new Set<string>();
 
   function later(ms: number, fn: () => void) {
     timers.push(setTimeout(fn, ms));
@@ -206,6 +216,9 @@ export function createMissionController(
   function tick() {
     const dtS = (TICK_MS / 1000) * SIM_TIME_SCALE;
     const fresh: ReconCell[] = [];
+    // Cells in a camera's view this tick, and the first drone that sees each.
+    const inView = new Map<string, string>();
+    if (area) for (const unit of forces) moveUnit(unit, area, starts, dtS);
     for (const [droneId, drone] of drones) {
       if (drone.phase === 'lost_link' || drone.phase === 'destroyed') continue;
       drone.groundM = groundAt(drone, drone.position);
@@ -226,7 +239,11 @@ export function createMissionController(
         }
       }
       updateWarning(droneId, drone);
-      if (drone.phase === 'air' || drone.phase === 'landing') fresh.push(...scan(drone));
+      if ((drone.phase === 'air' || drone.phase === 'landing') && reconGrid) {
+        const cone = coneCells(reconGrid, drone.position, drone.heading - drone.crabDeg);
+        fresh.push(...markSeen(cone));
+        for (const cell of cone) if (!inView.has(cellKey(cell))) inView.set(cellKey(cell), droneId);
+      }
       // In the air the drain grows with the airspeed: the cruise speed when flying somewhere, the wind
       // speed when hovering or coming down (it holds its spot against the wind). On the ground: the link only.
       const airspeedMs = drone.target || drone.course !== null ? drone.cruiseSpeedMs : wind.speedMs;
@@ -240,14 +257,46 @@ export function createMissionController(
       syncStatus(droneId, drone);
     }
     if (reconGrid && fresh.length > 0) broadcast({ type: 'recon_cells', grid: reconGrid, cells: fresh });
+    detect(inView);
   }
 
-  /** Marks what the drone's camera sees (ahead, along the way it flies); returns the cells seen for the first time. */
-  function scan(drone: DroneState): ReconCell[] {
-    if (!reconGrid) return [];
+  /**
+   * Enemies in sight: in a drone camera's view this tick, or in the ground an ally watches. One seen for the
+   * first time becomes known; a known one on the move is reported where it is now. Out of sight, the
+   * dashboard keeps it where it was last seen.
+   */
+  function detect(inView: Map<string, string>) {
+    if (!reconGrid) return;
+    const changed: MissionUnit[] = [];
+    for (const unit of forces) {
+      if (unit.side !== 'enemy') continue;
+      const key = cellKey(cellOf(reconGrid, unit.position));
+      const droneId = inView.get(key) ?? null;
+      if (!droneId && !allyWatch.has(key)) continue;
+      const was = known.get(unit.id);
+      if (was && unit.speedMs === 0) continue;
+      if (!was) serverLog('enemy found', { id: unit.id, kind: unit.kind, by: droneId ?? 'ally' });
+      const view = unitView(unit, was?.source ?? (droneId ? 'drone' : 'ally'), was ? was.detectedByDroneId : droneId);
+      known.set(unit.id, view);
+      changed.push(view);
+    }
+    if (changed.length > 0) broadcast({ type: 'units', units: changed });
+  }
+
+  function unitView(unit: ForceUnit, source: UnitSource, detectedByDroneId: string | null): MissionUnit {
+    const { id, side, kind, position, headingDeg, speedMs } = unit;
+    return { id, side, kind, position, headingDeg, speedMs, source, detectedByDroneId };
+  }
+
+  function cellKey(cell: ReconCell): string {
+    return `${cell[0]},${cell[1]}`;
+  }
+
+  /** Marks the cells as reconnoitred; returns those seen for the first time. */
+  function markSeen(cells: ReconCell[]): ReconCell[] {
     const fresh: ReconCell[] = [];
-    for (const cell of coneCells(reconGrid, drone.position, drone.heading - drone.crabDeg)) {
-      const key = `${cell[0]},${cell[1]}`;
+    for (const cell of cells) {
+      const key = cellKey(cell);
       if (reconSeen.has(key)) continue;
       reconSeen.add(key);
       reconCells.push(cell);
@@ -483,6 +532,29 @@ export function createMissionController(
     }
   }
 
+  /**
+   * Places the enemy and allies. The allies and the enemy known from intelligence are sent at once; the
+   * ground the allies watch is reconnoitred from the start.
+   */
+  function deployForces(missionArea: MissionArea, startPoints: LatLng[]) {
+    area = missionArea;
+    starts = startPoints;
+    forces = placeForces(missionArea, startPoints);
+    const watched: ReconCell[] = [];
+    for (const unit of forces) {
+      if (unit.intel) known.set(unit.id, unitView(unit, 'intel', null));
+      if (unit.side !== 'ally') continue;
+      for (const cell of circleCells(reconGrid!, unit.position, ALLY_RECON_RADIUS_M)) {
+        allyWatch.add(cellKey(cell));
+        watched.push(cell);
+      }
+    }
+    serverLog('forces', { enemies: forces.filter((u) => u.side === 'enemy').length, allies: forces.filter((u) => u.side === 'ally').length, known: known.size });
+    const fresh = markSeen(watched);
+    if (fresh.length > 0) broadcast({ type: 'recon_cells', grid: reconGrid!, cells: fresh });
+    if (known.size > 0) broadcast({ type: 'units', units: [...known.values()] });
+  }
+
   function start(area: MissionArea, layout: StartLayout, count: number) {
     if (running) {
       broadcast({ type: 'mission_error', reason: 'already_running' });
@@ -496,6 +568,7 @@ export function createMissionController(
     running = true;
     droneCount = count;
     reconGrid = { origin: area.center, cellM: RECON_CELL_M };
+    deployForces(area, starts.points);
     startedAt = Date.now();
     schedule = buildSchedule(starts.points);
     // Start loading the ground under the start points, so it is known when the drones come online.
@@ -513,6 +586,11 @@ export function createMissionController(
     reconGrid = null;
     reconSeen.clear();
     reconCells = [];
+    area = null;
+    starts = [];
+    forces = [];
+    known.clear();
+    allyWatch.clear();
     running = false;
     droneCount = 0;
   }
@@ -545,7 +623,7 @@ export function createMissionController(
         tasks: live ? tasksOf(live) : [],
       });
     }
-    return { type: 'mission_snapshot', running: true, droneCount, drones: list, ...(reconGrid ? { recon: { grid: reconGrid, cells: reconCells } } : {}) };
+    return { type: 'mission_snapshot', running: true, droneCount, drones: list, ...(reconGrid ? { recon: { grid: reconGrid, cells: reconCells } } : {}), units: [...known.values()] };
   }
 
   return {

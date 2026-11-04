@@ -3,8 +3,9 @@ import { MAX_TASKS, type LatLng, type ServerMessage } from '../../../shared/prot
 import { createMissionController } from './controller.js';
 import { NO_TERRAIN, type Terrain } from '../terrain/terrain.js';
 import type { Building, Buildings } from '../buildings/buildings.js';
-import { toMetersFrom } from '../../../shared/mission/area.js';
+import { offsetLatLng, toMetersFrom } from '../../../shared/mission/area.js';
 import { CONNECT_MS, BOOT_MS, STAGGER_MS } from './schedule.js';
+import type { ForceUnit } from './forces.js';
 
 const area = { center: { lat: 50, lng: 30 }, widthKm: 200, heightKm: 200 };
 const single = { kind: 'single' as const, point: { lat: 50, lng: 30 } };
@@ -447,7 +448,8 @@ describe('mission controller', () => {
     const reconMessages = () => sent.filter((m) => m.type === 'recon_cells') as Extract<ServerMessage, { type: 'recon_cells' }>[];
     const allCells = () => reconMessages().flatMap((m) => m.cells.map(([x, y]) => `${x},${y}`));
     function online() {
-      const mission = createMissionController((m) => sent.push(m));
+      // No enemy or allies: an ally would reconnoitre the ground around it from the start.
+      const mission = createMissionController((m) => sent.push(m), undefined, NO_TERRAIN, undefined, () => []);
       mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1 });
       vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
       return mission;
@@ -488,6 +490,90 @@ describe('mission controller', () => {
       mission.dispose();
     });
 
+  });
+
+  describe('enemy and allies', () => {
+    const unitMessages = () => sent.filter((m) => m.type === 'units') as Extract<ServerMessage, { type: 'units' }>[];
+    const sentUnits = () => unitMessages().flatMap((m) => m.units);
+    const force = (over: Partial<ForceUnit>): ForceUnit => ({
+      id: 'enemy-1', side: 'enemy', kind: 'infantry', position: area.center, headingDeg: null, speedMs: 0, intel: false, band: [0, 100_000], waypoint: null, ...over,
+    });
+    function online(forces: ForceUnit[]) {
+      const mission = createMissionController((m) => sent.push(m), undefined, NO_TERRAIN, undefined, () => forces.map((f) => ({ ...f })));
+      mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1 });
+      vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
+      return mission;
+    }
+
+    it('sends the allies and the enemy known from intelligence at the start, and hides the rest', () => {
+      const ally = force({ id: 'ally-1', side: 'ally', position: offsetLatLng(area.center, 0, -20_000), intel: true });
+      const known = force({ id: 'enemy-1', kind: 'artillery', position: offsetLatLng(area.center, 0, 30_000), intel: true });
+      const hidden = force({ id: 'enemy-2', position: offsetLatLng(area.center, 0, 40_000) });
+      const mission = online([known, hidden, ally]);
+      expect(unitMessages()).toHaveLength(1);
+      expect(sentUnits().map((u) => [u.id, u.source])).toEqual([['enemy-1', 'intel'], ['ally-1', 'intel']]);
+      expect(sentUnits()[0]).toEqual({ id: 'enemy-1', side: 'enemy', kind: 'artillery', position: known.position, headingDeg: null, speedMs: 0, source: 'intel', detectedByDroneId: null });
+      const snap = mission.snapshot();
+      expect(snap.type === 'mission_snapshot' && snap.units?.map((u) => u.id)).toEqual(['enemy-1', 'ally-1']);
+      mission.handle({ type: 'mission_reset' });
+      expect(mission.snapshot()).toEqual({ type: 'mission_snapshot', running: false, droneCount: 0, drones: [] });
+      mission.dispose();
+    });
+
+    it('reconnoitres the 2 km around each ally from the start', () => {
+      const mission = online([force({ id: 'ally-1', side: 'ally', position: offsetLatLng(area.center, 0, -20_000), intel: true })]);
+      const recon = sent.filter((m) => m.type === 'recon_cells') as Extract<ServerMessage, { type: 'recon_cells' }>[];
+      const cells = recon[0].cells;
+      expect(cells.length).toBeGreaterThan(1200);
+      expect(cells.length).toBeLessThan(1320);
+      expect(cells.every(([, y]) => y >= -221 && y <= -180)).toBe(true); // 20 km south, ±2 km
+      mission.dispose();
+    });
+
+    it('finds a hidden enemy once a drone camera sees it, and names the drone', () => {
+      const enemy = force({ position: offsetLatLng(area.center, 1000, 0) }); // 1 km east; the drone looks north
+      const mission = online([enemy]);
+      vi.advanceTimersByTime(5000);
+      expect(sentUnits()).toEqual([]);
+      mission.handle({ type: 'move', droneIds: ['drone-1'], target: offsetLatLng(area.center, 5000, 0) });
+      vi.advanceTimersByTime(2000);
+      expect(sentUnits()).toEqual([expect.objectContaining({ id: 'enemy-1', source: 'drone', detectedByDroneId: 'drone-1', position: enemy.position })]);
+      // A unit that stands is sent once, not again while the camera keeps seeing it.
+      vi.advanceTimersByTime(3000);
+      expect(sentUnits()).toHaveLength(1);
+      mission.dispose();
+    });
+
+    it('finds an enemy within 2 km of an ally', () => {
+      const allyAt = offsetLatLng(area.center, 0, -20_000);
+      const mission = online([
+        force({ id: 'ally-1', side: 'ally', position: allyAt, intel: true }),
+        force({ id: 'enemy-1', position: offsetLatLng(allyAt, 0, 1500) }),
+        force({ id: 'enemy-2', position: offsetLatLng(allyAt, 0, 2500) }),
+      ]);
+      expect(sentUnits().filter((u) => u.side === 'enemy')).toEqual([expect.objectContaining({ id: 'enemy-1', source: 'ally', detectedByDroneId: null })]);
+      mission.dispose();
+    });
+
+    it('follows an enemy on the move while it is in sight, and keeps it where it was last seen after', () => {
+      const allyAt = offsetLatLng(area.center, 0, -20_000);
+      const mission = online([
+        force({ id: 'ally-1', side: 'ally', position: allyAt, intel: true }),
+        // 60 m a tick (6 m/s, 10 simulated seconds) east from 1.5 km: out of the ally's 2 km after about 9 ticks.
+        force({ id: 'enemy-1', kind: 'vehicle', position: offsetLatLng(allyAt, 1500, 0), speedMs: 6, headingDeg: 90, waypoint: offsetLatLng(allyAt, 20_000, 0) }),
+      ]);
+      vi.advanceTimersByTime(30_000);
+      const seen = sentUnits().filter((u) => u.id === 'enemy-1');
+      expect(seen.length).toBeGreaterThan(4);
+      expect(seen.length).toBeLessThan(15);
+      const last = seen.at(-1)!;
+      expect(toMetersFrom(allyAt, last.position).east).toBeLessThan(2050);
+      expect(last.headingDeg).toBeCloseTo(90, 0);
+      expect(last.speedMs).toBe(6);
+      const snap = mission.snapshot();
+      expect(snap.type === 'mission_snapshot' && snap.units?.find((u) => u.id === 'enemy-1')?.position).toEqual(last.position);
+      mission.dispose();
+    });
   });
 
   it('gives a snapshot of a running mission and an empty one when idle', () => {
