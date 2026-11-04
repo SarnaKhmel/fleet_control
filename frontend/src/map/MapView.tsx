@@ -135,6 +135,7 @@ export function MapView() {
       // Mode clicks take priority: zone drawing, then start points, else the location.
       if (mission.drawing) mission.drawClick(point);
       else if (mission.picking) mission.addPoint(point);
+      else if (mission.routeMode) mission.addRoutePoint(point);
       else if (mission.moveMode) moveOnlineDrones(point);
       // Shift+click with drones selected sets their course toward the clicked point.
       else if (event.originalEvent?.shiftKey && useSelectionStore.getState().selectedIds.length > 0) headOnlineDronesToward(point);
@@ -194,6 +195,15 @@ export function MapView() {
     map.setStyle(style);
     styleRef.current = style;
   }, [theme, view]);
+
+  // Numbered markers for the control points of the route being built.
+  const routePoints = useMissionStore((state) => state.routePoints);
+  const routeMarkersRef = useRef<Marker[]>([]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    routeMarkersRef.current = syncStartMarkers(map, routeMarkersRef.current, routePoints);
+  }, [routePoints]);
 
   // Numbered markers for the picked start points.
   useEffect(() => {

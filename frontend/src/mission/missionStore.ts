@@ -40,6 +40,9 @@ export interface MissionState {
   picking: boolean;
   /** Move mode: the next map click sends the online drones to that point. */
   moveMode: boolean;
+  /** Route mode: map clicks add control points for the selected drones. */
+  routeMode: boolean;
+  routePoints: LatLng[];
   /** Drawing the zone: two clicks give opposite corners. */
   drawing: boolean;
   drawAnchor: LatLng | null;
@@ -57,6 +60,9 @@ export interface MissionState {
   setClusterRadius: (meters: number) => void;
   setPicking: (picking: boolean) => void;
   setMoveMode: (on: boolean) => void;
+  setRouteMode: (on: boolean) => void;
+  addRoutePoint: (point: LatLng) => void;
+  clearRoute: () => void;
   setDrawing: (drawing: boolean) => void;
   /** Map click while drawing: the first click sets a corner, the second closes the zone. */
   drawClick: (point: LatLng) => void;
@@ -103,6 +109,8 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   clusterRadiusM: 500,
   picking: false,
   moveMode: false,
+  routeMode: false,
+  routePoints: [],
   drawing: false,
   drawAnchor: null,
   drawCursor: null,
@@ -117,6 +125,11 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   setClusterRadius: (clusterRadiusM) => (locked(get) ? undefined : set({ clusterRadiusM })),
   setPicking: (picking) => (locked(get) && picking ? undefined : set({ picking })),
   setMoveMode: (moveMode) => set({ moveMode }),
+  setRouteMode: (routeMode) => set({ routeMode }),
+  addRoutePoint: (point) => {
+    if (get().routePoints.length < 10) set({ routePoints: [...get().routePoints, point] });
+  },
+  clearRoute: () => set({ routePoints: [] }),
   setDrawing: (drawing) => (locked(get) && drawing ? undefined : set({ drawing, drawAnchor: null, drawCursor: null })),
   drawClick: (point) => {
     if (locked(get)) return;

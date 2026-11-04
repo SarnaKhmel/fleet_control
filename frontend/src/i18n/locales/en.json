@@ -124,7 +124,13 @@
     "moveOn": "Moving: click the map (stop)",
     "online": "Online {{count}}/{{total}}",
     "resetConfirm": "Confirm reset: all drones stop",
-    "locked": "Mission is running: zone and start points are fixed. Reset to change them."
+    "locked": "Mission is running: zone and start points are fixed. Reset to change them.",
+    "route": "Route of the selected drone",
+    "routeAdd": "Add control points",
+    "routeOn": "Adding: click the map (stop)",
+    "routePoints": "Control points: {{count}}/10",
+    "routeSend": "Send route",
+    "routeClear": "Clear points"
   },
   "sidebar": {
     "label": "Side panel",

@@ -96,3 +96,14 @@ export function headOnlineDronesToward(target: LatLng): number {
   const headingDeg = ((Math.atan2(east, north) * 180) / Math.PI + 360) % 360;
   return sendClientMessage({ type: 'heading', droneIds: ids, headingDeg }) ? ids.length : 0;
 }
+
+/** Gives every selected online drone the same ordered control points, each as its own route. */
+export function sendRouteToSelected(points: LatLng[]): number {
+  const drones = useMissionStore.getState().drones;
+  const ids = useSelectionStore.getState().selectedIds.filter((id) => drones[id]?.status === 'idle');
+  let sent = 0;
+  for (const droneId of ids) {
+    if (sendClientMessage({ type: 'route', droneId, points })) sent++;
+  }
+  return sent;
+}

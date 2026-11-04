@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DRONE_COUNT, GROUND_AMSL_M, type ClientMessage } from '../../../shared/protocol';
 import { useLocationStore } from '../location/locationStore';
-import { sendClientMessage } from './missionSocket';
+import { sendClientMessage, sendRouteToSelected } from './missionSocket';
 import { effectiveCenter, layoutFrom, startProblem, useMissionStore, type DroneView, type LayoutKind, type MissionPhase } from './missionStore';
 
 interface DroneStatusListProps {
@@ -157,6 +157,33 @@ export function MissionPanel() {
           onClick={() => state.setMoveMode(!state.moveMode)}
         >
           {state.moveMode ? t('mission.moveOn') : t('mission.move')}
+        </button>
+      </fieldset>
+
+      <fieldset>
+        <legend>{t('mission.route')}</legend>
+        <button
+          type="button"
+          aria-pressed={state.routeMode}
+          disabled={state.phase !== 'running'}
+          onClick={() => state.setRouteMode(!state.routeMode)}
+        >
+          {state.routeMode ? t('mission.routeOn') : t('mission.routeAdd')}
+        </button>
+        <span className="muted">{t('mission.routePoints', { count: state.routePoints.length })}</span>
+        <button
+          type="button"
+          disabled={state.routePoints.length === 0 || state.phase !== 'running'}
+          onClick={() => {
+            sendRouteToSelected(state.routePoints);
+            state.clearRoute();
+            state.setRouteMode(false);
+          }}
+        >
+          {t('mission.routeSend')}
+        </button>
+        <button type="button" onClick={state.clearRoute} disabled={state.routePoints.length === 0}>
+          {t('mission.routeClear')}
         </button>
       </fieldset>
 
