@@ -5,6 +5,7 @@ import { App } from './App';
 import { useThemeStore } from './theme/themeStore';
 import { useLocationStore } from './location/locationStore';
 import { mapInstances } from './test/maplibreMock';
+import { startWindSync } from './wind/windSync';
 
 vi.mock('maplibre-gl', () => import('./test/maplibreMock'));
 
@@ -14,6 +15,7 @@ describe('App', () => {
     useThemeStore.setState({ theme: 'dark' });
     useLocationStore.setState({ selected: null, saved: [], focusTick: 0 });
     mapInstances.length = 0;
+    startWindSync();
   });
 
   it('renders the English title by default', () => {
