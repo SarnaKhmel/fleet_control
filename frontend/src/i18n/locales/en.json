@@ -167,6 +167,8 @@
     "tasks": "Tasks",
     "tasksEmpty": "No tasks. Click the map to send the drone, Ctrl+click to add a point.",
     "taskRemove": "Remove task {{n}}",
-    "tasksClear": "Clear all"
+    "tasksClear": "Clear all",
+    "taskMarker": "{{callsign}} task {{n}}",
+    "taskMarkerHint": "Drag to move the task, right-click to remove it"
   }
 }

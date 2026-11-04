@@ -1228,6 +1228,23 @@ body,
   line-height: 1.2;
 }
 
+/* Task points of the selected drones: numbered, draggable, right-click removes. */
+.task-marker {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--bg);
+  border: 2px solid var(--fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: grab;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
 /* Route control points: square tags labelled K1, K2, … (start points are round and numbered). */
 .mission-control-marker {
   min-width: 26px;

@@ -1,36 +1,41 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
+import type { LatLng } from '../../../shared/protocol';
 import type { Theme } from '../theme/themeStore';
 import type { DroneView } from './missionStore';
 
-// Each drone's path as a dashed line: from where it set off, through the drone, to its last task,
-// with a dot on every task point.
+// Paths of the selected drones as dashed lines: the flown part (from where the drone set off, through
+// the points it reached, to the drone) is faint; the part still ahead (to its last task) is bright.
+// The task points themselves are draggable markers (taskMarkers.ts).
 export const WAYPOINT_SOURCE_ID = 'drone-waypoints';
 export const WAYPOINT_LINE_ID = 'drone-waypoints-line';
-export const WAYPOINT_POINT_ID = 'drone-waypoints-point';
 // Same values as the --accent token of each theme (map layers cannot read CSS variables).
 export const WAYPOINT_COLORS: Record<Theme, string> = { dark: '#4ea1ff', light: '#1f6feb' };
 
-/** GeoJSON with a path and task points for every drone that has a position and tasks. */
-export function waypointFeatures(drones: Record<string, DroneView>) {
+const line = (points: LatLng[]) => ({ type: 'LineString', coordinates: points.map((p) => [p.lng, p.lat]) });
+
+/** GeoJSON with a flown and an ahead line for every selected drone that has them. */
+export function waypointFeatures(drones: Record<string, DroneView>, selectedIds: string[]) {
   const features = [];
-  for (const [droneId, drone] of Object.entries(drones)) {
-    if (!drone.position || drone.tasks.length === 0) continue;
-    const path = [...(drone.origin ? [drone.origin] : []), drone.position, ...drone.tasks].map((p) => [p.lng, p.lat]);
-    features.push({ type: 'Feature', properties: { droneId }, geometry: { type: 'LineString', coordinates: path } });
-    drone.tasks.forEach((p, index) => {
-      features.push({ type: 'Feature', properties: { droneId, index }, geometry: { type: 'Point', coordinates: [p.lng, p.lat] } });
-    });
+  for (const droneId of selectedIds) {
+    const drone = drones[droneId];
+    if (!drone?.position) continue;
+    if (drone.trail.length > 0) {
+      features.push({ type: 'Feature', properties: { droneId, part: 'flown' }, geometry: line([...drone.trail, drone.position]) });
+    }
+    if (drone.tasks.length > 0) {
+      features.push({ type: 'Feature', properties: { droneId, part: 'ahead' }, geometry: line([drone.position, ...drone.tasks]) });
+    }
   }
   return { type: 'FeatureCollection', features };
 }
 
 /**
- * Adds the path layers on first use, then only replaces their data and colors. Once the source exists
+ * Adds the path layer on first use, then only replaces its data and color. Once the source exists
  * it is updated at any time: MapLibre reports the style as not loaded whenever any tiles are loading,
  * which would hold the paths back most of the time. Only adding the source waits for the style.
  */
-export function syncWaypoints(map: MapLibreMap, drones: Record<string, DroneView>, theme: Theme): void {
-  const data = waypointFeatures(drones);
+export function syncWaypoints(map: MapLibreMap, drones: Record<string, DroneView>, selectedIds: string[], theme: Theme): void {
+  const data = waypointFeatures(drones, selectedIds);
   const source = map.getSource(WAYPOINT_SOURCE_ID) as { setData?: (d: unknown) => void } | undefined;
   if (source?.setData) {
     source.setData(data);
@@ -41,17 +46,13 @@ export function syncWaypoints(map: MapLibreMap, drones: Record<string, DroneView
       id: WAYPOINT_LINE_ID,
       type: 'line',
       source: WAYPOINT_SOURCE_ID,
-      filter: ['==', ['geometry-type'], 'LineString'],
-      paint: { 'line-color': WAYPOINT_COLORS[theme], 'line-width': 2, 'line-dasharray': [2, 2] },
-    });
-    map.addLayer({
-      id: WAYPOINT_POINT_ID,
-      type: 'circle',
-      source: WAYPOINT_SOURCE_ID,
-      filter: ['==', ['geometry-type'], 'Point'],
-      paint: { 'circle-radius': 5, 'circle-color': WAYPOINT_COLORS[theme], 'circle-stroke-width': 2, 'circle-stroke-color': WAYPOINT_COLORS[theme], 'circle-stroke-opacity': 0.4 },
+      paint: {
+        'line-color': WAYPOINT_COLORS[theme],
+        'line-width': 2,
+        'line-dasharray': [2, 2],
+        'line-opacity': ['match', ['get', 'part'], 'flown', 0.4, 1],
+      },
     });
   }
   map.setPaintProperty(WAYPOINT_LINE_ID, 'line-color', WAYPOINT_COLORS[theme]);
-  map.setPaintProperty(WAYPOINT_POINT_ID, 'circle-color', WAYPOINT_COLORS[theme]);
 }

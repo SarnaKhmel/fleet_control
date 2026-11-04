@@ -1,32 +1,41 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FakeMap } from '../test/maplibreMock';
 import type { DroneView } from './missionStore';
-import { syncWaypoints, waypointFeatures, WAYPOINT_LINE_ID, WAYPOINT_POINT_ID, WAYPOINT_SOURCE_ID } from './waypointLayer';
+import { syncWaypoints, waypointFeatures, WAYPOINT_LINE_ID, WAYPOINT_SOURCE_ID } from './waypointLayer';
 
-const base: DroneView = { callsign: 'BA-01', status: 'idle', progress: 100, position: { lat: 50.1, lng: 30.1 }, heading: 0, altitudeM: 210, speedMs: 10, batteryPct: 90, crabDeg: 0, origin: null, tasks: [] };
+const base: DroneView = { callsign: 'BA-01', status: 'idle', progress: 100, position: { lat: 50.1, lng: 30.1 }, heading: 0, altitudeM: 210, speedMs: 10, batteryPct: 90, crabDeg: 0, trail: [], tasks: [] };
+const flying: DroneView = { ...base, trail: [{ lat: 50, lng: 30 }], tasks: [{ lat: 50.2, lng: 30.2 }, { lat: 50.3, lng: 30.3 }] };
 
 describe('drone paths', () => {
-  it('draws the path from the departure point through the drone to the last task, with a dot per task', () => {
-    const drone = { ...base, origin: { lat: 50, lng: 30 }, tasks: [{ lat: 50.2, lng: 30.2 }, { lat: 50.3, lng: 30.3 }] };
-    const { features } = waypointFeatures({ 'drone-1': drone });
-    expect(features[0].geometry).toEqual({ type: 'LineString', coordinates: [[30, 50], [30.1, 50.1], [30.2, 50.2], [30.3, 50.3]] });
-    expect(features.slice(1).map((f) => f.geometry)).toEqual([
-      { type: 'Point', coordinates: [30.2, 50.2] },
-      { type: 'Point', coordinates: [30.3, 50.3] },
+  it('draws the flown part up to the drone and the part ahead to its last task', () => {
+    const { features } = waypointFeatures({ 'drone-1': flying }, ['drone-1']);
+    expect(features.map((f) => [f.properties.part, f.geometry.coordinates])).toEqual([
+      ['flown', [[30, 50], [30.1, 50.1]]],
+      ['ahead', [[30.1, 50.1], [30.2, 50.2], [30.3, 50.3]]],
     ]);
   });
 
-  it('skips drones without tasks or without a position', () => {
-    const tasks = [{ lat: 50.2, lng: 30.2 }];
-    expect(waypointFeatures({ 'drone-1': base, 'drone-2': { ...base, position: null, tasks } }).features).toEqual([]);
+  it('keeps the flown path after the tasks are done', () => {
+    const done = { ...flying, tasks: [] };
+    expect(waypointFeatures({ 'drone-1': done }, ['drone-1']).features.map((f) => f.properties.part)).toEqual(['flown']);
   });
 
-  it('adds the source and both layers to the map', () => {
+  it('shows only the selected drones, all of them when several are selected', () => {
+    const drones = { 'drone-1': flying, 'drone-2': flying, 'drone-3': flying };
+    expect(waypointFeatures(drones, []).features).toEqual([]);
+    const ids = waypointFeatures(drones, ['drone-1', 'drone-3']).features.map((f) => f.properties.droneId);
+    expect([...new Set(ids)]).toEqual(['drone-1', 'drone-3']);
+  });
+
+  it('skips a selected drone without a position', () => {
+    expect(waypointFeatures({ 'drone-1': { ...flying, position: null } }, ['drone-1']).features).toEqual([]);
+  });
+
+  it('adds the source and the line layer to the map', () => {
     const map = new FakeMap({ style: 'x' });
-    syncWaypoints(map as never, { 'drone-1': { ...base, tasks: [{ lat: 50.2, lng: 30.2 }] } }, 'dark');
+    syncWaypoints(map as never, { 'drone-1': flying }, ['drone-1'], 'dark');
     expect(map.getSource(WAYPOINT_SOURCE_ID)).toBeTruthy();
     expect(map.getLayer(WAYPOINT_LINE_ID)).toBeTruthy();
-    expect(map.getLayer(WAYPOINT_POINT_ID)).toBeTruthy();
   });
 
   it('updates the path while map tiles are still loading, once its source exists', () => {
@@ -36,15 +45,14 @@ describe('drone paths', () => {
     const setData = vi.fn();
     map.sources[WAYPOINT_SOURCE_ID] = { setData };
     map.layers[WAYPOINT_LINE_ID] = { id: WAYPOINT_LINE_ID };
-    map.layers[WAYPOINT_POINT_ID] = { id: WAYPOINT_POINT_ID };
-    syncWaypoints(map as never, { 'drone-1': { ...base, tasks: [{ lat: 50.2, lng: 30.2 }] } }, 'dark');
+    syncWaypoints(map as never, { 'drone-1': flying }, ['drone-1'], 'dark');
     expect(setData).toHaveBeenCalledOnce();
   });
 
   it('waits for the style before adding its source', () => {
     const map = new FakeMap({ style: 'x' });
     map.isStyleLoaded = () => false;
-    syncWaypoints(map as never, {}, 'dark');
+    syncWaypoints(map as never, {}, [], 'dark');
     expect(map.getSource(WAYPOINT_SOURCE_ID)).toBeUndefined();
   });
 });

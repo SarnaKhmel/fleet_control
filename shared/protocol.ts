@@ -62,6 +62,8 @@ export type ClientMessage =
   | { type: 'hold'; droneIds: string[] }
   /** Drops one task (0 = the current one) from a drone's list. */
   | { type: 'remove_task'; droneId: string; index: number }
+  /** Moves one task of a drone's list to another point. */
+  | { type: 'update_task'; droneId: string; index: number; point: LatLng }
   | { type: 'heading'; droneIds: string[]; headingDeg: number }
   | { type: 'wind'; speedMs: number; fromDeg: number }
   | { type: 'route'; droneId: string; points: LatLng[] };
@@ -82,8 +84,8 @@ export interface SnapshotDrone {
   speedMs: number;
   batteryPct: number;
   crabDeg: number;
-  /** Where the drone set off for its current task; null without tasks. */
-  origin: LatLng | null;
+  /** Path flown for the current task list: where the drone set off, then each point it reached or turned at. */
+  trail: LatLng[];
   /** Points the drone still has to fly to, the current one first. */
   tasks: LatLng[];
 }
@@ -92,7 +94,7 @@ export type ServerMessage =
   | { type: 'mission_snapshot'; running: boolean; drones: SnapshotDrone[] }
   | { type: 'drone_boot'; droneId: string; status: 'booting' | 'connecting'; progress: number }
   | { type: 'drone_online'; telemetry: DroneTelemetry }
-  | { type: 'position'; droneId: string; position: LatLng; heading: number; speedMs: number; altitudeM: number; batteryPct: number; crabDeg: number; origin: LatLng | null; tasks: LatLng[] }
+  | { type: 'position'; droneId: string; position: LatLng; heading: number; speedMs: number; altitudeM: number; batteryPct: number; crabDeg: number; trail: LatLng[]; tasks: LatLng[] }
   | { type: 'mission_error'; reason: MissionErrorReason }
   | { type: 'mission_reset' };
 
@@ -139,8 +141,17 @@ export function isLatLngList(value: unknown): value is LatLng[] {
   return Array.isArray(value) && value.length >= 1 && value.length <= MAX_TASKS && value.every(isLatLng);
 }
 
+export function isDroneId(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= 64;
+}
+
 export function isDroneIds(value: unknown): value is string[] {
-  return Array.isArray(value) && value.length >= 1 && value.length <= DRONE_COUNT && value.every((id) => typeof id === 'string' && id.length > 0 && id.length <= 64);
+  return Array.isArray(value) && value.length >= 1 && value.length <= DRONE_COUNT && value.every(isDroneId);
+}
+
+/** Position in a drone's task list: a whole number below MAX_TASKS. */
+export function isTaskIndex(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) >= 0 && (value as number) < MAX_TASKS;
 }
 
 export function parseClientMessage(raw: unknown): ClientMessage | null {
@@ -156,8 +167,11 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
   if (message.type === 'hold' && isDroneIds(message.droneIds)) {
     return { type: 'hold', droneIds: message.droneIds };
   }
-  if (message.type === 'remove_task' && typeof message.droneId === 'string' && message.droneId.length > 0 && message.droneId.length <= 64 && Number.isInteger(message.index) && (message.index as number) >= 0 && (message.index as number) < MAX_TASKS) {
-    return { type: 'remove_task', droneId: message.droneId, index: message.index as number };
+  if (message.type === 'remove_task' && isDroneId(message.droneId) && isTaskIndex(message.index)) {
+    return { type: 'remove_task', droneId: message.droneId, index: message.index };
+  }
+  if (message.type === 'update_task' && isDroneId(message.droneId) && isTaskIndex(message.index) && isLatLng(message.point)) {
+    return { type: 'update_task', droneId: message.droneId, index: message.index, point: message.point };
   }
   if (message.type === 'route' && typeof message.droneId === 'string' && message.droneId.length > 0 && isLatLngList(message.points)) {
     return { type: 'route', droneId: message.droneId, points: message.points };

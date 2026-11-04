@@ -28,8 +28,8 @@ export interface DroneView {
   /** Crab angle: how far the nose is turned into the wind, degrees (negative = left). */
   crabDeg: number;
   heading: number | null;
-  /** Where the drone set off for its current task; null without tasks. */
-  origin: LatLng | null;
+  /** Path flown for the current task list: where the drone set off, then each point it reached or turned at. */
+  trail: LatLng[];
   /** Points the server is flying the drone through, the current one first. */
   tasks: LatLng[];
 }
@@ -177,7 +177,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
               speedMs: 0,
               batteryPct: 100,
               crabDeg: 0,
-              origin: null,
+              trail: [],
               tasks: [],
             },
           },
@@ -201,7 +201,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
               speedMs: 0,
               batteryPct: message.telemetry.power_system.battery_remaining_pct,
               crabDeg: 0,
-              origin: null,
+              trail: [],
               tasks: [],
             },
           },
@@ -221,7 +221,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
               speedMs: message.speedMs,
               batteryPct: message.batteryPct,
               crabDeg: message.crabDeg,
-              origin: message.origin,
+              trail: message.trail,
               tasks: message.tasks,
             },
           },
@@ -241,7 +241,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
             speedMs: d.speedMs,
             batteryPct: d.batteryPct,
             crabDeg: d.crabDeg,
-            origin: d.origin,
+            trail: d.trail,
             tasks: d.tasks,
           };
         }

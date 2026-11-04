@@ -24,12 +24,22 @@ interface DroneState {
   course: number | null;
   /** Remaining control points; the drone flies them in order. */
   route: LatLng[];
-  /** Where the drone set off for its current target; null without a target. */
-  origin: LatLng | null;
+  /** Path flown for the current task list: where the drone set off, then every point it reached or turned at. */
+  trail: LatLng[];
   altitudeM: number;
   batteryPct: number;
   speedMs: number;
   crabDeg: number;
+}
+
+// The flown path keeps at most this many points; the oldest are dropped.
+export const TRAIL_MAX_POINTS = 50;
+
+/** The path with one more point, unless the drone is still at the last one. */
+function withTrailPoint(trail: LatLng[], point: LatLng): LatLng[] {
+  const last = trail.at(-1);
+  if (last && last.lat === point.lat && last.lng === point.lng) return trail;
+  return [...trail, point].slice(-TRAIL_MAX_POINTS);
 }
 
 /**
@@ -68,7 +78,7 @@ export function createMissionController(
       broadcast({ type: 'drone_boot', droneId: entry.droneId, status: 'connecting', progress: 0 }),
     );
     later(entry.startAtMs + BOOT_MS + CONNECT_MS, () => {
-      drones.set(entry.droneId, { position: entry.start, heading: 0, target: null, course: null, route: [], origin: null, altitudeM: GROUND_AMSL_M, batteryPct: 100, speedMs: 0, crabDeg: 0 });
+      drones.set(entry.droneId, { position: entry.start, heading: 0, target: null, course: null, route: [], trail: [], altitudeM: GROUND_AMSL_M, batteryPct: 100, speedMs: 0, crabDeg: 0 });
       broadcast({ type: 'drone_online', telemetry: buildTelemetry(entry, now()) });
     });
   }
@@ -96,9 +106,9 @@ export function createMissionController(
         if (drone.target && distanceReached(drone.position, drone.target, step.groundSpeedMs * dtS)) {
           drone.position = drone.target;
           serverLog('reached', { droneId, point: drone.target, remainingRoute: drone.route.length });
-          // Reached a control point: continue to the next one of the route, if any, setting off from here.
+          // Reached a control point: it joins the flown path, and the drone goes on to the next one, if any.
+          drone.trail = withTrailPoint(drone.trail, drone.position);
           drone.target = drone.route.shift() ?? null;
-          drone.origin = drone.target ? drone.position : null;
         } else {
           drone.position = step.position;
         }
@@ -122,7 +132,7 @@ export function createMissionController(
       altitudeM: drone.altitudeM,
       batteryPct: drone.batteryPct,
       crabDeg: drone.crabDeg,
-      origin: drone.origin,
+      trail: drone.trail,
       tasks: tasksOf(drone),
     });
   }
@@ -132,13 +142,17 @@ export function createMissionController(
     return drone.target ? [drone.target, ...drone.route] : [];
   }
 
-  /** Makes `tasks` the drone's whole list; the current task starts from where the drone is now. */
-  function setTasks(droneId: string, drone: DroneState, tasks: LatLng[]) {
+  /**
+   * Makes `tasks` the drone's whole list. A new list starts a new flown path from where the drone is;
+   * with `turn` the drone keeps its path and turns here (its current task was changed or dropped).
+   */
+  function setTasks(droneId: string, drone: DroneState, tasks: LatLng[], turn = false) {
     const [first, ...rest] = tasks;
     drone.target = first ?? null;
     drone.route = rest;
-    drone.origin = first ? drone.position : null;
     drone.course = null;
+    if (turn) drone.trail = withTrailPoint(drone.trail, drone.position);
+    else drone.trail = first ? [drone.position] : [];
     // Report at once, so the operator sees the new tasks without waiting for the next tick.
     report(droneId, drone);
   }
@@ -175,9 +189,24 @@ export function createMissionController(
     if (index >= tasks.length) return;
     serverLog('remove task', { droneId, index });
     if (index === 0) {
-      setTasks(droneId, drone, tasks.slice(1));
+      setTasks(droneId, drone, tasks.slice(1), true);
     } else {
       drone.route.splice(index - 1, 1);
+      report(droneId, drone);
+    }
+  }
+
+  /** Moves one task to another point; moving the current one turns the drone toward it from where it is. */
+  function updateTask(droneId: string, index: number, point: LatLng) {
+    const drone = drones.get(droneId);
+    if (!drone) return;
+    const tasks = tasksOf(drone);
+    if (index >= tasks.length) return;
+    serverLog('update task', { droneId, index, point });
+    if (index === 0) {
+      setTasks(droneId, drone, [point, ...tasks.slice(1)], true);
+    } else {
+      drone.route[index - 1] = point;
       report(droneId, drone);
     }
   }
@@ -198,7 +227,7 @@ export function createMissionController(
         drone.course = headingDeg;
         drone.target = null;
         drone.route = [];
-        drone.origin = null;
+        drone.trail = [];
         report(id, drone);
       }
     }
@@ -249,7 +278,7 @@ export function createMissionController(
         speedMs: live?.speedMs ?? 0,
         batteryPct: live?.batteryPct ?? 100,
         crabDeg: live?.crabDeg ?? 0,
-        origin: live?.origin ?? null,
+        trail: live?.trail ?? [],
         tasks: live ? tasksOf(live) : [],
       });
     }
@@ -268,6 +297,7 @@ export function createMissionController(
       } else if (running && message.type === 'move') move(message.droneIds, message.target, message.append === true);
       else if (running && message.type === 'hold') hold(message.droneIds);
       else if (running && message.type === 'remove_task') removeTask(message.droneId, message.index);
+      else if (running && message.type === 'update_task') updateTask(message.droneId, message.index, message.point);
       else if (running && message.type === 'heading') setHeading(message.droneIds, message.headingDeg);
       else if (running && message.type === 'route') setRoute(message.droneId, message.points);
     },

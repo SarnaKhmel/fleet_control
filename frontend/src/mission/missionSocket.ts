@@ -95,6 +95,11 @@ export function removeDroneTask(droneId: string, index: number): boolean {
   return sendClientMessage({ type: 'remove_task', droneId, index });
 }
 
+/** Moves one task of a drone's list to another point. */
+export function updateDroneTask(droneId: string, index: number, point: LatLng): boolean {
+  return sendClientMessage({ type: 'update_task', droneId, index, point });
+}
+
 /** Drops all of a drone's tasks: it hovers where it is. */
 export function clearDroneTasks(droneId: string): boolean {
   return sendClientMessage({ type: 'hold', droneIds: [droneId] });

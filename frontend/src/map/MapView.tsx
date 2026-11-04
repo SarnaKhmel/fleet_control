@@ -18,6 +18,7 @@ import { effectiveCenter, useMissionStore } from '../mission/missionStore';
 import { syncStartMarkers } from '../mission/startMarkers';
 import { syncDroneMarkers } from '../mission/droneMarkers';
 import { syncWaypoints } from '../mission/waypointLayer';
+import { syncTaskMarkers } from '../mission/taskMarkers';
 import { headOnlineDronesToward, moveOnlineDrones } from '../mission/missionSocket';
 import { dronesInScreenBox, useSelectionStore, type ScreenPoint } from '../mission/selection';
 import { boxesOverlap, boxOf, registerZoneFitter, zoneBoxOf } from '../mission/zoneView';
@@ -67,7 +68,7 @@ export function MapView() {
       addBuildingsLayer(map, current);
       addBordersLayer(map, current);
       syncMissionArea(map, useMissionStore.getState(), current);
-      syncWaypoints(map, useMissionStore.getState().drones, current);
+      syncWaypoints(map, useMissionStore.getState().drones, useSelectionStore.getState().selectedIds, current);
       const front = useFrontLineStore.getState();
       syncFrontLine(map, { enabled: front.enabled, zones: front.zones, theme: current });
       map.setPitch(useMapViewStore.getState().buildings3d ? TILT_3D_PITCH : 0);
@@ -226,7 +227,8 @@ export function MapView() {
     startMarkersRef.current = syncStartMarkers(map, startMarkersRef.current, missionPoints);
   }, [missionPoints]);
 
-  // Drones with a known position, drawn as NATO symbols or in our own style, and their paths.
+  // Drones with a known position, drawn as NATO symbols or in our own style; the selected ones also
+  // show their path and their task points.
   // Positions change many times a second, so the map follows the stores directly instead of
   // re-rendering this component on every update (tasks/tech.md, section 6).
   useEffect(() => {
@@ -234,8 +236,10 @@ export function MapView() {
     if (!map) return;
     const sync = () => {
       const { drones } = useMissionStore.getState();
+      const { selectedIds } = useSelectionStore.getState();
       droneMarkersRef.current = syncDroneMarkers(map, droneMarkersRef.current, drones, useSymbolStyleStore.getState().style);
-      syncWaypoints(map, drones, useThemeStore.getState().theme);
+      syncWaypoints(map, drones, selectedIds, useThemeStore.getState().theme);
+      syncTaskMarkers(map, drones, selectedIds);
     };
     sync();
     const unsubscribe = [

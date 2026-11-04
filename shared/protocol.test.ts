@@ -71,4 +71,12 @@ describe('parseClientMessage', () => {
     for (const index of [-1, 1.5, 10, '0', undefined]) expect(parseClientMessage({ ...remove, index })).toBeNull();
     expect(parseClientMessage({ ...remove, droneId: '' })).toBeNull();
   });
+
+  it('accepts update_task with a valid index and point', () => {
+    const update = { type: 'update_task', droneId: 'drone-1', index: 0, point: { lat: 50.1, lng: 30.2 } };
+    expect(parseClientMessage(update)).toEqual(update);
+    expect(parseClientMessage({ ...update, index: 10 })).toBeNull();
+    expect(parseClientMessage({ ...update, point: { lat: 91, lng: 0 } })).toBeNull();
+    expect(parseClientMessage({ ...update, point: undefined })).toBeNull();
+  });
 });

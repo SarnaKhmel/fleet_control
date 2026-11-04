@@ -51,7 +51,7 @@ describe('MissionPanel', () => {
   it('shows no drone status before a mission runs, even if drones were seen', () => {
     useMissionStore.setState({
       phase: 'idle',
-      drones: { 'drone-1': { callsign: 'BA-01', status: 'idle', progress: 100, position: null, heading: null, altitudeM: 150, speedMs: 0, batteryPct: 100, crabDeg: 0, origin: null, tasks: [] } },
+      drones: { 'drone-1': { callsign: 'BA-01', status: 'idle', progress: 100, position: null, heading: null, altitudeM: 150, speedMs: 0, batteryPct: 100, crabDeg: 0, trail: [], tasks: [] } },
     });
     render(<MissionPanel />);
     expect(screen.queryByText(/Online/)).toBeNull();
@@ -61,7 +61,7 @@ describe('MissionPanel', () => {
   it('does not re-render on drone position updates', () => {
     useMissionStore.setState({
       phase: 'running',
-      drones: { 'drone-1': { callsign: 'BA-01', status: 'idle', progress: 100, position: { lat: 50, lng: 30 }, heading: 0, altitudeM: 210, speedMs: 0, batteryPct: 100, crabDeg: 0, origin: null, tasks: [] } },
+      drones: { 'drone-1': { callsign: 'BA-01', status: 'idle', progress: 100, position: { lat: 50, lng: 30 }, heading: 0, altitudeM: 210, speedMs: 0, batteryPct: 100, crabDeg: 0, trail: [], tasks: [] } },
     });
     let renders = 0;
     render(
@@ -71,7 +71,7 @@ describe('MissionPanel', () => {
     );
     const before = renders;
     act(() => {
-      useMissionStore.getState().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 10, speedMs: 10, altitudeM: 210, batteryPct: 99, crabDeg: 0, origin: null, tasks: [] });
+      useMissionStore.getState().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 10, speedMs: 10, altitudeM: 210, batteryPct: 99, crabDeg: 0, trail: [], tasks: [] });
     });
     expect(renders).toBe(before);
     useMissionStore.setState({ phase: 'idle', drones: {} });

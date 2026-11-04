@@ -15,7 +15,7 @@ const drone: DroneView = {
   speedMs: 10,
   batteryPct: 88,
   crabDeg: -4,
-  origin: null,
+  trail: [],
   tasks: [],
 };
 

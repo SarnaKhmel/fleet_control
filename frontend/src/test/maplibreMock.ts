@@ -98,9 +98,22 @@ export class Marker {
   lngLat: [number, number] | null = null;
   added = false;
   element: HTMLElement | undefined;
-  constructor(options?: { element?: HTMLElement }) {
+  draggable: boolean;
+  handlers: Record<string, (() => void)[]> = {};
+  constructor(options?: { element?: HTMLElement; draggable?: boolean }) {
     this.element = options?.element;
+    this.draggable = !!options?.draggable;
     markerInstances.push(this);
+  }
+  on(event: string, handler: () => void) {
+    (this.handlers[event] ??= []).push(handler);
+    return this;
+  }
+  fire(event: string) {
+    this.handlers[event]?.forEach((handler) => handler());
+  }
+  getLngLat() {
+    return { lng: this.lngLat![0], lat: this.lngLat![1] };
   }
   setLngLat(lngLat: [number, number]) {
     this.lngLat = lngLat;

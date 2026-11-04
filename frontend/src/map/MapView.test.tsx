@@ -97,7 +97,7 @@ describe('MapView', () => {
     expect(marker.lngLat).toEqual([30, 50]);
     const before = renders;
     act(() => {
-      useMissionStore.getState().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 0, speedMs: 10, altitudeM: 210, batteryPct: 99, crabDeg: 0, origin: null, tasks: [] });
+      useMissionStore.getState().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 0, speedMs: 10, altitudeM: 210, batteryPct: 99, crabDeg: 0, trail: [], tasks: [] });
     });
     expect(marker.lngLat).toEqual([30.1, 50.1]);
     expect(renders).toBe(before);
@@ -112,7 +112,6 @@ describe('MapView', () => {
     const setData = vi.fn();
     map.sources[WAYPOINT_SOURCE_ID] = { setData };
     map.layers['drone-waypoints-line'] = { id: 'drone-waypoints-line' };
-    map.layers['drone-waypoints-point'] = { id: 'drone-waypoints-point' };
     map.isStyleLoaded = () => false;
     act(() => {
       useMissionStore.getState().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30, altitude_amsl_m: 150 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
