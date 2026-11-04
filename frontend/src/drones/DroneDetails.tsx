@@ -1,5 +1,8 @@
 import { useTranslation } from 'react-i18next';
+import { toMetersFrom } from '../../../shared/mission/area';
+import { rangeOutline } from '../../../shared/flight/battery';
 import { takesCommands } from '../../../shared/protocol';
+import { useWindStore } from '../wind/windStore';
 import { Accordion } from '../sidebar/Accordion';
 import { batteryLevel } from '../mission/battery';
 import type { DroneView } from '../mission/missionStore';
@@ -23,9 +26,21 @@ function droneAlert(drone: DroneView | undefined): 'destroyed' | 'destroyedColli
   return level === 'ok' ? null : level;
 }
 
+/** Shortest and longest distance the drone can still fly, km (upwind and downwind), as text. */
+function rangeText(drone: DroneView, wind: { speedMs: number; fromDeg: number }): string {
+  if (!drone.position) return '—';
+  const reach = rangeOutline(drone.position, drone.batteryPct, drone.cruiseSpeedMs, wind).map((p) => {
+    const { east, north } = toMetersFrom(drone.position!, p);
+    return Math.hypot(east, north) / 1000;
+  });
+  const [min, max] = [Math.min(...reach), Math.max(...reach)];
+  return max - min < 0.1 ? `${max.toFixed(1)} km` : `${min.toFixed(1)}–${max.toFixed(1)} km`;
+}
+
 /** One drone as a collapsible section: summary in the header, telemetry inside. */
 export function DroneDetails({ droneId, drone, defaultOpen }: DroneDetailsProps) {
   const { t } = useTranslation();
+  const wind = useWindStore((s) => s.wind);
   const callsign = drone?.callsign ?? droneId;
   const online = takesCommands(drone?.status) && drone?.altitudeM != null;
   // Height above the ground under the drone, which follows the terrain.
@@ -63,6 +78,8 @@ export function DroneDetails({ droneId, drone, defaultOpen }: DroneDetailsProps)
         <dd>{online ? `${Math.round(drone!.crabDeg)}°` : '—'}</dd>
         <dt>{t('drone.battery')}</dt>
         <dd>{battery}</dd>
+        <dt title={t('drone.rangeHint')}>{t('drone.range')}</dt>
+        <dd>{online ? rangeText(drone!, wind) : '—'}</dd>
         <dt>{t('drone.position')}</dt>
         <dd>
           {(online || lost) && drone?.position ? `${drone.position.lat.toFixed(5)}, ${drone.position.lng.toFixed(5)}` : '—'}

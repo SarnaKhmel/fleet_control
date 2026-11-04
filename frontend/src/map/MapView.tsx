@@ -19,6 +19,8 @@ import { syncStartMarkers } from '../mission/startMarkers';
 import { syncDroneMarkers } from '../mission/droneMarkers';
 import { addWaypointLayer, syncWaypoints } from '../mission/waypointLayer';
 import { addCameraLayer, syncCamera } from '../mission/cameraLayer';
+import { addRangeLayer, syncRange } from '../mission/rangeLayer';
+import { useWindStore } from '../wind/windStore';
 import { syncTaskMarkers } from '../mission/taskMarkers';
 import { headOnlineDronesToward, moveOnlineDrones } from '../mission/missionSocket';
 import { dronesInScreenBox, useSelectionStore, type ScreenPoint } from '../mission/selection';
@@ -72,6 +74,8 @@ export function MapView() {
       const { selectedIds } = useSelectionStore.getState();
       addCameraLayer(map, current);
       syncCamera(map, drones, selectedIds, current);
+      addRangeLayer(map, current);
+      syncRange(map, drones, selectedIds, useWindStore.getState().wind, current);
       addWaypointLayer(map, current);
       syncWaypoints(map, drones, selectedIds, current);
       const front = useFrontLineStore.getState();
@@ -226,7 +230,7 @@ export function MapView() {
   }, [missionPoints]);
 
   // Drones with a known position, drawn as NATO symbols or in our own style; the selected ones also
-  // show their path, their task points and what their camera sees.
+  // show their path, their task points, what their camera sees and how far they can still fly.
   // Positions change many times a second, so the map follows the stores directly instead of
   // re-rendering this component on every update (tasks/tech.md, section 6).
   useEffect(() => {
@@ -238,6 +242,7 @@ export function MapView() {
       syncDroneMarkers(map, drones, useSymbolStyleStore.getState().style);
       const theme = useThemeStore.getState().theme;
       syncCamera(map, drones, selectedIds, theme);
+      syncRange(map, drones, selectedIds, useWindStore.getState().wind, theme);
       syncWaypoints(map, drones, selectedIds, theme);
       syncTaskMarkers(map, drones, selectedIds);
     };
@@ -251,6 +256,9 @@ export function MapView() {
       }),
       useSymbolStyleStore.subscribe(sync),
       useThemeStore.subscribe(sync),
+      useWindStore.subscribe((state, previous) => {
+        if (state.wind !== previous.wind) sync();
+      }),
     ];
     return () => unsubscribe.forEach((stop) => stop());
   }, []);

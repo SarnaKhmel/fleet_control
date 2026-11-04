@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { useWindStore } from '../wind/windStore';
 import { DroneDetails } from './DroneDetails';
 import type { DroneView } from '../mission/missionStore';
 import { clearDroneTasks, removeDroneTask } from '../mission/missionSocket';
@@ -97,5 +98,15 @@ describe('DroneDetails', () => {
   it('says a drone destroyed in a collision flew into a building', () => {
     render(<DroneDetails droneId="drone-1" drone={{ ...drone, status: 'destroyed', cause: 'collision', batteryPct: 40 }} defaultOpen />);
     expect(screen.getByRole('alert').textContent).toBe('Destroyed: the drone flew into a building at the position shown.');
+  });
+
+  it('shows how far the drone can still fly, against the wind and with it', () => {
+    useWindStore.setState({ wind: { speedMs: 0, fromDeg: 0 } });
+    const { rerender } = render(<DroneDetails droneId="drone-1" drone={{ ...drone, batteryPct: 50 }} defaultOpen />);
+    expect(screen.getByText('12.0 km')).toBeTruthy(); // 1200 s at 10 m/s
+    act(() => useWindStore.setState({ wind: { speedMs: 4, fromDeg: 0 } }));
+    rerender(<DroneDetails droneId="drone-1" drone={{ ...drone, batteryPct: 50 }} defaultOpen />);
+    expect(screen.getByText('7.2–16.8 km')).toBeTruthy(); // 6 and 14 m/s over the ground
+    useWindStore.setState({ wind: { speedMs: 0, fromDeg: 0 } });
   });
 });

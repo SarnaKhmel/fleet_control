@@ -185,6 +185,8 @@
     "flight": "Flight",
     "flightAltitude": "Height above ground, m",
     "flightSpeed": "Speed, m/s",
-    "flightApply": "Apply ({{count}})"
+    "flightApply": "Apply ({{count}})",
+    "range": "Range",
+    "rangeHint": "How far it can still fly on its charge at its cruise speed: against the wind and with it"
   }
 }
