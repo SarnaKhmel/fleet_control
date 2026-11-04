@@ -5,7 +5,7 @@
   "targets": {
     "dev": {
       "executor": "nx:run-commands",
-      "options": { "command": "tsx watch src/server.ts", "cwd": "backend" }
+      "options": { "command": "node --watch-path=src --watch-path=../shared --import tsx src/server.ts", "cwd": "backend" }
     },
     "build": {
       "executor": "nx:run-commands",
