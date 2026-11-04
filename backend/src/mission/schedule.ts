@@ -1,4 +1,4 @@
-import { DRONE_COUNT, type DroneStatus, type LatLng, type MissionArea, type StartLayout } from '../../../shared/protocol.js';
+import { callsignOf, droneIdOf, type DroneStatus, type LatLng, type MissionArea, type StartLayout } from '../../../shared/protocol.js';
 import { isInsideArea } from '../../../shared/mission/area.js';
 
 // Timeline of the mission start, in milliseconds since mission_start. Short on purpose: it is a
@@ -19,18 +19,18 @@ export interface DroneSchedule {
 
 export type StartResult = { ok: true; points: LatLng[] } | { ok: false; reason: 'outside_area' };
 
-/** Start points for each drone, or a reason when a point lies outside the mission area. */
-export function resolveStarts(area: MissionArea, layout: StartLayout): StartResult {
+/** Start points for each of `droneCount` drones, or a reason when a point lies outside the mission area. */
+export function resolveStarts(area: MissionArea, layout: StartLayout, droneCount: number): StartResult {
   let points: LatLng[];
   switch (layout.kind) {
     case 'single':
-      points = Array.from({ length: DRONE_COUNT }, () => layout.point);
+      points = Array.from({ length: droneCount }, () => layout.point);
       break;
     case 'cluster': {
-      // Three drones on a ring of half the radius, so they start close together but not on one point.
+      // The drones on a ring of half the radius, so they start close together but not on one point.
       const r = layout.radiusM / 2;
-      points = Array.from({ length: DRONE_COUNT }, (_, i) => {
-        const angle = (2 * Math.PI * i) / DRONE_COUNT;
+      points = Array.from({ length: droneCount }, (_, i) => {
+        const angle = (2 * Math.PI * i) / droneCount;
         const dLat = (r * Math.cos(angle)) / 110_574;
         const dLng = (r * Math.sin(angle)) / (111_320 * Math.cos((layout.center.lat * Math.PI) / 180));
         return { lat: layout.center.lat + dLat, lng: layout.center.lng + dLng };
@@ -48,8 +48,8 @@ export function resolveStarts(area: MissionArea, layout: StartLayout): StartResu
 /** One entry per drone: drones start one after another, every STAGGER_MS. */
 export function buildSchedule(starts: LatLng[]): DroneSchedule[] {
   return starts.map((start, i) => ({
-    droneId: `drone-${i + 1}`,
-    callsign: `BA-0${i + 1}`,
+    droneId: droneIdOf(i),
+    callsign: callsignOf(i),
     start,
     startAtMs: i * STAGGER_MS,
     bootMs: BOOT_MS,

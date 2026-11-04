@@ -6,13 +6,38 @@ const store = () => useMissionStore.getState();
 
 describe('mission store', () => {
   beforeEach(() => {
-    useMissionStore.setState({ center: null, widthKm: 200, heightKm: 200, layoutKind: 'single', points: [], phase: 'idle', drones: {}, error: null, picking: false, drawing: false, drawAnchor: null, drawCursor: null });
+    useMissionStore.setState({ center: null, widthKm: 200, heightKm: 200, layoutKind: 'single', points: [], phase: 'idle', drones: {}, error: null, picking: false, drawing: false, drawAnchor: null, drawCursor: null, droneCount: 3 });
   });
 
   it('single layout keeps one point and replaces it on click', () => {
     store().addPoint(p(50.4, 30.5));
     store().addPoint(p(50.5, 30.6));
     expect(store().points).toEqual([p(50.5, 30.6)]);
+  });
+
+  it('keeps the drone count a whole number from 1 to MAX_DRONES, fixed while the mission runs', () => {
+    store().setDroneCount(7.4);
+    expect(store().droneCount).toBe(7);
+    store().setDroneCount(0);
+    expect(store().droneCount).toBe(1);
+    store().setDroneCount(99);
+    expect(store().droneCount).toBe(20);
+    store().setDroneCount(Number.NaN);
+    expect(store().droneCount).toBe(20);
+    store().markStarting();
+    store().setDroneCount(4);
+    expect(store().droneCount).toBe(20);
+  });
+
+  it('separate layout needs one start point per drone', () => {
+    store().setDroneCount(5);
+    store().setLayoutKind('separate');
+    [p(50, 30), p(50.1, 30), p(50.2, 30), p(50.3, 30)].forEach(store().addPoint);
+    expect(layoutFrom(store())).toBeNull();
+    store().addPoint(p(50.4, 30));
+    expect(layoutFrom(store())).toEqual({ kind: 'separate', points: store().points });
+    store().setDroneCount(2); // fewer drones: the extra points go
+    expect(store().points).toEqual([p(50, 30), p(50.1, 30)]);
   });
 
   it('separate layout collects three points', () => {
@@ -117,12 +142,15 @@ describe('mission store', () => {
     store().apply({
       type: 'mission_snapshot',
       running: true,
+      droneCount: 5,
       drones: [{ droneId: 'drone-1', callsign: 'BA-01', status: 'idle', progress: 100, position: { lat: 50, lng: 30 }, heading: 10, altitudeM: 210, speedMs: 0, batteryPct: 99, crabDeg: 0, trail: [], tasks: [] }],
     });
     expect(store().phase).toBe('running');
+    expect(store().droneCount).toBe(5);
     expect(store().drones['drone-1']).toMatchObject({ callsign: 'BA-01', status: 'idle', altitudeM: 210 });
-    store().apply({ type: 'mission_snapshot', running: false, drones: [] });
+    store().apply({ type: 'mission_snapshot', running: false, droneCount: 0, drones: [] });
     expect(store().phase).toBe('idle');
     expect(store().drones).toEqual({});
+    expect(store().droneCount).toBe(5); // the operator's choice is kept when no mission runs
   });
 });

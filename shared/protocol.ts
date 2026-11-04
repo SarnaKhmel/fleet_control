@@ -2,7 +2,23 @@
 // Server is the source of truth; the client sends intents only. Every incoming message is
 // validated with the guards below before it is used.
 
-export const DRONE_COUNT = 3;
+/** Drones in a mission: the operator picks how many, from 1 to MAX_DRONES. */
+export const DEFAULT_DRONE_COUNT = 3;
+export const MAX_DRONES = 20;
+
+/** Id of the drone at `index` (0-based) in a mission: drone-1, drone-2, … */
+export function droneIdOf(index: number): string {
+  return `drone-${index + 1}`;
+}
+
+/** Callsign of the drone at `index` (0-based): BA-01 … BA-20. */
+export function callsignOf(index: number): string {
+  return `BA-${String(index + 1).padStart(2, '0')}`;
+}
+
+export function isDroneCount(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) >= 1 && (value as number) <= MAX_DRONES;
+}
 export const MISSION_DEFAULT_AREA_KM = 50;
 export const MISSION_MAX_AREA_KM = 500;
 export const CLUSTER_MAX_RADIUS_M = 5000;
@@ -54,7 +70,7 @@ export interface DroneTelemetry {
 // ---- Client → server ----
 
 export type ClientMessage =
-  | { type: 'mission_start'; area: MissionArea; layout: StartLayout }
+  | { type: 'mission_start'; area: MissionArea; layout: StartLayout; droneCount: number }
   | { type: 'mission_reset' }
   /** Without `append` the target replaces the drones' tasks; with it, the target goes to the end of them. */
   | { type: 'move'; droneIds: string[]; target: LatLng; append?: boolean }
@@ -91,7 +107,8 @@ export interface SnapshotDrone {
 }
 
 export type ServerMessage =
-  | { type: 'mission_snapshot'; running: boolean; drones: SnapshotDrone[] }
+  /** `droneCount` is the size of the running mission's fleet (0 when none runs); `drones` lists those started so far. */
+  | { type: 'mission_snapshot'; running: boolean; droneCount: number; drones: SnapshotDrone[] }
   | { type: 'drone_boot'; droneId: string; status: 'booting' | 'connecting'; progress: number }
   | { type: 'drone_online'; telemetry: DroneTelemetry }
   | { type: 'position'; droneId: string; position: LatLng; heading: number; speedMs: number; altitudeM: number; batteryPct: number; crabDeg: number; }
@@ -128,7 +145,8 @@ export function isStartLayout(value: unknown): value is StartLayout {
     case 'cluster':
       return isLatLng(layout.center) && isFiniteNumber(layout.radiusM) && layout.radiusM > 0 && layout.radiusM <= CLUSTER_MAX_RADIUS_M;
     case 'separate':
-      return Array.isArray(layout.points) && layout.points.length === DRONE_COUNT && layout.points.every(isLatLng);
+      // One point per drone; parseClientMessage checks the count against droneCount.
+      return Array.isArray(layout.points) && layout.points.length >= 1 && layout.points.length <= MAX_DRONES && layout.points.every(isLatLng);
     default:
       return false;
   }
@@ -148,7 +166,7 @@ export function isDroneId(value: unknown): value is string {
 }
 
 export function isDroneIds(value: unknown): value is string[] {
-  return Array.isArray(value) && value.length >= 1 && value.length <= DRONE_COUNT && value.every(isDroneId);
+  return Array.isArray(value) && value.length >= 1 && value.length <= MAX_DRONES && value.every(isDroneId);
 }
 
 /** Position in a drone's task list: a whole number below MAX_TASKS. */
@@ -160,8 +178,10 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const message = raw as Record<string, unknown>;
   if (message.type === 'mission_reset') return { type: 'mission_reset' };
-  if (message.type === 'mission_start' && isMissionArea(message.area) && isStartLayout(message.layout)) {
-    return { type: 'mission_start', area: message.area, layout: message.layout };
+  if (message.type === 'mission_start' && isMissionArea(message.area) && isStartLayout(message.layout) && isDroneCount(message.droneCount)) {
+    // A layout with a point per drone must have exactly one point for each.
+    if (message.layout.kind === 'separate' && message.layout.points.length !== message.droneCount) return null;
+    return { type: 'mission_start', area: message.area, layout: message.layout, droneCount: message.droneCount };
   }
   if (message.type === 'move' && isDroneIds(message.droneIds) && isLatLng(message.target) && (message.append === undefined || typeof message.append === 'boolean')) {
     return message.append ? { type: 'move', droneIds: message.droneIds, target: message.target, append: true } : { type: 'move', droneIds: message.droneIds, target: message.target };

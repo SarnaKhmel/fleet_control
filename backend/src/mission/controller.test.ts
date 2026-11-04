@@ -16,7 +16,7 @@ describe('mission controller', () => {
 
   it('boots drones one after another and brings each online', () => {
     const mission = createMissionController((m) => sent.push(m), () => '2026-11-04T12:00:00Z');
-    mission.handle({ type: 'mission_start', area, layout: single });
+    mission.handle({ type: 'mission_start', area, layout: single, droneCount: 3 });
 
     vi.advanceTimersByTime(STAGGER_MS + BOOT_MS + CONNECT_MS);
 
@@ -28,22 +28,22 @@ describe('mission controller', () => {
 
   it('refuses a second start while a mission runs', () => {
     const mission = createMissionController((m) => sent.push(m));
-    mission.handle({ type: 'mission_start', area, layout: single });
-    mission.handle({ type: 'mission_start', area, layout: single });
+    mission.handle({ type: 'mission_start', area, layout: single, droneCount: 3 });
+    mission.handle({ type: 'mission_start', area, layout: single, droneCount: 3 });
     expect(sent).toContainEqual({ type: 'mission_error', reason: 'already_running' });
     mission.dispose();
   });
 
   it('reports a start outside the mission area and does not run it', () => {
     const mission = createMissionController((m) => sent.push(m));
-    mission.handle({ type: 'mission_start', area, layout: { kind: 'single', point: { lat: 52, lng: 30 } } });
+    mission.handle({ type: 'mission_start', area, layout: { kind: 'single', point: { lat: 52, lng: 30 } }, droneCount: 3 });
     expect(sent).toEqual([{ type: 'mission_error', reason: 'outside_area' }]);
     mission.dispose();
   });
 
   it('reset stops pending timers and announces the reset', () => {
     const mission = createMissionController((m) => sent.push(m));
-    mission.handle({ type: 'mission_start', area, layout: single });
+    mission.handle({ type: 'mission_start', area, layout: single, droneCount: 3 });
     mission.handle({ type: 'mission_reset' });
     sent = [];
     vi.advanceTimersByTime(60_000);
@@ -53,24 +53,36 @@ describe('mission controller', () => {
 
   it('allows a new mission after reset', () => {
     const mission = createMissionController((m) => sent.push(m));
-    mission.handle({ type: 'mission_start', area, layout: single });
+    mission.handle({ type: 'mission_start', area, layout: single, droneCount: 3 });
     mission.handle({ type: 'mission_reset' });
-    mission.handle({ type: 'mission_start', area, layout: single });
+    mission.handle({ type: 'mission_start', area, layout: single, droneCount: 3 });
     expect(sent.some((m) => m.type === 'mission_error')).toBe(false);
     mission.dispose();
   });
 
   it('brings all three drones online within four seconds', () => {
     const mission = createMissionController((m) => sent.push(m));
-    mission.handle({ type: 'mission_start', area, layout: single });
+    mission.handle({ type: 'mission_start', area, layout: single, droneCount: 3 });
     vi.advanceTimersByTime(4000);
     expect(sent.filter((m) => m.type === 'drone_online')).toHaveLength(3);
     mission.dispose();
   });
 
+  it('starts as many drones as the operator asked for, and tells a reconnecting client how many', () => {
+    const mission = createMissionController((m) => sent.push(m));
+    mission.handle({ type: 'mission_start', area, layout: single, droneCount: 12 });
+    vi.advanceTimersByTime(11 * STAGGER_MS + BOOT_MS + CONNECT_MS);
+    const online = sent.filter((m) => m.type === 'drone_online').map((m) => (m.type === 'drone_online' ? m.telemetry.meta.callsign : ''));
+    expect(online).toHaveLength(12);
+    expect(online.at(-1)).toBe('BA-12');
+    const snap = mission.snapshot();
+    expect(snap.type === 'mission_snapshot' && snap.droneCount).toBe(12);
+    mission.dispose();
+  });
+
   it('moves an online drone toward a target and reports positions', () => {
     const mission = createMissionController((m) => sent.push(m));
-    mission.handle({ type: 'mission_start', area, layout: single });
+    mission.handle({ type: 'mission_start', area, layout: single, droneCount: 3 });
     vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
     sent = [];
     mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.02, lng: 30 } });
@@ -84,7 +96,7 @@ describe('mission controller', () => {
 
   it('ignores move for drones that are not online yet', () => {
     const mission = createMissionController((m) => sent.push(m));
-    mission.handle({ type: 'mission_start', area, layout: single });
+    mission.handle({ type: 'mission_start', area, layout: single, droneCount: 3 });
     mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.02, lng: 30 } });
     // Once online, the drone only climbs: the move it got while booting was not kept.
     vi.advanceTimersByTime(BOOT_MS + CONNECT_MS + 3000);
@@ -96,7 +108,7 @@ describe('mission controller', () => {
 
   it('climbs an online drone to hover altitude before it is given a move', () => {
     const mission = createMissionController((m) => sent.push(m));
-    mission.handle({ type: 'mission_start', area, layout: single });
+    mission.handle({ type: 'mission_start', area, layout: single, droneCount: 3 });
     vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
     sent = [];
     vi.advanceTimersByTime(5000);
@@ -111,8 +123,8 @@ describe('mission controller', () => {
 
   it('gives a snapshot of a running mission and an empty one when idle', () => {
     const mission = createMissionController((m) => sent.push(m));
-    expect(mission.snapshot()).toEqual({ type: 'mission_snapshot', running: false, drones: [] });
-    mission.handle({ type: 'mission_start', area, layout: single });
+    expect(mission.snapshot()).toEqual({ type: 'mission_snapshot', running: false, droneCount: 0, drones: [] });
+    mission.handle({ type: 'mission_start', area, layout: single, droneCount: 3 });
     vi.advanceTimersByTime(BOOT_MS + CONNECT_MS + 2000);
     const snap = mission.snapshot();
     expect(snap.type === 'mission_snapshot' && snap.running).toBe(true);
@@ -122,7 +134,7 @@ describe('mission controller', () => {
 
   it('flies a drone on a heading until it is given something else', () => {
     const mission = createMissionController((m) => sent.push(m));
-    mission.handle({ type: 'mission_start', area, layout: single });
+    mission.handle({ type: 'mission_start', area, layout: single, droneCount: 3 });
     vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
     sent = [];
     mission.handle({ type: 'heading', droneIds: ['drone-1'], headingDeg: 0 });
@@ -138,7 +150,7 @@ describe('mission controller', () => {
   it('turns the nose into a crosswind so the drone still tracks the target', () => {
     const mission = createMissionController((m) => sent.push(m));
     mission.handle({ type: 'wind', speedMs: 3, fromDeg: 270 }); // wind blows east, pushing a northbound drone right
-    mission.handle({ type: 'mission_start', area, layout: single });
+    mission.handle({ type: 'mission_start', area, layout: single, droneCount: 3 });
     vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
     sent = [];
     mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.02, lng: 30 } });
@@ -151,7 +163,7 @@ describe('mission controller', () => {
 
   it('flies a drone through its own control points in order', () => {
     const mission = createMissionController((m) => sent.push(m));
-    mission.handle({ type: 'mission_start', area, layout: single });
+    mission.handle({ type: 'mission_start', area, layout: single, droneCount: 3 });
     vi.advanceTimersByTime(STAGGER_MS * 2 + BOOT_MS + CONNECT_MS);
     sent = [];
     mission.handle({
@@ -184,7 +196,7 @@ describe('mission controller', () => {
     };
     const online = () => {
       const mission = createMissionController((m) => sent.push(m));
-      mission.handle({ type: 'mission_start', area, layout: single });
+      mission.handle({ type: 'mission_start', area, layout: single, droneCount: 3 });
       vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
       sent = [];
       return mission;

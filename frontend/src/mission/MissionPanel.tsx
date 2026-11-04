@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-import { DRONE_COUNT, type ClientMessage } from '../../../shared/protocol';
+import { MAX_DRONES, type ClientMessage } from '../../../shared/protocol';
 import { useLocationStore } from '../location/locationStore';
 import { sendClientMessage } from './missionSocket';
 import { effectiveCenter, layoutFrom, startProblem, useMissionStore, type LayoutKind } from './missionStore';
@@ -17,6 +17,7 @@ export function MissionPanel() {
       layoutKind: s.layoutKind,
       points: s.points,
       clusterRadiusM: s.clusterRadiusM,
+      droneCount: s.droneCount,
       picking: s.picking,
       drawing: s.drawing,
       drawAnchor: s.drawAnchor,
@@ -26,6 +27,7 @@ export function MissionPanel() {
       setSize: s.setSize,
       setLayoutKind: s.setLayoutKind,
       setClusterRadius: s.setClusterRadius,
+      setDroneCount: s.setDroneCount,
       setPicking: s.setPicking,
       setDrawing: s.setDrawing,
       clearPoints: s.clearPoints,
@@ -37,7 +39,7 @@ export function MissionPanel() {
   const [confirmReset, setConfirmReset] = useState(false);
   const locked = state.phase === 'running';
 
-  const need = state.layoutKind === 'separate' ? DRONE_COUNT : 1;
+  const need = state.layoutKind === 'separate' ? state.droneCount : 1;
   const problem = startProblem(state);
   const canStart = state.phase === 'idle' && problem === null;
 
@@ -70,7 +72,7 @@ export function MissionPanel() {
     const layout = layoutFrom(state);
     if (!layout) return;
     const area = { center: effectiveCenter(state), widthKm: state.widthKm, heightKm: state.heightKm };
-    if (send({ type: 'mission_start', area, layout })) state.markStarting();
+    if (send({ type: 'mission_start', area, layout, droneCount: state.droneCount })) state.markStarting();
   }
 
 
@@ -100,6 +102,10 @@ export function MissionPanel() {
 
       <fieldset>
         <legend>{t('mission.layout')}</legend>
+        <label>
+          {t('mission.droneCount')}
+          <input type="number" min={1} max={MAX_DRONES} disabled={locked} value={state.droneCount} onChange={(e) => state.setDroneCount(Number(e.target.value))} />
+        </label>
         <select value={state.layoutKind} disabled={locked} onChange={(e) => state.setLayoutKind(e.target.value as LayoutKind)}>
           <option value="single">{t('mission.layoutSingle')}</option>
           <option value="cluster">{t('mission.layoutCluster')}</option>

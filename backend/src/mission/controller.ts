@@ -54,6 +54,7 @@ export function createMissionController(
   let ticker: ReturnType<typeof setInterval> | undefined;
   let running = false;
   let startedAt = 0;
+  let droneCount = 0;
   // Wind at the mission location, as last reported by the dashboard (Open-Meteo, 10 m).
   let wind = { speedMs: 0, fromDeg: 0 };
   let schedule: DroneSchedule[] = [];
@@ -236,17 +237,18 @@ export function createMissionController(
     }
   }
 
-  function start(area: MissionArea, layout: StartLayout) {
+  function start(area: MissionArea, layout: StartLayout, count: number) {
     if (running) {
       broadcast({ type: 'mission_error', reason: 'already_running' });
       return;
     }
-    const starts = resolveStarts(area, layout);
+    const starts = resolveStarts(area, layout, count);
     if (!starts.ok) {
       broadcast({ type: 'mission_error', reason: starts.reason });
       return;
     }
     running = true;
+    droneCount = count;
     startedAt = Date.now();
     schedule = buildSchedule(starts.points);
     schedule.forEach(scheduleDrone);
@@ -260,10 +262,11 @@ export function createMissionController(
     ticker = undefined;
     drones.clear();
     running = false;
+    droneCount = 0;
   }
 
   function snapshot(): ServerMessage {
-    if (!running) return { type: 'mission_snapshot', running: false, drones: [] };
+    if (!running) return { type: 'mission_snapshot', running: false, droneCount: 0, drones: [] };
     const elapsed = Date.now() - startedAt;
     const list = [];
     for (const entry of schedule) {
@@ -285,7 +288,7 @@ export function createMissionController(
         tasks: live ? tasksOf(live) : [],
       });
     }
-    return { type: 'mission_snapshot', running: true, drones: list };
+    return { type: 'mission_snapshot', running: true, droneCount, drones: list };
   }
 
   return {
@@ -293,7 +296,7 @@ export function createMissionController(
     handle(message) {
       serverLog('client message', message.type);
       if (message.type === 'wind') wind = { speedMs: message.speedMs, fromDeg: message.fromDeg };
-      else if (message.type === 'mission_start') start(message.area, message.layout);
+      else if (message.type === 'mission_start') start(message.area, message.layout, message.droneCount);
       else if (message.type === 'mission_reset') {
         stop();
         broadcast({ type: 'mission_reset' });

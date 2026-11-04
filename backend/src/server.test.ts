@@ -37,6 +37,7 @@ describe('mission over WebSocket', () => {
         type: 'mission_start',
         area: { center: { lat: 50, lng: 30 }, widthKm: 200, heightKm: 200 },
         layout: { kind: 'single', point: { lat: 52, lng: 30 } },
+        droneCount: 3,
       }),
     );
     expect(await reply).toEqual({ type: 'mission_error', reason: 'outside_area' });

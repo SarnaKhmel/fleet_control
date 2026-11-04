@@ -10,7 +10,7 @@ const position = (lat: number, altitudeM: number) => ({ type: 'position' as cons
 describe('DroneControls', () => {
   beforeEach(() => {
     useSelectionStore.setState({ selectedIds: [] });
-    useMissionStore.setState({ phase: 'running', drones: { 'drone-1': online } });
+    useMissionStore.setState({ phase: 'running', drones: { 'drone-1': online }, droneCount: 3 });
   });
   afterEach(() => useMissionStore.setState({ phase: 'idle', drones: {} }));
 
@@ -18,6 +18,14 @@ describe('DroneControls', () => {
     render(<DroneControls />);
     expect(screen.getByText('60 m')).toBeTruthy();
     expect(screen.getByText('Online 1/3')).toBeTruthy();
+  });
+
+  it('lists every drone of the mission, with two-digit callsigns', () => {
+    useMissionStore.setState({ droneCount: 12 });
+    render(<DroneControls />);
+    expect(screen.getAllByRole('listitem')).toHaveLength(12);
+    expect(screen.getByText('BA-12')).toBeTruthy();
+    expect(screen.getByText('Online 1/12')).toBeTruthy();
   });
 
   it('selects a drone from its row, and Shift+click adds or removes one', () => {

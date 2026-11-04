@@ -1,4 +1,4 @@
-import { MISSION_DEFAULT_AREA_KM } from '../../../shared/protocol';
+import { DEFAULT_DRONE_COUNT, MISSION_DEFAULT_AREA_KM } from '../../../shared/protocol';
 import { sendClientMessage } from './missionSocket';
 import { useMissionStore } from './missionStore';
 import { useSelectionStore } from './selection';
@@ -17,6 +17,7 @@ export function resetEverything(): void {
     layoutKind: 'single',
     points: [],
     clusterRadiusM: 500,
+    droneCount: DEFAULT_DRONE_COUNT,
     picking: false,
     drawing: false,
     drawAnchor: null,

@@ -96,6 +96,7 @@
     "layoutCluster": "Cluster around a point",
     "layoutSeparate": "Each from its own point",
     "radius": "Cluster radius, m",
+    "droneCount": "Number of drones",
     "pick": "Pick start points on map",
     "pickingOn": "Picking: click the map (stop)",
     "picked": "Points: {{count}} of {{need}}",

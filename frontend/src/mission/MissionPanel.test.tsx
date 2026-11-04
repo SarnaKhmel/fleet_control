@@ -6,7 +6,7 @@ import * as socket from './missionSocket';
 
 describe('MissionPanel', () => {
   beforeEach(() => {
-    useMissionStore.setState({ center: null, widthKm: 200, heightKm: 200, layoutKind: 'single', points: [], picking: false, phase: 'idle', drones: {}, error: null });
+    useMissionStore.setState({ center: null, widthKm: 200, heightKm: 200, layoutKind: 'single', points: [], picking: false, phase: 'idle', drones: {}, error: null, droneCount: 3 });
   });
 
   it('keeps Start disabled until the picks are complete and inside the area', () => {
@@ -26,6 +26,17 @@ describe('MissionPanel', () => {
     );
     expect(useMissionStore.getState().phase).toBe('running');
     send.mockRestore();
+  });
+
+  it('sends the chosen number of drones with mission_start', () => {
+    const send = vi.spyOn(socket, 'sendClientMessage').mockReturnValue(true);
+    render(<MissionPanel />);
+    fireEvent.change(screen.getByLabelText('Number of drones'), { target: { value: '8' } });
+    act(() => useMissionStore.getState().addPoint({ lat: 50.45, lng: 30.52 }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start mission' }));
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: 'mission_start', droneCount: 8 }));
+    send.mockRestore();
+    useMissionStore.setState({ phase: 'idle' });
   });
 
   it('shows a notice when the server is not connected', () => {

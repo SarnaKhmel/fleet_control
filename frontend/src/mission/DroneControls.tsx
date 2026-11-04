@@ -1,9 +1,7 @@
-import { DRONE_COUNT, GROUND_AMSL_M } from '../../../shared/protocol';
+import { callsignOf, droneIdOf, GROUND_AMSL_M } from '../../../shared/protocol';
 import { useTranslation } from 'react-i18next';
 import { useMissionStore } from './missionStore';
 import { useSelectionStore } from './selection';
-
-const DRONE_IDS = Array.from({ length: DRONE_COUNT }, (_, i) => `drone-${i + 1}`);
 
 // One drone's boot progress and state. It subscribes only to what it shows (height rounded to a meter),
 // so position updates do not re-render it. Clicking the row selects the drone, which opens its details
@@ -30,8 +28,8 @@ function DroneStatusRow({ droneId, index }: { droneId: string; index: number }) 
         }}
       >
         <div className="drone-status-line">
-          {/* The callsign is fixed by the schedule (BA-01…BA-03); the drone is only a status until it is online. */}
-          <strong>{`BA-0${index + 1}`}</strong>
+          {/* The callsign is fixed by the schedule (BA-01, BA-02, …); the drone is only a status until it is online. */}
+          <strong>{callsignOf(index)}</strong>
           <span className={`drone-state is-${status ?? 'offline'}`}>
             {status === 'idle' && heightM !== null ? `${heightM} m` : status ? t(`mission.status.${status}`) : t('mission.status.offline')}
           </span>
@@ -44,10 +42,11 @@ function DroneStatusRow({ droneId, index }: { droneId: string; index: number }) 
   );
 }
 
-// Boot progress and connection state of the three drones, always visible while a mission is in play.
+// Boot progress and connection state of every drone of the mission, always visible while it is in play.
 export function DroneStatusList() {
   const { t } = useTranslation();
   const phase = useMissionStore((s) => s.phase);
+  const droneCount = useMissionStore((s) => s.droneCount);
   const online = useMissionStore((s) => Object.values(s.drones).filter((d) => d.status === 'idle').length);
   // Drones exist only while a mission runs; before the start or after a reset the list is hidden.
   if (phase !== 'running') return null;
@@ -55,11 +54,11 @@ export function DroneStatusList() {
     <section className="drone-status" aria-label={t('mission.drones')}>
       <div className="drone-status-head">
         <span>{t('mission.drones')}</span>
-        <span className="drone-status-count">{t('mission.online', { count: online, total: DRONE_COUNT })}</span>
+        <span className="drone-status-count">{t('mission.online', { count: online, total: droneCount })}</span>
       </div>
       <ul>
-        {DRONE_IDS.map((id, index) => (
-          <DroneStatusRow key={id} droneId={id} index={index} />
+        {Array.from({ length: droneCount }, (_, index) => (
+          <DroneStatusRow key={index} droneId={droneIdOf(index)} index={index} />
         ))}
       </ul>
       <p className="muted drone-status-hint">{t('mission.selectHint')}</p>

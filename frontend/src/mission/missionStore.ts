@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import {
-  DRONE_COUNT,
+  DEFAULT_DRONE_COUNT,
+  MAX_DRONES,
   isLatLng,
   MISSION_DEFAULT_AREA_KM,
   MISSION_MAX_AREA_KM,
@@ -36,6 +37,8 @@ export interface DroneView {
 }
 
 export interface MissionState {
+  /** Drones in the mission (1 to MAX_DRONES): set before the start, then the running mission's count. */
+  droneCount: number;
   center: LatLng | null;
   widthKm: number;
   heightKm: number;
@@ -58,6 +61,8 @@ export interface MissionState {
   setSize: (widthKm: number, heightKm: number) => void;
   setLayoutKind: (kind: LayoutKind) => void;
   setClusterRadius: (meters: number) => void;
+  /** Rounds and clamps to 1…MAX_DRONES; extra start points of a separate layout are dropped. */
+  setDroneCount: (count: number) => void;
   setPicking: (picking: boolean) => void;
   setDrawing: (drawing: boolean) => void;
   /** Map click while drawing: the first click sets a corner, the second closes the zone. */
@@ -84,17 +89,17 @@ export function effectiveCenter(state: Pick<MissionState, 'center'>): LatLng {
 }
 
 /** Layout built from the picked points, or null when the picks are not complete. */
-export function layoutFrom(state: Pick<MissionState, 'layoutKind' | 'points' | 'clusterRadiusM'>): StartLayout | null {
-  const { layoutKind, points, clusterRadiusM } = state;
+export function layoutFrom(state: Pick<MissionState, 'layoutKind' | 'points' | 'clusterRadiusM' | 'droneCount'>): StartLayout | null {
+  const { layoutKind, points, clusterRadiusM, droneCount } = state;
   if (layoutKind === 'single' && points.length === 1) return { kind: 'single', point: points[0] };
   if (layoutKind === 'cluster' && points.length === 1) return { kind: 'cluster', center: points[0], radiusM: clusterRadiusM };
-  if (layoutKind === 'separate' && points.length === DRONE_COUNT) return { kind: 'separate', points };
+  if (layoutKind === 'separate' && points.length === droneCount) return { kind: 'separate', points };
   return null;
 }
 
 /** Reason the mission cannot start yet, or null when it can. */
 export function startProblem(
-  state: Pick<MissionState, 'center' | 'widthKm' | 'heightKm' | 'layoutKind' | 'points' | 'clusterRadiusM'>,
+  state: Pick<MissionState, 'center' | 'widthKm' | 'heightKm' | 'layoutKind' | 'points' | 'clusterRadiusM' | 'droneCount'>,
 ): 'incomplete' | 'outside' | null {
   const layout = layoutFrom(state);
   if (!layout) return 'incomplete';
@@ -113,6 +118,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   layoutKind: 'single',
   points: [],
   clusterRadiusM: 500,
+  droneCount: DEFAULT_DRONE_COUNT,
   picking: false,
   drawing: false,
   drawAnchor: null,
@@ -126,6 +132,12 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   setSize: (widthKm, heightKm) => (locked(get) ? undefined : set({ widthKm, heightKm, zoneChosen: true })),
   setLayoutKind: (layoutKind) => (locked(get) ? undefined : set({ layoutKind, points: [] })),
   setClusterRadius: (clusterRadiusM) => (locked(get) ? undefined : set({ clusterRadiusM })),
+  setDroneCount: (count) => {
+    if (locked(get) || !Number.isFinite(count)) return;
+    const droneCount = Math.min(MAX_DRONES, Math.max(1, Math.round(count)));
+    const { layoutKind, points } = get();
+    set({ droneCount, points: layoutKind === 'separate' ? points.slice(0, droneCount) : points });
+  },
   setPicking: (picking) => (locked(get) && picking ? undefined : set({ picking })),
   setDrawing: (drawing) => (locked(get) && drawing ? undefined : set({ drawing, drawAnchor: null, drawCursor: null })),
   drawClick: (point) => {
@@ -143,7 +155,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   addPoint: (point) => {
     if (locked(get)) return;
     const { layoutKind, points } = get();
-    const max = layoutKind === 'separate' ? DRONE_COUNT : 1;
+    const max = layoutKind === 'separate' ? get().droneCount : 1;
     // Keep the newest picks: a click past the limit replaces the oldest pick.
     set({ points: [...points, point].slice(-max) });
   },
@@ -244,7 +256,8 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
             tasks: pointList(d.tasks),
           };
         }
-        set({ phase: message.running ? 'running' : 'idle', drones, error: null });
+        // A running mission's fleet size is the server's; when none runs, keep the operator's choice.
+        set({ phase: message.running ? 'running' : 'idle', drones, error: null, ...(message.running ? { droneCount: message.droneCount } : {}) });
         return;
       }
       case 'mission_error':
