@@ -34,4 +34,16 @@ describe('MissionPanel', () => {
     expect(screen.getByRole('alert').textContent).toBe('Not connected to the server');
     send.mockRestore();
   });
+
+  it('asks for a second press before resetting a running mission', () => {
+    const send = vi.spyOn(socket, 'sendClientMessage').mockReturnValue(true);
+    useMissionStore.setState({ phase: 'running' });
+    render(<MissionPanel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Reset mission' }));
+    expect(send).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /Confirm reset/ }));
+    expect(send).toHaveBeenCalledWith({ type: 'mission_reset' });
+    send.mockRestore();
+    useMissionStore.setState({ phase: 'idle' });
+  });
 });

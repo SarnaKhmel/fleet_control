@@ -1172,3 +1172,9 @@ body,
   background: var(--accent);
   transition: width 0.4s ease;
 }
+
+.sidebar .btn-danger {
+  border-color: var(--warning);
+  color: var(--warning);
+  font-weight: 600;
+}

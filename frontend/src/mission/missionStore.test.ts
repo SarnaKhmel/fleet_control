@@ -70,4 +70,19 @@ describe('mission store', () => {
     store().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 90, speedMs: 10 });
     expect(store().drones['drone-1']).toMatchObject({ position: { lat: 50.1, lng: 30.1 }, heading: 90 });
   });
+
+  it('fixes the zone, layout and start points once the mission runs', () => {
+    store().addPoint({ lat: 50.45, lng: 30.52 });
+    store().markStarting();
+    store().setSize(50, 50);
+    store().setCenter({ lat: 49, lng: 30 });
+    store().setLayoutKind('separate');
+    store().clearPoints();
+    store().setDrawing(true);
+    expect(store().widthKm).toBe(200);
+    expect(store().center).toBeNull();
+    expect(store().layoutKind).toBe('single');
+    expect(store().points).toHaveLength(1);
+    expect(store().drawing).toBe(false);
+  });
 });

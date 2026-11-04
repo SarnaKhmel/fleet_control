@@ -85,6 +85,9 @@ export function startProblem(state: MissionState): 'incomplete' | 'outside' | nu
   return starts.every((p) => isInsideArea(p, area)) ? null : 'outside';
 }
 
+// Once a mission runs, its zone, layout and start points are fixed; only move and reset remain.
+const locked = (get: () => MissionState) => get().phase === 'running';
+
 export const useMissionStore = create<MissionState>()((set, get) => ({
   center: null,
   widthKm: MISSION_DEFAULT_AREA_KM,
@@ -102,14 +105,15 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   phase: 'idle',
   drones: {},
   error: null,
-  setCenter: (center) => set({ center, zoneChosen: true }),
-  setSize: (widthKm, heightKm) => set({ widthKm, heightKm, zoneChosen: true }),
-  setLayoutKind: (layoutKind) => set({ layoutKind, points: [] }),
-  setClusterRadius: (clusterRadiusM) => set({ clusterRadiusM }),
-  setPicking: (picking) => set({ picking }),
+  setCenter: (center) => (locked(get) ? undefined : set({ center, zoneChosen: true })),
+  setSize: (widthKm, heightKm) => (locked(get) ? undefined : set({ widthKm, heightKm, zoneChosen: true })),
+  setLayoutKind: (layoutKind) => (locked(get) ? undefined : set({ layoutKind, points: [] })),
+  setClusterRadius: (clusterRadiusM) => (locked(get) ? undefined : set({ clusterRadiusM })),
+  setPicking: (picking) => (locked(get) && picking ? undefined : set({ picking })),
   setMoveMode: (moveMode) => set({ moveMode }),
-  setDrawing: (drawing) => set({ drawing, drawAnchor: null, drawCursor: null }),
+  setDrawing: (drawing) => (locked(get) && drawing ? undefined : set({ drawing, drawAnchor: null, drawCursor: null })),
   drawClick: (point) => {
+    if (locked(get)) return;
     const { drawAnchor } = get();
     if (!drawAnchor) {
       set({ drawAnchor: point, drawCursor: point });
@@ -121,12 +125,13 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   setDrawCursor: (drawCursor) => set({ drawCursor }),
   setZoneVisible: (zoneVisible) => set({ zoneVisible }),
   addPoint: (point) => {
+    if (locked(get)) return;
     const { layoutKind, points } = get();
     const max = layoutKind === 'separate' ? DRONE_COUNT : 1;
     // Keep the newest picks: a click past the limit replaces the oldest pick.
     set({ points: [...points, point].slice(-max) });
   },
-  clearPoints: () => set({ points: [] }),
+  clearPoints: () => (locked(get) ? undefined : set({ points: [] })),
   markStarting: () => set({ phase: 'running', drones: {}, error: null }),
   apply: (message) => {
     switch (message.type) {

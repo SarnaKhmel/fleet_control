@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DRONE_COUNT, type ClientMessage } from '../../../shared/protocol';
 import { useLocationStore } from '../location/locationStore';
@@ -54,6 +54,8 @@ export function MissionPanel() {
   const state = useMissionStore();
   const selected = useLocationStore((s) => s.selected);
   const [notice, setNotice] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const locked = state.phase === 'running';
 
   const need = state.layoutKind === 'separate' ? DRONE_COUNT : 1;
   const problem = startProblem(state);
@@ -66,6 +68,22 @@ export function MissionPanel() {
     }
     setNotice(null);
     return true;
+  }
+
+  // Resetting a running mission needs a second press within a few seconds.
+  useEffect(() => {
+    if (!confirmReset) return;
+    const timer = setTimeout(() => setConfirmReset(false), 4000);
+    return () => clearTimeout(timer);
+  }, [confirmReset]);
+
+  function resetMission() {
+    if (locked && !confirmReset) {
+      setConfirmReset(true);
+      return;
+    }
+    setConfirmReset(false);
+    send({ type: 'mission_reset' });
   }
 
   function start() {
@@ -83,7 +101,7 @@ export function MissionPanel() {
 
       <fieldset>
         <legend>{t('mission.area')}</legend>
-        <button type="button" aria-pressed={state.drawing} onClick={() => state.setDrawing(!state.drawing)}>
+        <button type="button" aria-pressed={state.drawing} disabled={locked} onClick={() => state.setDrawing(!state.drawing)}>
           {state.drawing ? t('mission.drawingOn') : t('mission.draw')}
         </button>
         {state.drawing && (
@@ -91,20 +109,20 @@ export function MissionPanel() {
         )}
         <label>
           {t('mission.width')}
-          <input type="number" min={1} max={500} value={state.widthKm} onChange={(e) => state.setSize(Number(e.target.value), state.heightKm)} />
+          <input type="number" min={1} max={500} disabled={locked} value={state.widthKm} onChange={(e) => state.setSize(Number(e.target.value), state.heightKm)} />
         </label>
         <label>
           {t('mission.height')}
-          <input type="number" min={1} max={500} value={state.heightKm} onChange={(e) => state.setSize(state.widthKm, Number(e.target.value))} />
+          <input type="number" min={1} max={500} disabled={locked} value={state.heightKm} onChange={(e) => state.setSize(state.widthKm, Number(e.target.value))} />
         </label>
-        <button type="button" onClick={() => state.setCenter(selected)} disabled={!selected}>
+        <button type="button" onClick={() => state.setCenter(selected)} disabled={!selected || locked}>
           {t('mission.useLocation')}
         </button>
       </fieldset>
 
       <fieldset>
         <legend>{t('mission.layout')}</legend>
-        <select value={state.layoutKind} onChange={(e) => state.setLayoutKind(e.target.value as LayoutKind)}>
+        <select value={state.layoutKind} disabled={locked} onChange={(e) => state.setLayoutKind(e.target.value as LayoutKind)}>
           <option value="single">{t('mission.layoutSingle')}</option>
           <option value="cluster">{t('mission.layoutCluster')}</option>
           <option value="separate">{t('mission.layoutSeparate')}</option>
@@ -112,16 +130,16 @@ export function MissionPanel() {
         {state.layoutKind === 'cluster' && (
           <label>
             {t('mission.radius')}
-            <input type="number" min={1} max={5000} value={state.clusterRadiusM} onChange={(e) => state.setClusterRadius(Number(e.target.value))} />
+            <input type="number" min={1} max={5000} disabled={locked} value={state.clusterRadiusM} onChange={(e) => state.setClusterRadius(Number(e.target.value))} />
           </label>
         )}
-        <button type="button" aria-pressed={state.picking} onClick={() => state.setPicking(!state.picking)}>
+        <button type="button" aria-pressed={state.picking} disabled={locked} onClick={() => state.setPicking(!state.picking)}>
           {state.picking ? t('mission.pickingOn') : t('mission.pick')}
         </button>
         <span className="muted">
           {t('mission.picked', { count: state.points.length, need })}
         </span>
-        <button type="button" onClick={state.clearPoints} disabled={state.points.length === 0}>
+        <button type="button" onClick={state.clearPoints} disabled={state.points.length === 0 || locked}>
           {t('mission.clearPoints')}
         </button>
       </fieldset>
@@ -142,12 +160,13 @@ export function MissionPanel() {
         <button type="button" className="btn-primary" onClick={start} disabled={!canStart}>
           {t('mission.start')}
         </button>
-        <button type="button" onClick={() => send({ type: 'mission_reset' })}>
-          {t('mission.reset')}
+        <button type="button" className={confirmReset ? 'btn-danger' : undefined} onClick={resetMission}>
+          {confirmReset ? t('mission.resetConfirm') : t('mission.reset')}
         </button>
       </div>
 
       {problem && state.phase === 'idle' && <p className="muted">{t(`mission.problem.${problem}`)}</p>}
+      {locked && <p className="muted">{t('mission.locked')}</p>}
       {state.error && (
         <p role="alert" className="form-error">
           {t(`mission.error.${state.error}`)}
