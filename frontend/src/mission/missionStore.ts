@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import {
   DRONE_COUNT,
+  isLatLng,
   MISSION_DEFAULT_AREA_KM,
   MISSION_MAX_AREA_KM,
   type LatLng,
@@ -67,6 +68,14 @@ export interface MissionState {
   clearPoints: () => void;
   apply: (message: ServerMessage) => void;
   markStarting: () => void;
+}
+
+/**
+ * A list of points from the server, or an empty list if it is missing or malformed (for example from a
+ * server of an older build), so the map and panels can always read it.
+ */
+function pointList(value: unknown): LatLng[] {
+  return Array.isArray(value) && value.every(isLatLng) ? value : [];
 }
 
 /** Zone center: the chosen center, else the selected location, else the default city. */
@@ -202,8 +211,8 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
               speedMs: message.speedMs,
               batteryPct: message.batteryPct,
               crabDeg: message.crabDeg,
-              trail: message.trail,
-              tasks: message.tasks,
+              trail: pointList(message.trail),
+              tasks: pointList(message.tasks),
             },
           },
         });
@@ -222,8 +231,8 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
             speedMs: d.speedMs,
             batteryPct: d.batteryPct,
             crabDeg: d.crabDeg,
-            trail: d.trail,
-            tasks: d.tasks,
+            trail: pointList(d.trail),
+            tasks: pointList(d.tasks),
           };
         }
         set({ phase: message.running ? 'running' : 'idle', drones, error: null });
