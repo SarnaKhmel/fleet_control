@@ -24,7 +24,7 @@ export const useMapViewStore = create<MapViewState>()(
     (set) => ({
       view: 'auto',
       setView: (view) => set({ view }),
-      buildings3d: true,
+      buildings3d: false,
       setBuildings3d: (buildings3d) => set({ buildings3d }),
     }),
     { name: MAP_VIEW_KEY },
