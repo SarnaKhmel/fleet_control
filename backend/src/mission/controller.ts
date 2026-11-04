@@ -3,7 +3,7 @@ import { BOOT_MS, buildSchedule, CONNECT_MS, DroneSchedule, resolveStarts } from
 import { buildTelemetry } from './telemetry.js';
 import { toMetersFrom } from '../../../shared/mission/area.js';
 import { droneStateAt } from './schedule.js';
-import { bearingTo, BATTERY_DRAIN_PER_TICK, CLIMB_RATE_MS, DRONE_SPEED_MS, formationTargets, GROUND_AMSL_M, HOVER_ALT_M, TICK_MS, windStep } from './kinematics.js';
+import { bearingTo, BATTERY_DRAIN_PER_TICK, CLIMB_RATE_MS, DRONE_SPEED_MS, formationTargets, GROUND_AMSL_M, HOVER_ALT_M, SIM_TIME_SCALE, TICK_MS, windStep } from './kinematics.js';
 
 // Interval between "booting" progress messages, simulated ms.
 export const PROGRESS_STEP_MS = 1000;
@@ -80,10 +80,10 @@ export function createMissionController(
   function tick() {
     for (const [droneId, drone] of drones) {
       const climbing = drone.altitudeM < GROUND_AMSL_M + HOVER_ALT_M;
-      if (climbing) drone.altitudeM = Math.min(GROUND_AMSL_M + HOVER_ALT_M, drone.altitudeM + CLIMB_RATE_MS * (TICK_MS / 1000));
+      if (climbing) drone.altitudeM = Math.min(GROUND_AMSL_M + HOVER_ALT_M, drone.altitudeM + CLIMB_RATE_MS * SIM_TIME_SCALE * (TICK_MS / 1000));
       const moving = drone.target !== null || drone.course !== null;
       if (!moving && !climbing) continue;
-      const dtS = TICK_MS / 1000;
+      const dtS = (TICK_MS / 1000) * SIM_TIME_SCALE;
       let crabDeg = 0;
       // Flying to a target or along a course: the nose is turned into the wind to hold the ground track.
       const track = drone.target ? bearingTo(drone.position, drone.target) : drone.course;
@@ -101,7 +101,7 @@ export function createMissionController(
       }
       drone.speedMs = drone.target || drone.course !== null ? DRONE_SPEED_MS : 0;
       drone.crabDeg = crabDeg;
-      drone.batteryPct = Math.max(0, drone.batteryPct - BATTERY_DRAIN_PER_TICK);
+      drone.batteryPct = Math.max(0, drone.batteryPct - BATTERY_DRAIN_PER_TICK * SIM_TIME_SCALE);
       broadcast({
         type: 'position',
         droneId,
