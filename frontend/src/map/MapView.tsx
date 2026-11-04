@@ -16,6 +16,8 @@ import { syncFrontLine } from '../frontline/frontLine';
 import { syncMissionArea } from '../mission/missionLayer';
 import { useMissionStore } from '../mission/missionStore';
 import { syncStartMarkers } from '../mission/startMarkers';
+import { syncDroneMarkers } from '../mission/droneMarkers';
+import { useSymbolStyleStore } from '../mission/symbolStyle';
 import { useFrontLineStore } from '../frontline/frontLine';
 import { CONTROL_POINT_SIDC, natoElement } from '../symbology/nato';
 
@@ -32,6 +34,9 @@ export function MapView() {
   const markerRef = useRef<Marker | null>(null);
   const startMarkersRef = useRef<Marker[]>([]);
   const missionPoints = useMissionStore((state) => state.points);
+  const drones = useMissionStore((state) => state.drones);
+  const symbolStyle = useSymbolStyleStore((state) => state.style);
+  const droneMarkersRef = useRef<Marker[]>([]);
   const styleRef = useRef<string | null>(null);
   const theme = useThemeStore((state) => state.theme);
   const view = useMapViewStore((state) => state.view);
@@ -107,6 +112,13 @@ export function MapView() {
     if (!map) return;
     startMarkersRef.current = syncStartMarkers(map, startMarkersRef.current, missionPoints);
   }, [missionPoints]);
+
+  // Drones with a known position, drawn as NATO symbols or in our own style.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    droneMarkersRef.current = syncDroneMarkers(map, droneMarkersRef.current, drones, symbolStyle);
+  }, [drones, symbolStyle]);
 
   // Approximate front line follows its switch, the loaded zones and the theme.
   const frontEnabled = useFrontLineStore((state) => state.enabled);

@@ -18,6 +18,9 @@ export interface DroneView {
   callsign: string;
   status: 'booting' | 'connecting' | 'idle';
   progress: number;
+  /** Known once the drone is online; null while it is still booting. */
+  position: LatLng | null;
+  heading: number | null;
 }
 
 export interface MissionState {
@@ -96,7 +99,13 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
         set({
           drones: {
             ...get().drones,
-            [message.droneId]: { callsign: prev?.callsign ?? message.droneId, status: message.status, progress: message.progress },
+            [message.droneId]: {
+              callsign: prev?.callsign ?? message.droneId,
+              status: message.status,
+              progress: message.progress,
+              position: null,
+              heading: null,
+            },
           },
         });
         return;
@@ -105,7 +114,16 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
         set({
           drones: {
             ...get().drones,
-            [message.telemetry.meta.drone_id]: { callsign: message.telemetry.meta.callsign, status: 'idle', progress: 100 },
+            [message.telemetry.meta.drone_id]: {
+              callsign: message.telemetry.meta.callsign,
+              status: 'idle',
+              progress: 100,
+              position: {
+                lat: message.telemetry.position_and_kinematics.gps.latitude,
+                lng: message.telemetry.position_and_kinematics.gps.longitude,
+              },
+              heading: message.telemetry.position_and_kinematics.heading_deg,
+            },
           },
         });
         return;

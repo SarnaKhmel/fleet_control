@@ -83,7 +83,9 @@ export const markerInstances: Marker[] = [];
 export class Marker {
   lngLat: [number, number] | null = null;
   added = false;
-  constructor(_options?: unknown) {
+  element: HTMLElement | undefined;
+  constructor(options?: { element?: HTMLElement }) {
+    this.element = options?.element;
     markerInstances.push(this);
   }
   setLngLat(lngLat: [number, number]) {

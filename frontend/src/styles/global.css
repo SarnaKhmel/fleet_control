@@ -478,3 +478,51 @@ body,
   font-weight: 700;
   box-shadow: 0 0 0 2px var(--bg);
 }
+
+/* Own drone style: a round marker, colored by status, with a heading arrow and the callsign. */
+.drone-marker {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 2px solid var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drone-marker.is-idle {
+  border-color: var(--accent);
+}
+
+.drone-marker.is-connecting {
+  border-color: var(--warning);
+}
+
+.drone-marker-arrow {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  margin-left: -4px;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 8px solid var(--fg);
+  transform-origin: 50% 21px;
+}
+
+.drone-marker-label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 2px;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  color: var(--fg);
+  background: var(--panel);
+  padding: 0 3px;
+  border-radius: 3px;
+}

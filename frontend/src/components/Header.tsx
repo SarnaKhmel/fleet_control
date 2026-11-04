@@ -8,6 +8,7 @@ import { useLocationStore } from '../location/locationStore';
 import { geocodeCity } from '../location/geocode';
 import { useMapViewStore, type MapView } from '../map/mapStyles';
 import { loadFrontLine, useFrontLineStore } from '../frontline/frontLine';
+import { useSymbolStyleStore, type SymbolStyle } from '../mission/symbolStyle';
 
 export function Header() {
   const { t, i18n } = useTranslation();
@@ -20,6 +21,8 @@ export function Header() {
   const setBuildings3d = useMapViewStore((state) => state.setBuildings3d);
   const frontEnabled = useFrontLineStore((state) => state.enabled);
   const setFrontEnabled = useFrontLineStore((state) => state.setEnabled);
+  const symbolStyle = useSymbolStyleStore((state) => state.style);
+  const setSymbolStyle = useSymbolStyleStore((state) => state.setStyle);
   const [coords, setCoords] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
@@ -87,6 +90,14 @@ export function Header() {
         >
           <option value="auto">{t('header.mapAuto')}</option>
           <option value="landscape">{t('header.mapLandscape')}</option>
+        </select>
+        <select
+          aria-label={t('header.symbols')}
+          value={symbolStyle}
+          onChange={(event) => setSymbolStyle(event.target.value as SymbolStyle)}
+        >
+          <option value="nato">{t('header.symbolsNato')}</option>
+          <option value="custom">{t('header.symbolsCustom')}</option>
         </select>
         <button
           type="button"

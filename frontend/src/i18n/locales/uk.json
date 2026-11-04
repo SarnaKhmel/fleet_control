@@ -16,7 +16,10 @@
     "buildings3dOn": "3D будівлі: увімк.",
     "buildings3dOff": "3D будівлі: вимк.",
     "cityNotFound": "Місто не знайдено",
-    "geocodeError": "Пошук не вдався, спробуйте ще раз"
+    "geocodeError": "Пошук не вдався, спробуйте ще раз",
+    "symbols": "Символи дронів",
+    "symbolsNato": "Дрони: NATO",
+    "symbolsCustom": "Дрони: власний стиль"
   },
   "map": {
     "label": "Карта",

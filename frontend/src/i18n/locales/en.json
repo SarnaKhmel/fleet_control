@@ -16,7 +16,10 @@
     "buildings3dOn": "3D buildings: on",
     "buildings3dOff": "3D buildings: off",
     "cityNotFound": "City not found",
-    "geocodeError": "Search failed, try again"
+    "geocodeError": "Search failed, try again",
+    "symbols": "Drone symbols",
+    "symbolsNato": "Drones: NATO",
+    "symbolsCustom": "Drones: own style"
   },
   "map": {
     "label": "Map",
