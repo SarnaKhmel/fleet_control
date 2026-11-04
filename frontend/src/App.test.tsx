@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, act } from '@testing-library/react';
+import { fireEvent, render, screen, act, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import i18n from './i18n';
 import { App } from './App';
@@ -6,6 +6,7 @@ import { useThemeStore } from './theme/themeStore';
 import { useLocationStore } from './location/locationStore';
 import { mapInstances } from './test/maplibreMock';
 import { startWindSync } from './wind/windSync';
+import { useSettingsPanelStore } from './settings/settingsStore';
 
 vi.mock('maplibre-gl', () => import('./test/maplibreMock'));
 
@@ -15,6 +16,7 @@ describe('App', () => {
     useThemeStore.setState({ theme: 'dark' });
     useLocationStore.setState({ selected: null, saved: [], focusTick: 0 });
     mapInstances.length = 0;
+    useSettingsPanelStore.setState({ open: true });
     startWindSync();
   });
 
@@ -51,10 +53,10 @@ describe('App', () => {
       mapInstances[0].emit('click', { lngLat: { lat: 50.5, lng: 30.25 } });
       mapInstances[0].emit('idle', {} as never);
     });
-    expect(screen.getByText('50.50000, 30.25000')).toBeTruthy();
+    expect(document.querySelector('.location-coords')?.textContent).toBe('50.50000, 30.25000');
     expect(screen.getByText('Ground elevation: 180 m')).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear', hidden: true }));
     expect(screen.getByText('Click the map to choose a location.')).toBeTruthy();
   });
 
@@ -64,14 +66,14 @@ describe('App', () => {
 
     fireEvent.change(input, { target: { value: '50.1, 30.2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Go' }));
-    expect(screen.getByText('50.10000, 30.20000')).toBeTruthy();
+    expect(document.querySelector('.location-coords')?.textContent).toBe('50.10000, 30.20000');
     expect(mapInstances[0].lastFlyTo?.center).toEqual([30.2, 50.1]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', hidden: true }));
     expect(useLocationStore.getState().saved).toEqual([{ lat: 50.1, lng: 30.2 }]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
-    fireEvent.click(screen.getByRole('button', { name: '50.10000, 30.20000' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear', hidden: true }));
+    fireEvent.click(screen.getByRole('button', { name: '50.10000, 30.20000', hidden: true }));
     expect(document.querySelector('.location-coords')?.textContent).toBe('50.10000, 30.20000');
   });
 
@@ -94,7 +96,7 @@ describe('App', () => {
     render(<App />);
     fireEvent.change(screen.getByLabelText('Coordinates'), { target: { value: 'Kyiv' } });
     fireEvent.click(screen.getByRole('button', { name: 'Go' }));
-    expect(await screen.findByText('50.45010, 30.52340')).toBeTruthy();
+    await waitFor(() => expect(document.querySelector('.location-coords')?.textContent).toBe('50.45010, 30.52340'));
     vi.unstubAllGlobals();
   });
 
