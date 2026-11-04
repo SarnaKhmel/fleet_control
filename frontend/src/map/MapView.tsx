@@ -140,7 +140,9 @@ export function MapView() {
       const target = event.originalEvent?.target;
       if (target instanceof Element && target.closest('.maplibregl-marker')) return;
       const point = { lat: event.lngLat.lat, lng: event.lngLat.lng };
-      const append = !!(event.originalEvent?.ctrlKey || event.originalEvent?.metaKey);
+      // A click adds the point to the end of the selected drones' tasks; Ctrl+click (Cmd+click on a Mac)
+      // starts their tasks over with just this point.
+      const append = !(event.originalEvent?.ctrlKey || event.originalEvent?.metaKey);
       const mission = useMissionStore.getState();
       debugLog('map click', {
         point,
@@ -153,8 +155,7 @@ export function MapView() {
       else if (mission.picking) mission.addPoint(point);
       // Shift+click with drones selected sets their course toward the clicked point.
       else if (event.originalEvent?.shiftKey && useSelectionStore.getState().selectedIds.length > 0) headOnlineDronesToward(point);
-      // With drones selected, a click sends them to that point (Esc clears the selection); Ctrl+click
-      // (Cmd+click on a Mac) appends the point to their tasks instead of replacing them.
+      // With drones selected, a click gives them that point as a task (Esc clears the selection).
       else if (useSelectionStore.getState().selectedIds.length > 0) moveOnlineDrones(point, append);
       else useLocationStore.getState().select(point);
     });

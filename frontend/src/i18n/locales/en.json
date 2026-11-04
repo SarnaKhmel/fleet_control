@@ -158,7 +158,7 @@
     "battery": "Battery",
     "position": "Position",
     "tasks": "Tasks",
-    "tasksEmpty": "No tasks. Click the map to send the drone, Ctrl+click to add a point.",
+    "tasksEmpty": "No tasks. Click the map to add points one after another; Ctrl+click starts over.",
     "taskRemove": "Remove task {{n}}",
     "tasksClear": "Clear all",
     "taskMarker": "{{callsign}} task {{n}}",

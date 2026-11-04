@@ -62,14 +62,14 @@ describe('MapView', () => {
     useMissionStore.setState({ phase: 'idle' });
   });
 
-  it('with drones selected, a click replaces their tasks and Ctrl+click appends to them', () => {
+  it('with drones selected, a click adds a point to their tasks and Ctrl+click starts them over', () => {
     useMissionStore.setState({ phase: 'running', picking: false, drawing: false });
     useSelectionStore.setState({ selectedIds: ['drone-1'] });
     render(<MapView />);
     act(() => mapInstances[0].emit('click', { lngLat: { lat: 50.1, lng: 30.2 }, originalEvent: { target: document.body } } as never));
-    expect(moveOnlineDrones).toHaveBeenLastCalledWith({ lat: 50.1, lng: 30.2 }, false);
+    expect(moveOnlineDrones).toHaveBeenLastCalledWith({ lat: 50.1, lng: 30.2 }, true);
     act(() => mapInstances[0].emit('click', { lngLat: { lat: 50.3, lng: 30.4 }, originalEvent: { target: document.body, ctrlKey: true } } as never));
-    expect(moveOnlineDrones).toHaveBeenLastCalledWith({ lat: 50.3, lng: 30.4 }, true);
+    expect(moveOnlineDrones).toHaveBeenLastCalledWith({ lat: 50.3, lng: 30.4 }, false);
     useSelectionStore.setState({ selectedIds: [] });
     useMissionStore.setState({ phase: 'idle' });
   });
@@ -83,7 +83,7 @@ describe('MapView', () => {
     act(() => {
       mapInstances[0].emit('click', { lngLat: { lat: 50.2, lng: 30.3 } });
     });
-    expect(moveOnlineDrones).toHaveBeenCalledWith({ lat: 50.2, lng: 30.3 }, false);
+    expect(moveOnlineDrones).toHaveBeenCalledWith({ lat: 50.2, lng: 30.3 }, true);
     useSelectionStore.setState({ selectedIds: [] });
     useMissionStore.setState({ phase: 'idle' });
   });
