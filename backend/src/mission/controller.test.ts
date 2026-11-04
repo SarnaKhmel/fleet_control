@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_TASKS, type LatLng, type ServerMessage } from '../../../shared/protocol.js';
 import { createMissionController } from './controller.js';
 import { NO_TERRAIN, type Terrain } from '../terrain/terrain.js';
+import type { Building, Buildings } from '../buildings/buildings.js';
 import { toMetersFrom } from '../../../shared/mission/area.js';
 import { CONNECT_MS, BOOT_MS, STAGGER_MS } from './schedule.js';
 
@@ -206,6 +207,7 @@ describe('mission controller', () => {
       it('in the air: the drone falls where it ran dry and is destroyed', () => {
         const mission = flyUntilEmpty();
         expect(statuses()).toEqual(['moving', 'destroyed']);
+        expect(lastOf('drone_status')).toMatchObject({ status: 'destroyed', cause: 'battery' });
         const crash = lastOf('position');
         expect(crash).toMatchObject({ batteryPct: 0, speedMs: 0, altitudeM: 150 });
         // It lies there: no more positions after the fall.
@@ -348,6 +350,70 @@ describe('mission controller', () => {
       mission.handle({ type: 'set_flight', droneIds: ['drone-1'], altitudeAglM: 120, cruiseSpeedMs: 15 });
       const snap = mission.snapshot();
       expect(snap.type === 'mission_snapshot' && snap.drones[0]).toMatchObject({ groundM: 300, altitudeAglM: 120, cruiseSpeedMs: 15 });
+      mission.dispose();
+    });
+  });
+
+  describe('buildings', () => {
+    // A 70 m tower 2 km north of the start, across the whole width of the path.
+    const tower: Buildings = {
+      at: (p) => (p.lat > 50.018 && p.lat < 50.0185 && Math.abs(p.lng - 30) < 0.01 ? ({ rings: [], heightM: 70, south: 0, north: 0, west: 0, east: 0 } as Building) : null),
+    };
+    const warnings = () => sent.filter((m) => m.type === 'drone_warning') as Extract<ServerMessage, { type: 'drone_warning' }>[];
+    function flyNorth() {
+      const mission = createMissionController((m) => sent.push(m), undefined, NO_TERRAIN, tower);
+      mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1 });
+      vi.advanceTimersByTime(BOOT_MS + CONNECT_MS + 3000);
+      sent = [];
+      mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.05, lng: 30 } });
+      return mission;
+    }
+
+    it('warns of a building at its height ahead, counting down the time to impact', () => {
+      const mission = flyNorth();
+      // 2 km at 10 m/s is 200 simulated seconds, 20 real ones: right at the edge of the warning window.
+      vi.advanceTimersByTime(3000);
+      const [first, second] = warnings();
+      expect(first.warning).toMatchObject({ kind: 'building', heightM: 70 });
+      expect(second.warning!.etaS).toBe(first.warning!.etaS - 1);
+      expect(second.warning!.distanceM).toBeCloseTo(first.warning!.distanceM - 100, -1);
+      expect(mission.snapshot()).toMatchObject({ drones: [{ warning: { kind: 'building', heightM: 70 } }] });
+      mission.dispose();
+    });
+
+    it('clears the warning once the operator sends the drone above the building', () => {
+      const mission = flyNorth();
+      vi.advanceTimersByTime(2000);
+      mission.handle({ type: 'set_flight', droneIds: ['drone-1'], altitudeAglM: 100 });
+      vi.advanceTimersByTime(1000);
+      expect(warnings().at(-1)?.warning).toBeNull();
+      vi.advanceTimersByTime(60_000);
+      expect(sent.some((m) => m.type === 'drone_status' && m.status === 'destroyed')).toBe(false);
+      mission.dispose();
+    });
+
+    it('is destroyed where it flies into the building if nothing is done, keeping its tasks', () => {
+      const mission = flyNorth();
+      vi.advanceTimersByTime(30_000);
+      const down = sent.find((m) => m.type === 'drone_status' && m.status === 'destroyed');
+      expect(down).toEqual({ type: 'drone_status', droneId: 'drone-1', status: 'destroyed', cause: 'collision' });
+      const crash = sent.filter((m) => m.type === 'position').at(-1) as Extract<ServerMessage, { type: 'position' }>;
+      expect(crash.position.lat).toBeGreaterThan(50.018);
+      expect(crash.position.lat).toBeLessThan(50.0185);
+      expect(warnings().at(-1)?.warning).toBeNull();
+      expect(mission.snapshot()).toMatchObject({ drones: [{ status: 'destroyed', cause: 'collision', warning: null, tasks: [{ lat: 50.05, lng: 30 }] }] });
+      mission.dispose();
+    });
+
+    it('gives no warning to a hovering drone or one above the building', () => {
+      const mission = createMissionController((m) => sent.push(m), undefined, NO_TERRAIN, tower);
+      mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1 });
+      vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
+      mission.handle({ type: 'set_flight', droneIds: ['drone-1'], altitudeAglM: 90 });
+      vi.advanceTimersByTime(10_000);
+      mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.05, lng: 30 } });
+      vi.advanceTimersByTime(40_000);
+      expect(warnings()).toEqual([]);
       mission.dispose();
     });
   });

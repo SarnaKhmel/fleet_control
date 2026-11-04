@@ -1,8 +1,10 @@
-import { DEFAULT_ALTITUDE_AGL_M, DEFAULT_CRUISE_SPEED_MS, MAX_TASKS, type ClientMessage, type FlightStatus, type LatLng, type MissionArea, type ServerMessage, type SnapshotDrone, type StartLayout } from '../../../shared/protocol.js';
+import { DEFAULT_ALTITUDE_AGL_M, DEFAULT_CRUISE_SPEED_MS, MAX_TASKS, type ClientMessage, type CollisionWarning, type DownCause, type FlightStatus, type LatLng, type MissionArea, type ServerMessage, type SnapshotDrone, type StartLayout } from '../../../shared/protocol.js';
 import { BOOT_MS, buildSchedule, CONNECT_MS, DroneSchedule, resolveStarts } from './schedule.js';
 import { buildTelemetry } from './telemetry.js';
 import { offsetLatLng, toMetersFrom } from '../../../shared/mission/area.js';
 import { NO_TERRAIN, type Terrain } from '../terrain/terrain.js';
+import { NO_BUILDINGS, type Buildings } from '../buildings/buildings.js';
+import { buildingAhead, hitOnStep, WARNING_REAL_S } from './obstacles.js';
 import { serverLog } from '../log.js';
 import { droneStateAt } from './schedule.js';
 import { bearingTo, BATTERY_DRAIN_PER_TICK, BATTERY_LINK_DRAIN_PER_TICK, CLIMB_RATE_MS, formationTargets, GROUND_AMSL_M, SIM_TIME_SCALE, TICK_MS, windStep } from './kinematics.js';
@@ -44,6 +46,10 @@ interface DroneState {
   phase: 'air' | 'landing' | 'landed' | 'lost_link' | 'destroyed';
   /** The status last sent to clients, so a change is sent once. */
   status: FlightStatus;
+  /** Why it went down for good, once it has. */
+  cause: DownCause | null;
+  /** The building ahead it will hit, while there is one. */
+  warning: CollisionWarning | null;
 }
 
 /** The drone's status: its phase, and in the air whether it has somewhere to go. */
@@ -73,6 +79,7 @@ export function createMissionController(
   broadcast: (message: ServerMessage) => void,
   now: () => string = () => new Date().toISOString(),
   terrain: Terrain = NO_TERRAIN,
+  buildings: Buildings = NO_BUILDINGS,
 ): MissionController {
   let timers: ReturnType<typeof setTimeout>[] = [];
   let ticker: ReturnType<typeof setInterval> | undefined;
@@ -120,6 +127,8 @@ export function createMissionController(
         crabDeg: 0,
         phase: 'air',
         status: 'idle',
+        cause: null,
+        warning: null,
       };
       drones.set(entry.droneId, drone);
       broadcast({ type: 'drone_online', telemetry: buildTelemetry(entry, now(), groundM) });
@@ -138,8 +147,8 @@ export function createMissionController(
     const status = statusOf(drone);
     if (status === drone.status) return;
     drone.status = status;
-    serverLog('status', { droneId, status });
-    broadcast({ type: 'drone_status', droneId, status });
+    serverLog('status', { droneId, status, cause: drone.cause });
+    broadcast({ type: 'drone_status', droneId, status, ...(drone.cause ? { cause: drone.cause } : {}) });
   }
 
   /** A grounded or landing drone that is given somewhere to go takes off again. */
@@ -163,9 +172,11 @@ export function createMissionController(
    * if it was on the ground. Its flown path ends at that spot and its remaining tasks stay, so the operator
    * sees where it ended and where it was going until the mission ends.
    */
-  function goDown(droneId: string, drone: DroneState, phase: 'lost_link' | 'destroyed') {
-    serverLog(phase === 'destroyed' ? 'drone destroyed' : 'drone lost link', { droneId, position: drone.position });
+  function goDown(droneId: string, drone: DroneState, phase: 'lost_link' | 'destroyed', cause: DownCause) {
+    serverLog(phase === 'destroyed' ? 'drone destroyed' : 'drone lost link', { droneId, cause, position: drone.position });
     drone.phase = phase;
+    drone.cause = cause;
+    setWarning(droneId, drone, null);
     drone.speedMs = 0;
     drone.crabDeg = 0;
     drone.altitudeM = drone.groundM;
@@ -199,12 +210,19 @@ export function createMissionController(
       } else if (drone.phase === 'landed') {
         drone.altitudeM = drone.groundM;
       } else if (drone.phase === 'air') {
-        flyStep(droneId, drone, dtS);
+        const hit = flyStep(droneId, drone, dtS);
+        if (hit) {
+          // Flew into a building below its top: it is destroyed where it hit.
+          drone.position = hit;
+          goDown(droneId, drone, 'destroyed', 'collision');
+          continue;
+        }
       }
+      updateWarning(droneId, drone);
       const drain = drone.phase === 'landed' ? BATTERY_LINK_DRAIN_PER_TICK : BATTERY_DRAIN_PER_TICK;
       drone.batteryPct = Math.max(0, drone.batteryPct - drain * SIM_TIME_SCALE);
       if (drone.batteryPct === 0) {
-        goDown(droneId, drone, drone.phase === 'landed' ? 'lost_link' : 'destroyed');
+        goDown(droneId, drone, drone.phase === 'landed' ? 'lost_link' : 'destroyed', 'battery');
         continue;
       }
       report(droneId, drone);
@@ -237,8 +255,47 @@ export function createMissionController(
     drone.altitudeM = Math.max(drone.groundM, drone.altitudeM + Math.max(-maxStep, Math.min(maxStep, change)));
   }
 
-  /** A drone in the air: takes a step toward its target or along its course, keeping its height above ground. */
-  function flyStep(droneId: string, drone: DroneState, dtS: number) {
+  /** The drone's path ahead: through its target and route, or along its course; empty when it is not moving. */
+  function pathAhead(drone: DroneState, lengthM: number): LatLng[] {
+    if (drone.target) return [drone.position, drone.target, ...drone.route];
+    if (drone.course === null) return [];
+    const rad = (drone.course * Math.PI) / 180;
+    return [drone.position, offsetLatLng(drone.position, lengthM * Math.sin(rad), lengthM * Math.cos(rad))];
+  }
+
+  /**
+   * Warns while a building on the path ahead, within WARNING_REAL_S of flight, reaches the drone's set
+   * height (minus a clearance). Sent every tick while it lasts, so the time to impact counts down; cleared once.
+   */
+  function updateWarning(droneId: string, drone: DroneState) {
+    const lookM = drone.cruiseSpeedMs * WARNING_REAL_S * SIM_TIME_SCALE;
+    const found = drone.phase === 'air' ? buildingAhead(buildings, pathAhead(drone, lookM), lookM, drone.altitudeAglM) : null;
+    setWarning(
+      droneId,
+      drone,
+      found && {
+        kind: 'building',
+        point: found.point,
+        distanceM: Math.round(found.distanceM),
+        etaS: Math.round(found.distanceM / drone.cruiseSpeedMs / SIM_TIME_SCALE),
+        heightM: found.building.heightM,
+      },
+    );
+  }
+
+  function setWarning(droneId: string, drone: DroneState, warning: CollisionWarning | null) {
+    if (!warning && !drone.warning) return;
+    if (warning && !drone.warning) serverLog('collision warning', { droneId, warning });
+    drone.warning = warning;
+    broadcast({ type: 'drone_warning', droneId, warning });
+  }
+
+  /**
+   * A drone in the air: takes a step toward its target or along its course, keeping its height above ground.
+   * Returns where it flew into a building on the way, or null.
+   */
+  function flyStep(droneId: string, drone: DroneState, dtS: number): LatLng | null {
+    const from = drone.position;
     let crabDeg = 0;
     // Flying to a target or along a course: the nose is turned into the wind to hold the ground track.
     const track = drone.target ? bearingTo(drone.position, drone.target) : drone.course;
@@ -261,6 +318,7 @@ export function createMissionController(
     drone.crabDeg = crabDeg;
     drone.groundM = groundAt(drone, drone.position);
     holdHeight(drone, drone.target || drone.course !== null ? track : null, dtS);
+    return drone.position === from ? null : hitOnStep(buildings, from, drone.position, drone.altitudeM - drone.groundM);
   }
 
   /** Sends the drone's position and flight state (many times a second across the fleet: kept small). */
@@ -441,6 +499,8 @@ export function createMissionController(
         droneId: entry.droneId,
         callsign: entry.callsign,
         status: live ? live.status : (state.status as 'booting' | 'connecting' | 'idle'),
+        ...(live?.cause ? { cause: live.cause } : {}),
+        warning: live?.warning ?? null,
         progress: state.progress,
         position: live?.position ?? null,
         heading: live?.heading ?? null,

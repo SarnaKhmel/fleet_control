@@ -64,6 +64,22 @@ export type DroneStatus = 'offline' | 'booting' | 'connecting' | 'idle' | 'movin
  */
 export type FlightStatus = 'idle' | 'moving' | 'landing' | 'landed' | 'lost_link' | 'destroyed';
 
+/** Why a drone went down for good: its battery ran out, or it flew into a building. */
+export type DownCause = 'battery' | 'collision';
+
+/** A building ahead of a drone that it will hit at its present height. */
+export interface CollisionWarning {
+  kind: 'building';
+  /** Where on its path the drone would hit the building. */
+  point: LatLng;
+  /** Distance along the path to that point, meters. */
+  distanceM: number;
+  /** Real (wall-clock) seconds until it gets there at its present speed. */
+  etaS: number;
+  /** Height of the building above the ground, meters. */
+  heightM: number;
+}
+
 /** True for an online drone that still takes commands (everything but lost link and destroyed). */
 export function takesCommands(status: string | null | undefined): boolean {
   return status === 'idle' || status === 'moving' || status === 'landing' || status === 'landed';
@@ -126,6 +142,10 @@ export interface SnapshotDrone {
   droneId: string;
   callsign: string;
   status: 'booting' | 'connecting' | FlightStatus;
+  /** Why it went down, for lost_link and destroyed. */
+  cause?: DownCause;
+  /** A building ahead that it will hit, if any. */
+  warning?: CollisionWarning | null;
   progress: number;
   position: LatLng | null;
   heading: number | null;
@@ -154,8 +174,13 @@ export type ServerMessage =
   | { type: 'drone_tasks'; droneId: string; trail: LatLng[]; tasks: LatLng[] }
   /** The height above ground and cruise speed the drone keeps. Sent when it comes online and on a change. */
   | { type: 'drone_settings'; droneId: string; altitudeAglM: number; cruiseSpeedMs: number }
-  /** An online drone's state changed (see FlightStatus). Sent only on a change. */
-  | { type: 'drone_status'; droneId: string; status: FlightStatus }
+  /** An online drone's state changed (see FlightStatus). Sent only on a change; `cause` says why it went down. */
+  | { type: 'drone_status'; droneId: string; status: FlightStatus; cause?: DownCause }
+  /**
+   * A building ahead on the drone's path at or above its height: sent every tick while it lasts, then
+   * once with `warning: null` when the path is clear again.
+   */
+  | { type: 'drone_warning'; droneId: string; warning: CollisionWarning | null }
   | { type: 'mission_error'; reason: MissionErrorReason }
   | { type: 'mission_reset' };
 
