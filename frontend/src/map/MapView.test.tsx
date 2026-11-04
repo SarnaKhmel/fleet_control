@@ -6,6 +6,7 @@ import { mapInstances } from '../test/maplibreMock';
 import { useMapViewStore } from './mapStyles';
 import { useMapIssueStore } from './mapIssue';
 import { useMapScaleStore } from './mapScaleStore';
+import { useMissionStore } from '../mission/missionStore';
 
 vi.mock('maplibre-gl', () => import('../test/maplibreMock'));
 
@@ -29,6 +30,35 @@ describe('MapView', () => {
       mapInstances[0].emit('click', { lngLat: { lat: 50.1, lng: 30.2 } });
     });
     expect(useLocationStore.getState().selected).toEqual({ lat: 50.1, lng: 30.2 });
+  });
+
+  it('ignores a map click that comes from a marker', () => {
+    useMissionStore.setState({ phase: 'running', routeMode: true, routePoints: [] });
+    render(<MapView />);
+    const marker = document.createElement('div');
+    marker.className = 'maplibregl-marker';
+    const label = marker.appendChild(document.createElement('span'));
+    act(() => {
+      mapInstances[0].emit('click', { lngLat: { lat: 50.1, lng: 30.2 }, originalEvent: { target: label } } as never);
+    });
+    expect(useMissionStore.getState().routePoints).toEqual([]);
+    act(() => {
+      mapInstances[0].emit('click', { lngLat: { lat: 50.1, lng: 30.2 }, originalEvent: { target: document.body } } as never);
+    });
+    expect(useMissionStore.getState().routePoints).toEqual([{ lat: 50.1, lng: 30.2 }]);
+    useMissionStore.setState({ phase: 'idle', routeMode: false, routePoints: [] });
+  });
+
+  it('adds control points after a start made with start-point picking left on', () => {
+    useMissionStore.setState({ phase: 'idle', picking: true, routeMode: false, routePoints: [], drones: {} });
+    useMissionStore.getState().markStarting();
+    useMissionStore.getState().setRouteMode(true);
+    render(<MapView />);
+    act(() => {
+      mapInstances[0].emit('click', { lngLat: { lat: 50.2, lng: 30.3 } });
+    });
+    expect(useMissionStore.getState().routePoints).toEqual([{ lat: 50.2, lng: 30.3 }]);
+    useMissionStore.setState({ phase: 'idle', routeMode: false, routePoints: [] });
   });
 
   it('switches the basemap style when the theme changes', () => {

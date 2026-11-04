@@ -6,7 +6,7 @@ const store = () => useMissionStore.getState();
 
 describe('mission store', () => {
   beforeEach(() => {
-    useMissionStore.setState({ center: null, widthKm: 200, heightKm: 200, layoutKind: 'single', points: [], phase: 'idle', drones: {}, error: null });
+    useMissionStore.setState({ center: null, widthKm: 200, heightKm: 200, layoutKind: 'single', points: [], phase: 'idle', drones: {}, error: null, picking: false, drawing: false, drawAnchor: null, drawCursor: null, moveMode: false, routeMode: false });
   });
 
   it('single layout keeps one point and replaces it on click', () => {
@@ -53,6 +53,24 @@ describe('mission store', () => {
     store().apply({ type: 'drone_boot', droneId: 'drone-1', status: 'booting', progress: 10 });
     store().apply({ type: 'mission_reset' });
     expect(store().drones).toEqual({});
+  });
+
+  it('turns the setup modes off when the mission starts, so they do not swallow map clicks', () => {
+    store().setPicking(true);
+    store().setDrawing(true);
+    store().drawClick({ lat: 50, lng: 30 });
+    store().markStarting();
+    expect(store()).toMatchObject({ picking: false, drawing: false, drawAnchor: null, drawCursor: null });
+  });
+
+  it('keeps move mode and route mode mutually exclusive', () => {
+    store().setMoveMode(true);
+    store().setRouteMode(true);
+    expect(store()).toMatchObject({ routeMode: true, moveMode: false });
+    store().setMoveMode(true);
+    expect(store()).toMatchObject({ moveMode: true, routeMode: false });
+    store().setMoveMode(false);
+    expect(store()).toMatchObject({ moveMode: false, routeMode: false });
   });
 
   it('draws a zone from two clicks and sets its center and size', () => {

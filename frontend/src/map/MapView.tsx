@@ -131,6 +131,10 @@ export function MapView() {
         suppressNextClick = false;
         return;
       }
+      // A click on a marker (drone, start or control point) bubbles up to the map too. The marker handles
+      // it itself; as a map click it would send the just-selected drone to its own position.
+      const target = event.originalEvent?.target;
+      if (target instanceof Element && target.closest('.maplibregl-marker')) return;
       const point = { lat: event.lngLat.lat, lng: event.lngLat.lng };
       const mission = useMissionStore.getState();
       debugLog('map click', {

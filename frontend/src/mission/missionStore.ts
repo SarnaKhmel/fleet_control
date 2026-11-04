@@ -124,8 +124,9 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   setLayoutKind: (layoutKind) => (locked(get) ? undefined : set({ layoutKind, points: [] })),
   setClusterRadius: (clusterRadiusM) => (locked(get) ? undefined : set({ clusterRadiusM })),
   setPicking: (picking) => (locked(get) && picking ? undefined : set({ picking })),
-  setMoveMode: (moveMode) => set({ moveMode }),
-  setRouteMode: (routeMode) => set({ routeMode }),
+  // Move and route modes both take map clicks, so turning one on turns the other off.
+  setMoveMode: (moveMode) => set(moveMode ? { moveMode, routeMode: false } : { moveMode }),
+  setRouteMode: (routeMode) => set(routeMode ? { routeMode, moveMode: false } : { routeMode }),
   addRoutePoint: (point) => {
     if (get().routePoints.length < 10) set({ routePoints: [...get().routePoints, point] });
   },
@@ -151,7 +152,8 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
     set({ points: [...points, point].slice(-max) });
   },
   clearPoints: () => (locked(get) ? undefined : set({ points: [] })),
-  markStarting: () => set({ phase: 'running', drones: {}, error: null }),
+  // Setup modes end with the start: their buttons lock, and a left-on mode would swallow every map click.
+  markStarting: () => set({ phase: 'running', drones: {}, error: null, picking: false, drawing: false, drawAnchor: null, drawCursor: null }),
   apply: (message) => {
     switch (message.type) {
       case 'drone_boot': {
