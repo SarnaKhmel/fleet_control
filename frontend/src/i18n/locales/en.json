@@ -46,5 +46,20 @@
     "SW": "SW",
     "W": "W",
     "NW": "NW"
+  },
+  "menu": {
+    "open": "Menu",
+    "legend": "Legend"
+  },
+  "legend": {
+    "title": "Legend",
+    "back": "← Map",
+    "drone": "Own drone (unmanned aerial vehicle)",
+    "control": "Selected location (control point)",
+    "targetDetected": "Target detected — unknown",
+    "targetConfirmed": "Target confirmed — hostile",
+    "targetEngaged": "Target engaged — hostile",
+    "targetNeutralized": "Target neutralized — destroyed",
+    "wind": "Wind compass: the arrow shows where the wind blows toward; speed in m/s"
   }
 }

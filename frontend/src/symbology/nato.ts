@@ -36,3 +36,11 @@ export function natoElement(sidc: string, size = 32): HTMLElement {
   el.innerHTML = natoSymbol(sidc, size).asSVG();
   return el;
 }
+
+/**
+ * Visual cue on top of the symbol. NATO has no standard "engaged" status, so an engaged
+ * hostile target gets an orange frame; confirmed stays a plain hostile symbol.
+ */
+export function targetHighlight(status: TargetStatus): 'engaged' | null {
+  return status === 'engaged' ? 'engaged' : null;
+}
