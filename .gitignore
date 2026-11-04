@@ -1,0 +1,5 @@
+# Local-only: personal task notes, Claude Code configuration and skills
+tasks/
+CLAUDE.md
+.claude/
+.idea/
