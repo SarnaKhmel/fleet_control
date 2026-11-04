@@ -139,7 +139,8 @@ export function MapView() {
       else if (mission.moveMode) moveOnlineDrones(point);
       // Shift+click with drones selected sets their course toward the clicked point.
       else if (event.originalEvent?.shiftKey && useSelectionStore.getState().selectedIds.length > 0) headOnlineDronesToward(point);
-      else if (useSelectionStore.getState().selectedIds.length > 0) useSelectionStore.getState().clear();
+      // With drones selected, a plain click sends them to that point (Esc clears the selection).
+      else if (useSelectionStore.getState().selectedIds.length > 0) moveOnlineDrones(point);
       else useLocationStore.getState().select(point);
     });
     // Tell the UI whether the mission zone is still on screen, and register the "back to zone" action.
