@@ -130,7 +130,8 @@
     "routeOn": "Adding: click the map (stop)",
     "routePoints": "Control points: {{count}}/10",
     "routeSend": "Send route",
-    "routeClear": "Clear points"
+    "routeClear": "Clear points",
+    "routeSelectFirst": "Select a drone on the map first (click it, or Shift+drag a box)."
   },
   "sidebar": {
     "label": "Side panel",

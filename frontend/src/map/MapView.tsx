@@ -202,7 +202,7 @@ export function MapView() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    routeMarkersRef.current = syncStartMarkers(map, routeMarkersRef.current, routePoints);
+    routeMarkersRef.current = syncStartMarkers(map, routeMarkersRef.current, routePoints, 'control');
   }, [routePoints]);
 
   // Numbered markers for the picked start points.

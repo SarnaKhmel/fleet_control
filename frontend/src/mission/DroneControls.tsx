@@ -2,6 +2,7 @@ import { DRONE_COUNT, GROUND_AMSL_M } from '../../../shared/protocol';
 import { useTranslation } from 'react-i18next';
 import { useMissionStore, type DroneView, type MissionPhase } from './missionStore';
 import { sendRouteToSelected } from './missionSocket';
+import { useSelectionStore } from './selection';
 
 interface DroneStatusListProps {
   drones: Record<string, DroneView>;
@@ -57,6 +58,7 @@ export function DroneStatusList({ drones, phase }: DroneStatusListProps) {
 export function DroneControls() {
   const { t } = useTranslation();
   const state = useMissionStore();
+  const selectedIds = useSelectionStore((s) => s.selectedIds);
   return (
     <div className="drone-controls">
       <DroneStatusList drones={state.drones} phase={state.phase} />
@@ -85,15 +87,18 @@ export function DroneControls() {
           <span className="muted">{t('mission.routePoints', { count: state.routePoints.length })}</span>
           <button
             type="button"
-            disabled={state.routePoints.length === 0 || state.phase !== 'running'}
+            disabled={state.routePoints.length === 0 || state.phase !== 'running' || selectedIds.length === 0}
             onClick={() => {
-              sendRouteToSelected(state.routePoints);
-              state.clearRoute();
-              state.setRouteMode(false);
+              // The route goes to the selected drones; without a selection nothing is sent and the points stay.
+              if (sendRouteToSelected(state.routePoints) > 0) {
+                state.clearRoute();
+                state.setRouteMode(false);
+              }
             }}
           >
             {t('mission.routeSend')}
           </button>
+          {selectedIds.length === 0 && <p className="muted">{t('mission.routeSelectFirst')}</p>}
           <button type="button" onClick={state.clearRoute} disabled={state.routePoints.length === 0}>
             {t('mission.routeClear')}
           </button>
