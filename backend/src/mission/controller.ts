@@ -2,7 +2,7 @@ import type { ClientMessage, LatLng, MissionArea, ServerMessage, StartLayout } f
 import { BOOT_MS, buildSchedule, CONNECT_MS, DroneSchedule, resolveStarts } from './schedule.js';
 import { buildTelemetry } from './telemetry.js';
 import { droneStateAt } from './schedule.js';
-import { advanceAlong, CLIMB_RATE_MS, DRONE_SPEED_MS, formationTargets, GROUND_AMSL_M, HOVER_ALT_M, stepToward, TICK_MS } from './kinematics.js';
+import { advanceAlong, BATTERY_DRAIN_PER_TICK, CLIMB_RATE_MS, DRONE_SPEED_MS, formationTargets, GROUND_AMSL_M, HOVER_ALT_M, stepToward, TICK_MS } from './kinematics.js';
 
 // Interval between "booting" progress messages, simulated ms.
 export const PROGRESS_STEP_MS = 1000;
@@ -21,6 +21,8 @@ interface DroneState {
   /** Course in degrees when flying a heading instead of a target. */
   course: number | null;
   altitudeM: number;
+  batteryPct: number;
+  speedMs: number;
 }
 
 /**
@@ -57,7 +59,7 @@ export function createMissionController(
       broadcast({ type: 'drone_boot', droneId: entry.droneId, status: 'connecting', progress: 0 }),
     );
     later(entry.startAtMs + BOOT_MS + CONNECT_MS, () => {
-      drones.set(entry.droneId, { position: entry.start, heading: 0, target: null, course: null, altitudeM: GROUND_AMSL_M });
+      drones.set(entry.droneId, { position: entry.start, heading: 0, target: null, course: null, altitudeM: GROUND_AMSL_M, batteryPct: 100, speedMs: 0 });
       broadcast({ type: 'drone_online', telemetry: buildTelemetry(entry, now()) });
     });
   }
@@ -79,13 +81,16 @@ export function createMissionController(
         drone.position = advanceAlong(drone.position, drone.course, stepM);
         drone.heading = drone.course;
       }
+      drone.speedMs = drone.target || drone.course !== null ? DRONE_SPEED_MS : 0;
+      drone.batteryPct = Math.max(0, drone.batteryPct - BATTERY_DRAIN_PER_TICK);
       broadcast({
         type: 'position',
         droneId,
         position: drone.position,
         heading: drone.heading,
-        speedMs: drone.target || drone.course !== null ? DRONE_SPEED_MS : 0,
+        speedMs: drone.speedMs,
         altitudeM: drone.altitudeM,
+        batteryPct: drone.batteryPct,
       });
     }
   }
@@ -154,6 +159,8 @@ export function createMissionController(
         position: live?.position ?? null,
         heading: live?.heading ?? null,
         altitudeM: live?.altitudeM ?? null,
+        speedMs: live?.speedMs ?? 0,
+        batteryPct: live?.batteryPct ?? 100,
       });
     }
     return { type: 'mission_snapshot', running: true, drones: list };

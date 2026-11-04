@@ -23,6 +23,8 @@ export interface DroneView {
   position: LatLng | null;
   /** Altitude above sea level, meters; null until online. */
   altitudeM: number | null;
+  speedMs: number;
+  batteryPct: number;
   heading: number | null;
 }
 
@@ -149,6 +151,8 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
               position: null,
               heading: null,
               altitudeM: null,
+              speedMs: 0,
+              batteryPct: 100,
             },
           },
         });
@@ -168,6 +172,8 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
               },
               heading: message.telemetry.position_and_kinematics.heading_deg,
               altitudeM: message.telemetry.position_and_kinematics.gps.altitude_amsl_m,
+              speedMs: 0,
+              batteryPct: message.telemetry.power_system.battery_remaining_pct,
             },
           },
         });
@@ -178,7 +184,14 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
         set({
           drones: {
             ...get().drones,
-            [message.droneId]: { ...drone, position: message.position, heading: message.heading, altitudeM: message.altitudeM },
+            [message.droneId]: {
+              ...drone,
+              position: message.position,
+              heading: message.heading,
+              altitudeM: message.altitudeM,
+              speedMs: message.speedMs,
+              batteryPct: message.batteryPct,
+            },
           },
         });
         return;
@@ -193,6 +206,8 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
             position: d.position,
             heading: d.heading,
             altitudeM: d.altitudeM,
+            speedMs: d.speedMs,
+            batteryPct: d.batteryPct,
           };
         }
         set({ phase: message.running ? 'running' : 'idle', drones, error: null });

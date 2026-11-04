@@ -72,13 +72,15 @@ export interface SnapshotDrone {
   position: LatLng | null;
   heading: number | null;
   altitudeM: number | null;
+  speedMs: number;
+  batteryPct: number;
 }
 
 export type ServerMessage =
   | { type: 'mission_snapshot'; running: boolean; drones: SnapshotDrone[] }
   | { type: 'drone_boot'; droneId: string; status: 'booting' | 'connecting'; progress: number }
   | { type: 'drone_online'; telemetry: DroneTelemetry }
-  | { type: 'position'; droneId: string; position: LatLng; heading: number; speedMs: number; altitudeM: number }
+  | { type: 'position'; droneId: string; position: LatLng; heading: number; speedMs: number; altitudeM: number; batteryPct: number }
   | { type: 'mission_error'; reason: MissionErrorReason }
   | { type: 'mission_reset' };
 
