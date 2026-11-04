@@ -44,6 +44,8 @@ function connect(url: string) {
   };
   socket.onclose = () => {
     socket = null;
+    // The server's mission state is unknown while disconnected: show it as idle until the snapshot arrives.
+    useMissionStore.getState().apply({ type: 'mission_reset' });
     // Reconnect with a growing pause, so a restarted server is picked up without a page reload.
     retryTimer = setTimeout(() => connect(url), retryDelayMs);
     retryDelayMs = Math.min(retryDelayMs * 2, MAX_RETRY_DELAY_MS);
