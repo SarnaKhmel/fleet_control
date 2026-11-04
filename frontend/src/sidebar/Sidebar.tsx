@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMissionStore } from '../mission/missionStore';
+import { DroneControls } from '../mission/DroneControls';
 import { useTranslation } from 'react-i18next';
 import { WindCompass } from '../wind/WindCompass';
 import { MissionPanel } from '../mission/MissionPanel';
@@ -42,6 +43,9 @@ export function Sidebar() {
           </Accordion>
           <Accordion title={t('sidebar.mission')} open={missionOpen} onOpenChange={setMissionOpen}>
             <MissionPanel />
+          </Accordion>
+          <Accordion title={t('sidebar.drones')} defaultOpen>
+            <DroneControls />
           </Accordion>
           <Accordion title={t('sidebar.location')} summary={selected ? formatLatLng(selected) : undefined}>
             <LocationPanel />
