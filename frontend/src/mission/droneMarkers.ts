@@ -37,12 +37,7 @@ function setArrowRotation(el: HTMLElement, heading: number | null) {
 }
 
 /** Keeps one marker per drone that has a position; returns the markers in use. */
-export function syncDroneMarkers(
-  map: MapLibreMap,
-  _previous: MapLibreMarkerType[],
-  drones: Record<string, DroneView>,
-  style: SymbolStyle,
-): MapLibreMarkerType[] {
+export function syncDroneMarkers(map: MapLibreMap, drones: Record<string, DroneView>, style: SymbolStyle): MapLibreMarkerType[] {
   const selected = useSelectionStore.getState().selectedIds;
   const seen = new Set<string>();
   const markers: MapLibreMarkerType[] = [];

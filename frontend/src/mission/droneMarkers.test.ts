@@ -21,7 +21,7 @@ describe('drone markers', () => {
 
   it('shows one marker per drone that has a position', () => {
     const map = new FakeMap({ style: 'x' });
-    const markers = syncDroneMarkers(map as never, [], { 'drone-1': online, 'drone-2': booting }, 'custom');
+    const markers = syncDroneMarkers(map as never, { 'drone-1': online, 'drone-2': booting }, 'custom');
     expect(markers).toHaveLength(1);
     expect(markerInstances.some((m) => m.added)).toBe(true);
   });
@@ -30,9 +30,9 @@ describe('drone markers', () => {
 describe('drone marker reuse', () => {
   it('moves the existing marker on a position update instead of recreating it', () => {
     const map = new FakeMap({ style: 'x' });
-    const first = syncDroneMarkers(map as never, [], { 'drone-1': online }, 'custom');
+    const first = syncDroneMarkers(map as never, { 'drone-1': online }, 'custom');
     const moved = { ...online, position: { lat: 50.01, lng: 30.01 } };
-    const second = syncDroneMarkers(map as never, first, { 'drone-1': moved }, 'custom');
+    const second = syncDroneMarkers(map as never, { 'drone-1': moved }, 'custom');
     expect(second[0]).toBe(first[0]);
     expect((second[0] as unknown as { lngLat: number[] }).lngLat).toEqual([30.01, 50.01]);
   });

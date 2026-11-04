@@ -43,7 +43,6 @@ export function MapView() {
   const markerRef = useRef<Marker | null>(null);
   const startMarkersRef = useRef<Marker[]>([]);
   const missionPoints = useMissionStore((state) => state.points);
-  const droneMarkersRef = useRef<Marker[]>([]);
   const styleRef = useRef<string | null>(null);
   const theme = useThemeStore((state) => state.theme);
   const view = useMapViewStore((state) => state.view);
@@ -226,7 +225,7 @@ export function MapView() {
     const sync = () => {
       const { drones } = useMissionStore.getState();
       const { selectedIds } = useSelectionStore.getState();
-      droneMarkersRef.current = syncDroneMarkers(map, droneMarkersRef.current, drones, useSymbolStyleStore.getState().style);
+      syncDroneMarkers(map, drones, useSymbolStyleStore.getState().style);
       syncWaypoints(map, drones, selectedIds, useThemeStore.getState().theme);
       syncTaskMarkers(map, drones, selectedIds);
     };
