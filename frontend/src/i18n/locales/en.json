@@ -6,5 +6,27 @@
     "language": "Language",
     "switchToLight": "Light theme",
     "switchToDark": "Dark theme"
+  },
+  "map": {
+    "label": "Map"
+  },
+  "location": {
+    "title": "Location",
+    "hint": "Click the map to choose a location.",
+    "clear": "Clear"
+  },
+  "wind": {
+    "title": "Wind",
+    "label": "{{speed}} m/s toward {{dir}} ({{deg}}°)"
+  },
+  "compass": {
+    "N": "N",
+    "NE": "NE",
+    "E": "E",
+    "SE": "SE",
+    "S": "S",
+    "SW": "SW",
+    "W": "W",
+    "NW": "NW"
   }
 }

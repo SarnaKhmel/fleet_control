@@ -52,3 +52,95 @@ body {
   padding: 0.3rem 0.6rem;
   cursor: pointer;
 }
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.map-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+/* MapLibre adds its own .maplibregl-map (position: relative); the extra class wins the cascade. */
+.map-area .map {
+  position: absolute;
+  inset: 0;
+}
+
+.location-panel {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1;
+  min-width: 14rem;
+  padding: 0.75rem 1rem;
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.location-panel h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.location-panel button {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+}
+
+.location-coords {
+  margin: 0 0 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: var(--muted);
+  margin: 0;
+}
+
+.wind-indicator {
+  position: absolute;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wind-arrow {
+  display: inline-block;
+  font-size: 1.25rem;
+  line-height: 1;
+  transition: transform 0.3s ease;
+}
+
+/* NATO symbols are drawn in black; a light chip keeps them readable on dark maps. */
+.nato-symbol {
+  background: var(--fg);
+  border-radius: 4px;
+  padding: 2px;
+  line-height: 0;
+}
