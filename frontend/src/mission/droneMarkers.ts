@@ -9,12 +9,12 @@ import { useSelectionStore } from './selection';
 
 /**
  * Classes that color a drone by its state: a drone that is out (lost link, destroyed) shows only that;
- * otherwise a low battery is yellow and a critical one red.
+ * otherwise a low battery is yellow and a critical one red, and a building ahead makes it pulse red.
  */
 function stateClasses(drone: DroneView): string[] {
   if (!takesCommands(drone.status)) return [`is-${drone.status}`];
   const level = batteryLevel(drone.batteryPct);
-  return level === 'ok' ? [] : [`is-battery-${level}`];
+  return [...(level === 'ok' ? [] : [`is-battery-${level}`]), ...(drone.warning ? ['is-warning'] : [])];
 }
 
 // Drones that have a position: NATO symbol, or our own marker with a heading arrow and status color.

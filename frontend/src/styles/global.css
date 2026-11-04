@@ -529,6 +529,18 @@ body,
   border-color: var(--danger);
 }
 
+/* A building ahead at the drone's height: a pulsing red ring until the way is clear. */
+.drone-marker.is-warning,
+.maplibregl-marker .nato-symbol.is-warning {
+  animation: collision-pulse 1s ease-in-out infinite;
+}
+
+@keyframes collision-pulse {
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--danger) 55%, transparent);
+  }
+}
+
 /* Lost link (empty battery): a grey, dashed marker at the spot where the drone came down. */
 .drone-marker.is-lost_link {
   border-color: var(--muted);
@@ -1290,7 +1302,8 @@ body,
 }
 
 .drone-state.is-lost_link,
-.drone-state.is-destroyed {
+.drone-state.is-destroyed,
+.drone-state.is-warning {
   color: var(--danger);
 }
 
@@ -1317,6 +1330,9 @@ body,
 }
 
 .drone-alert.is-critical,
+.drone-alert.is-collision,
+.drone-alert.is-destroyedCollision,
+.drone-alert.is-destroyed,
 .drone-alert.is-lost {
   border-left-color: var(--danger);
   background: color-mix(in srgb, var(--danger) 14%, transparent);

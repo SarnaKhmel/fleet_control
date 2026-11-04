@@ -5,7 +5,7 @@ import type { DroneView } from './missionStore';
 import { addCameraLayer, cameraFeatures, cameraSector, syncCamera, CAMERA_FILL_ID, CAMERA_LINE_ID, CAMERA_RANGE_M, CAMERA_SOURCE_ID } from './cameraLayer';
 import { WAYPOINT_COLORS } from './waypointLayer';
 
-const drone: DroneView = { callsign: 'BA-01', status: 'idle', progress: 100, position: { lat: 50, lng: 30 }, heading: 90, altitudeM: 150, groundM: 150, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] };
+const drone: DroneView = { callsign: 'BA-01', status: 'idle', cause: null, warning: null, progress: 100, position: { lat: 50, lng: 30 }, heading: 90, altitudeM: 150, groundM: 150, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] };
 
 describe('camera view', () => {
   it('is a closed sector from the drone, as long as the camera range', () => {

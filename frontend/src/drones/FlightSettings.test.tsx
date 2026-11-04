@@ -10,7 +10,7 @@ vi.mock('../mission/missionSocket', async (importOriginal) => ({
   setSelectedFlight: vi.fn(),
 }));
 
-const drone = (status: DroneView['status'], altitudeAglM = 60, cruiseSpeedMs = 10): DroneView => ({ callsign: 'BA-01', status, progress: 100, position: { lat: 50, lng: 30 }, heading: 0, altitudeM: 210, groundM: 150, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM, cruiseSpeedMs, trail: [], tasks: [] });
+const drone = (status: DroneView['status'], altitudeAglM = 60, cruiseSpeedMs = 10): DroneView => ({ callsign: 'BA-01', status, cause: null, warning: null, progress: 100, position: { lat: 50, lng: 30 }, heading: 0, altitudeM: 210, groundM: 150, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM, cruiseSpeedMs, trail: [], tasks: [] });
 
 describe('FlightSettings', () => {
   beforeEach(() => {

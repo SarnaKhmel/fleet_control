@@ -8,6 +8,8 @@ vi.mock('../mission/missionSocket', () => ({ removeDroneTask: vi.fn(), clearDron
 const drone: DroneView = {
   callsign: 'BA-01',
   status: 'idle',
+  cause: null,
+  warning: null,
   progress: 100,
   position: { lat: 50.1, lng: 30.2 },
   heading: 92,
@@ -83,5 +85,17 @@ describe('DroneDetails', () => {
     expect(screen.getByText('landed')).toBeTruthy();
     expect(screen.getByRole('alert').className).toContain('is-low');
     expect(screen.getByText('0 m · 20%')).toBeTruthy();
+  });
+
+  it('warns of a building ahead with the time and distance to impact', () => {
+    render(<DroneDetails droneId="drone-1" drone={{ ...drone, status: 'moving', warning: { kind: 'building' as const, point: { lat: 50.02, lng: 30 }, distanceM: 1200, etaS: 12, heightM: 70 } }} defaultOpen />);
+    const alert = screen.getAllByRole('alert')[0];
+    expect(alert.className).toContain('is-collision');
+    expect(alert.textContent).toBe('Building ahead, 70 m tall, at the flight height: impact in about 12 s (1200 m). Raise the drone or change its route.');
+  });
+
+  it('says a drone destroyed in a collision flew into a building', () => {
+    render(<DroneDetails droneId="drone-1" drone={{ ...drone, status: 'destroyed', cause: 'collision', batteryPct: 40 }} defaultOpen />);
+    expect(screen.getByRole('alert').textContent).toBe('Destroyed: the drone flew into a building at the position shown.');
   });
 });

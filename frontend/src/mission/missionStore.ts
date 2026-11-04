@@ -7,6 +7,8 @@ import {
   isLatLng,
   MISSION_DEFAULT_AREA_KM,
   MISSION_MAX_AREA_KM,
+  type CollisionWarning,
+  type DownCause,
   type FlightStatus,
   type LatLng,
   type MissionErrorReason,
@@ -24,6 +26,10 @@ export interface DroneView {
   callsign: string;
   /** Boot steps, then the server's FlightStatus once online. */
   status: 'booting' | 'connecting' | FlightStatus;
+  /** Why it went down for good (lost link, destroyed); null otherwise. */
+  cause: DownCause | null;
+  /** A building ahead that it will hit at its height, while there is one. */
+  warning: CollisionWarning | null;
   progress: number;
   /** Known once the drone is online; null while it is still booting. */
   position: LatLng | null;
@@ -182,6 +188,8 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
             [message.droneId]: {
               callsign: prev?.callsign ?? message.droneId,
               status: message.status,
+              cause: null,
+              warning: null,
               progress: message.progress,
               position: null,
               heading: null,
@@ -206,6 +214,8 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
             [message.telemetry.meta.drone_id]: {
               callsign: message.telemetry.meta.callsign,
               status: 'idle',
+              cause: null,
+              warning: null,
               progress: 100,
               position: {
                 lat: message.telemetry.position_and_kinematics.gps.latitude,
@@ -263,10 +273,16 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
         set({ drones: { ...get().drones, [message.droneId]: { ...drone, altitudeAglM: message.altitudeAglM, cruiseSpeedMs: message.cruiseSpeedMs } } });
         return;
       }
+      case 'drone_warning': {
+        const drone = get().drones[message.droneId];
+        if (!drone) return;
+        set({ drones: { ...get().drones, [message.droneId]: { ...drone, warning: message.warning } } });
+        return;
+      }
       case 'drone_status': {
         const drone = get().drones[message.droneId];
         if (!drone) return;
-        set({ drones: { ...get().drones, [message.droneId]: { ...drone, status: message.status } } });
+        set({ drones: { ...get().drones, [message.droneId]: { ...drone, status: message.status, cause: message.cause ?? null } } });
         return;
       }
       case 'mission_snapshot': {
@@ -275,6 +291,8 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
           drones[d.droneId] = {
             callsign: d.callsign,
             status: d.status,
+            cause: d.cause ?? null,
+            warning: d.warning ?? null,
             progress: d.progress,
             position: d.position,
             heading: d.heading,

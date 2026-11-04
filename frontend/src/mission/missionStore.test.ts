@@ -57,7 +57,7 @@ describe('mission store', () => {
 
   it('applies boot messages to the roster without a position', () => {
     store().apply({ type: 'drone_boot', droneId: 'drone-1', status: 'booting', progress: 40 });
-    expect(store().drones['drone-1']).toEqual({ callsign: 'drone-1', status: 'booting', progress: 40, position: null, heading: null, altitudeM: null, groundM: null, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] });
+    expect(store().drones['drone-1']).toEqual({ callsign: 'drone-1', status: 'booting', cause: null, warning: null, progress: 40, position: null, heading: null, altitudeM: null, groundM: null, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] });
   });
 
   it('takes the position and heading from the first telemetry', () => {
@@ -136,6 +136,16 @@ describe('mission store', () => {
     expect(store().drones['drone-1']).toMatchObject({ altitudeAglM: 150, cruiseSpeedMs: 20, groundM: 330 });
     store().apply({ type: 'drone_settings', droneId: 'drone-9', altitudeAglM: 150, cruiseSpeedMs: 20 });
     expect(store().drones['drone-9']).toBeUndefined();
+  });
+
+  it('takes collision warnings and the cause of a fall', () => {
+    store().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
+    store().apply({ type: 'drone_warning', droneId: 'drone-1', warning: { kind: 'building' as const, point: { lat: 50.02, lng: 30 }, distanceM: 1200, etaS: 12, heightM: 70 } });
+    expect(store().drones['drone-1'].warning).toMatchObject({ etaS: 12, heightM: 70 });
+    store().apply({ type: 'drone_warning', droneId: 'drone-1', warning: null });
+    expect(store().drones['drone-1'].warning).toBeNull();
+    store().apply({ type: 'drone_status', droneId: 'drone-1', status: 'destroyed', cause: 'collision' });
+    expect(store().drones['drone-1']).toMatchObject({ status: 'destroyed', cause: 'collision' });
   });
 
   it('treats missing or malformed task lists from the server as empty', () => {

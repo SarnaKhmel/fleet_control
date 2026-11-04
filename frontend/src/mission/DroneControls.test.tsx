@@ -4,7 +4,7 @@ import { DroneControls } from './DroneControls';
 import { useMissionStore, type DroneView } from './missionStore';
 import { useSelectionStore } from './selection';
 
-const online: DroneView = { callsign: 'BA-01', status: 'idle', progress: 100, position: { lat: 50, lng: 30 }, heading: 0, altitudeM: 210, groundM: 150, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] };
+const online: DroneView = { callsign: 'BA-01', status: 'idle', cause: null, warning: null, progress: 100, position: { lat: 50, lng: 30 }, heading: 0, altitudeM: 210, groundM: 150, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] };
 const position = (lat: number, altitudeM: number) => ({ type: 'position' as const, droneId: 'drone-1', position: { lat, lng: 30 }, heading: 0, speedMs: 10, altitudeM, groundM: 150, batteryPct: 99, crabDeg: 0 });
 
 describe('DroneControls', () => {
@@ -73,5 +73,11 @@ describe('DroneControls', () => {
     useMissionStore.setState({ drones: { 'drone-1': { ...online, altitudeM: 480, groundM: 400 } } });
     render(<DroneControls />);
     expect(screen.getByText('hovering · 80 m')).toBeTruthy();
+  });
+
+  it('flags a drone with a building ahead in the list', () => {
+    useMissionStore.setState({ drones: { 'drone-1': { ...online, warning: { kind: 'building' as const, point: { lat: 50.02, lng: 30 }, distanceM: 1200, etaS: 12, heightM: 70 } } } });
+    render(<DroneControls />);
+    expect(screen.getByText('⚠ building')).toBeTruthy();
   });
 });

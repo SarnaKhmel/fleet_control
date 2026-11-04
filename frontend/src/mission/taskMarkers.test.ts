@@ -7,7 +7,7 @@ import { syncTaskMarkers } from './taskMarkers';
 vi.mock('maplibre-gl', () => import('../test/maplibreMock'));
 vi.mock('./missionSocket', () => ({ removeDroneTask: vi.fn(), updateDroneTask: vi.fn() }));
 
-const drone = (tasks: { lat: number; lng: number }[]): DroneView => ({ callsign: 'BA-01', status: 'idle', progress: 100, position: { lat: 50, lng: 30 }, heading: 0, altitudeM: 210, groundM: 150, speedMs: 10, batteryPct: 90, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks });
+const drone = (tasks: { lat: number; lng: number }[]): DroneView => ({ callsign: 'BA-01', status: 'idle', cause: null, warning: null, progress: 100, position: { lat: 50, lng: 30 }, heading: 0, altitudeM: 210, groundM: 150, speedMs: 10, batteryPct: 90, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks });
 const live = () => markerInstances.filter((m) => m.added);
 
 describe('task markers', () => {

@@ -11,6 +11,7 @@ function DroneStatusRow({ droneId, index }: { droneId: string; index: number }) 
   const selected = useSelectionStore((s) => s.selectedIds.includes(droneId));
   const status = useMissionStore((s) => s.drones[droneId]?.status ?? null);
   const bootProgress = useMissionStore((s) => s.drones[droneId]?.progress ?? 0);
+  const warned = useMissionStore((s) => !!s.drones[droneId]?.warning);
   // Height above the ground under the drone, which follows the terrain.
   const heightM = useMissionStore((s) => {
     const drone = s.drones[droneId];
@@ -36,6 +37,7 @@ function DroneStatusRow({ droneId, index }: { droneId: string; index: number }) 
           <span className={`drone-state is-${status ?? 'offline'}`}>
             {isAirborne(status) && heightM !== null ? `${label} · ${heightM} m` : label}
           </span>
+          {warned && <span className="drone-state is-warning">{t('mission.warningBuilding')}</span>}
         </div>
         <div className="boot-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
           <span style={{ width: `${progress}%` }} />

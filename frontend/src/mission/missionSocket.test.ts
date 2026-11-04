@@ -20,6 +20,11 @@ describe('parseServerMessage', () => {
     expect(parseServerMessage(JSON.stringify(status))).toEqual(status);
   });
 
+  it('accepts collision warnings', () => {
+    const warning = { type: 'drone_warning', droneId: 'drone-1', warning: { kind: 'building' as const, point: { lat: 50.02, lng: 30 }, distanceM: 1200, etaS: 12, heightM: 70 } };
+    expect(parseServerMessage(JSON.stringify(warning))).toEqual(warning);
+  });
+
   it('drops unknown types, bad JSON and non-strings', () => {
     expect(parseServerMessage(JSON.stringify({ type: 'move' }))).toBeNull();
     expect(parseServerMessage('{not json')).toBeNull();
