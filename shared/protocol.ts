@@ -57,9 +57,13 @@ export type ClientMessage =
 
 // ---- Server → client ----
 
+export type MissionErrorReason = 'outside_area' | 'already_running';
+
 export type ServerMessage =
   | { type: 'drone_boot'; droneId: string; status: 'booting' | 'connecting'; progress: number }
-  | { type: 'drone_online'; telemetry: DroneTelemetry };
+  | { type: 'drone_online'; telemetry: DroneTelemetry }
+  | { type: 'mission_error'; reason: MissionErrorReason }
+  | { type: 'mission_reset' };
 
 // ---- Guards (trust boundary) ----
 

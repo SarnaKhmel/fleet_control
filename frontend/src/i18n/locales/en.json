@@ -71,5 +71,38 @@
     "off": "Front line: off",
     "source": "Approximate, based on DeepStateMap.live",
     "approximate": "Hand-traced zones, not survey data. Not the real front line."
+  },
+  "mission": {
+    "title": "Mission",
+    "area": "Mission area",
+    "width": "Width, km",
+    "height": "Height, km",
+    "useLocation": "Center on selected location",
+    "layout": "Start layout",
+    "layoutSingle": "All from one point",
+    "layoutCluster": "Cluster around a point",
+    "layoutSeparate": "Each from its own point",
+    "radius": "Cluster radius, m",
+    "pick": "Pick start points on map",
+    "pickingOn": "Picking: click the map (stop)",
+    "picked": "Points: {{count}} of {{need}}",
+    "clearPoints": "Clear points",
+    "start": "Start mission",
+    "reset": "Reset mission",
+    "notConnected": "Not connected to the server",
+    "problem": {
+      "incomplete": "Pick the start points.",
+      "outside": "Start points must be inside the mission area."
+    },
+    "error": {
+      "outside_area": "A start point is outside the mission area.",
+      "already_running": "A mission is already running. Reset first."
+    },
+    "status": {
+      "offline": "offline",
+      "booting": "booting",
+      "connecting": "connecting",
+      "idle": "online"
+    }
   }
 }

@@ -1,4 +1,4 @@
-import type { LatLng, MissionArea } from '../protocol';
+import type { LatLng, MissionArea } from '../protocol.js';
 
 // Local equirectangular meters around the area center: accurate enough for a 200 km square.
 const METERS_PER_DEG_LAT = 110_574;
@@ -15,4 +15,26 @@ export function toMetersFrom(center: LatLng, point: LatLng): { east: number; nor
 export function isInsideArea(point: LatLng, area: MissionArea): boolean {
   const { east, north } = toMetersFrom(area.center, point);
   return Math.abs(east) <= (area.widthKm * 1000) / 2 && Math.abs(north) <= (area.heightKm * 1000) / 2;
+}
+
+/** The point `eastM` meters east and `northM` meters north of `center` (inverse of toMetersFrom). */
+export function offsetLatLng(center: LatLng, eastM: number, northM: number): LatLng {
+  return {
+    lat: center.lat + northM / METERS_PER_DEG_LAT,
+    lng: center.lng + eastM / (METERS_PER_DEG_LNG_AT_EQUATOR * Math.cos((center.lat * Math.PI) / 180)),
+  };
+}
+
+/** Closed corner ring of the mission rectangle, for drawing. */
+export function areaRing(area: MissionArea): LatLng[] {
+  const halfW = (area.widthKm * 1000) / 2;
+  const halfH = (area.heightKm * 1000) / 2;
+  const corners = [
+    [-halfW, -halfH],
+    [halfW, -halfH],
+    [halfW, halfH],
+    [-halfW, halfH],
+  ];
+  const ring = corners.map(([e, n]) => offsetLatLng(area.center, e, n));
+  return [...ring, ring[0]];
 }

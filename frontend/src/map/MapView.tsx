@@ -13,6 +13,9 @@ import { useMapScaleStore } from './mapScaleStore';
 import { metersPerPixel } from './scale';
 import { useMapIssueStore } from './mapIssue';
 import { syncFrontLine } from '../frontline/frontLine';
+import { syncMissionArea } from '../mission/missionLayer';
+import { useMissionStore } from '../mission/missionStore';
+import { syncStartMarkers } from '../mission/startMarkers';
 import { useFrontLineStore } from '../frontline/frontLine';
 import { CONTROL_POINT_SIDC, natoElement } from '../symbology/nato';
 
@@ -27,6 +30,8 @@ export function MapView() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
+  const startMarkersRef = useRef<Marker[]>([]);
+  const missionPoints = useMissionStore((state) => state.points);
   const styleRef = useRef<string | null>(null);
   const theme = useThemeStore((state) => state.theme);
   const view = useMapViewStore((state) => state.view);
@@ -50,6 +55,7 @@ export function MapView() {
       addTerrain(map);
       addBuildingsLayer(map, current);
       addBordersLayer(map, current);
+      syncMissionArea(map, useMissionStore.getState(), current);
       const front = useFrontLineStore.getState();
       syncFrontLine(map, { enabled: front.enabled, zones: front.zones, theme: current });
       map.setPitch(useMapViewStore.getState().buildings3d ? TILT_3D_PITCH : 0);
@@ -72,7 +78,10 @@ export function MapView() {
       else if (!sourceId) useMapIssueStore.getState().setIssue('style');
     });
     map.on('click', (event) => {
-      useLocationStore.getState().select({ lat: event.lngLat.lat, lng: event.lngLat.lng });
+      const point = { lat: event.lngLat.lat, lng: event.lngLat.lng };
+      // While picking start points, clicks set the mission start instead of the location.
+      if (useMissionStore.getState().picking) useMissionStore.getState().addPoint(point);
+      else useLocationStore.getState().select(point);
     });
     mapRef.current = map;
     styleRef.current = style;
@@ -92,9 +101,24 @@ export function MapView() {
     styleRef.current = style;
   }, [theme, view]);
 
+  // Numbered markers for the picked start points.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    startMarkersRef.current = syncStartMarkers(map, startMarkersRef.current, missionPoints);
+  }, [missionPoints]);
+
   // Approximate front line follows its switch, the loaded zones and the theme.
   const frontEnabled = useFrontLineStore((state) => state.enabled);
   const frontZones = useFrontLineStore((state) => state.zones);
+  const missionCenter = useMissionStore((state) => state.center);
+  const missionWidth = useMissionStore((state) => state.widthKm);
+  const missionHeight = useMissionStore((state) => state.heightKm);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    syncMissionArea(map, useMissionStore.getState(), theme);
+  }, [missionCenter, missionWidth, missionHeight, theme]);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;

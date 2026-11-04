@@ -78,16 +78,25 @@ export class FakeMap {
   remove() {}
 }
 
+export const markerInstances: Marker[] = [];
+
 export class Marker {
   lngLat: [number, number] | null = null;
+  added = false;
+  constructor(_options?: unknown) {
+    markerInstances.push(this);
+  }
   setLngLat(lngLat: [number, number]) {
     this.lngLat = lngLat;
     return this;
   }
   addTo() {
+    this.added = true;
     return this;
   }
-  remove() {}
+  remove() {
+    this.added = false;
+  }
 }
 
 export { FakeMap as Map };

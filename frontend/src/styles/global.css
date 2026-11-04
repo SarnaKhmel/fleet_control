@@ -396,3 +396,85 @@ body,
   border: 2px solid var(--fg);
   border-top: none;
 }
+
+.mission-panel {
+  position: absolute;
+  left: 1rem;
+  top: 8.5rem;
+  z-index: 1;
+  width: 15rem;
+  max-height: calc(100% - 12rem);
+  overflow: auto;
+  padding: 0.6rem 0.8rem;
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.mission-panel h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+}
+
+.mission-panel fieldset {
+  margin: 0 0 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.mission-panel legend {
+  padding: 0 0.2rem;
+  color: var(--muted);
+}
+
+.mission-panel input,
+.mission-panel select,
+.mission-panel button {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.25rem 0.4rem;
+}
+
+.mission-panel button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.mission-panel button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.mission-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.roster {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+}
+
+.mission-start-marker {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--bg);
+  border: 2px solid var(--fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px var(--bg);
+}
