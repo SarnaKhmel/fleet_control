@@ -7,7 +7,8 @@ import { NO_BUILDINGS, type Buildings } from '../buildings/buildings.js';
 import { buildingAhead, hitOnStep, WARNING_REAL_S } from './obstacles.js';
 import { serverLog } from '../log.js';
 import { droneStateAt } from './schedule.js';
-import { bearingTo, BATTERY_DRAIN_PER_TICK, BATTERY_LINK_DRAIN_PER_TICK, CLIMB_RATE_MS, formationTargets, GROUND_AMSL_M, SIM_TIME_SCALE, TICK_MS, windStep } from './kinematics.js';
+import { airDrainPctPerS, groundDrainPctPerS } from '../../../shared/flight/battery.js';
+import { bearingTo, CLIMB_RATE_MS, formationTargets, GROUND_AMSL_M, SIM_TIME_SCALE, TICK_MS, windStep } from './kinematics.js';
 
 // Interval between "booting" progress messages, ms: several steps per boot, so the bar moves smoothly.
 export const PROGRESS_STEP_MS = 250;
@@ -219,8 +220,11 @@ export function createMissionController(
         }
       }
       updateWarning(droneId, drone);
-      const drain = drone.phase === 'landed' ? BATTERY_LINK_DRAIN_PER_TICK : BATTERY_DRAIN_PER_TICK;
-      drone.batteryPct = Math.max(0, drone.batteryPct - drain * SIM_TIME_SCALE);
+      // In the air the drain grows with the airspeed: the cruise speed when flying somewhere, the wind
+      // speed when hovering or coming down (it holds its spot against the wind). On the ground: the link only.
+      const airspeedMs = drone.target || drone.course !== null ? drone.cruiseSpeedMs : wind.speedMs;
+      const drain = drone.phase === 'landed' ? groundDrainPctPerS() : airDrainPctPerS(airspeedMs);
+      drone.batteryPct = Math.max(0, drone.batteryPct - drain * dtS);
       if (drone.batteryPct === 0) {
         goDown(droneId, drone, drone.phase === 'landed' ? 'lost_link' : 'destroyed', 'battery');
         continue;

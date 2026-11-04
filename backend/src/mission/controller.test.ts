@@ -156,6 +156,31 @@ describe('mission controller', () => {
       mission.dispose();
     });
 
+    it('drains faster at a higher speed and when hovering against the wind', () => {
+      // A minute of real time is 600 simulated seconds.
+      const used = (setup: (mission: ReturnType<typeof createMissionController>) => void) => {
+        sent = [];
+        const mission = online();
+        setup(mission);
+        const before = lastOf('position')?.batteryPct ?? 100;
+        vi.advanceTimersByTime(60_000);
+        const after = lastOf('position').batteryPct;
+        mission.dispose();
+        return before - after;
+      };
+      const calmHover = used(() => {});
+      const windyHover = used((m) => m.handle({ type: 'wind', speedMs: 8, fromDeg: 0 }));
+      const cruise10 = used((m) => m.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 51, lng: 30 } }));
+      const cruise20 = used((m) => {
+        m.handle({ type: 'set_flight', droneIds: ['drone-1'], cruiseSpeedMs: 20 });
+        m.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 51, lng: 30 } });
+      });
+      expect(calmHover).toBeCloseTo(15, 0); // 60 % of 25 %
+      expect(windyHover).toBeCloseTo(21.4, 0);
+      expect(cruise10).toBeCloseTo(25, 0);
+      expect(cruise20).toBeCloseTo(55, 0);
+    });
+
     it('lands where it is: drops its tasks, ends its path there and comes down to the ground', () => {
       const mission = online();
       mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 51, lng: 30 } });
