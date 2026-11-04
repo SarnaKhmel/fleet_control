@@ -20,7 +20,8 @@ function DroneStatusList({ drones, phase }: DroneStatusListProps) {
     return { id, callsign: `BA-0${i + 1}`, status: drone?.status ?? null, progress: drone?.progress ?? 0, altitudeM: drone?.altitudeM ?? null };
   });
   const online = rows.filter((r) => r.status === 'idle').length;
-  if (phase !== 'running' && online === 0) return null;
+  // Drones exist only while a mission runs; before the start or after a reset the list is hidden.
+  if (phase !== 'running') return null;
   return (
     <section className="drone-status" aria-label={t('mission.drones')}>
       <div className="drone-status-head">

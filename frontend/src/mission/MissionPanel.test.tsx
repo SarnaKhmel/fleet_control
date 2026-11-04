@@ -46,4 +46,14 @@ describe('MissionPanel', () => {
     send.mockRestore();
     useMissionStore.setState({ phase: 'idle' });
   });
+
+  it('shows no drone status before a mission runs, even if drones were seen', () => {
+    useMissionStore.setState({
+      phase: 'idle',
+      drones: { 'drone-1': { callsign: 'BA-01', status: 'idle', progress: 100, position: null, heading: null, altitudeM: 150, speedMs: 0, batteryPct: 100, crabDeg: 0 } },
+    });
+    render(<MissionPanel />);
+    expect(screen.queryByText(/Online/)).toBeNull();
+    useMissionStore.setState({ drones: {} });
+  });
 });
