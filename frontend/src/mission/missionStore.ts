@@ -211,9 +211,18 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
               speedMs: message.speedMs,
               batteryPct: message.batteryPct,
               crabDeg: message.crabDeg,
-              trail: pointList(message.trail),
-              tasks: pointList(message.tasks),
             },
+          },
+        });
+        return;
+      }
+      case 'drone_tasks': {
+        const drone = get().drones[message.droneId];
+        if (!drone) return;
+        set({
+          drones: {
+            ...get().drones,
+            [message.droneId]: { ...drone, trail: pointList(message.trail), tasks: pointList(message.tasks) },
           },
         });
         return;

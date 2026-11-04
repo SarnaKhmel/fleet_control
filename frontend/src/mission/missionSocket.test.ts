@@ -10,6 +10,11 @@ describe('parseServerMessage', () => {
     });
   });
 
+  it('accepts drone task lists', () => {
+    const tasks = { type: 'drone_tasks', droneId: 'drone-1', trail: [], tasks: [{ lat: 50, lng: 30 }] };
+    expect(parseServerMessage(JSON.stringify(tasks))).toEqual(tasks);
+  });
+
   it('drops unknown types, bad JSON and non-strings', () => {
     expect(parseServerMessage(JSON.stringify({ type: 'move' }))).toBeNull();
     expect(parseServerMessage('{not json')).toBeNull();

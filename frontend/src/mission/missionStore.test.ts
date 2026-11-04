@@ -74,18 +74,25 @@ describe('mission store', () => {
     expect(store().heightKm).toBeGreaterThan(1);
   });
 
-  it('moves a known drone on position messages', () => {
+  it('moves a known drone on position messages and keeps its tasks', () => {
     store().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
-    store().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 90, speedMs: 10, altitudeM: 210, batteryPct: 97, crabDeg: -4, trail: [{ lat: 50, lng: 30 }], tasks: [{ lat: 50.2, lng: 30.2 }] });
+    store().apply({ type: 'drone_tasks', droneId: 'drone-1', trail: [{ lat: 50, lng: 30 }], tasks: [{ lat: 50.2, lng: 30.2 }] });
+    store().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 90, speedMs: 10, altitudeM: 210, batteryPct: 97, crabDeg: -4 });
     expect(store().drones['drone-1']).toMatchObject({ position: { lat: 50.1, lng: 30.1 }, heading: 90, trail: [{ lat: 50, lng: 30 }], tasks: [{ lat: 50.2, lng: 30.2 }] });
   });
 
-  it('treats missing or malformed task lists from the server as empty', () => {
-    // A server from an older build sends positions without them; the map and panels must not break.
+  it('takes the task list and flown path of a drone from drone_tasks', () => {
     store().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
-    store().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 0, speedMs: 10, altitudeM: 210, batteryPct: 97, crabDeg: 0 } as never);
     expect(store().drones['drone-1']).toMatchObject({ trail: [], tasks: [] });
-    store().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 0, speedMs: 10, altitudeM: 210, batteryPct: 97, crabDeg: 0, trail: 'x', tasks: [{ lat: 'a' }] } as never);
+    store().apply({ type: 'drone_tasks', droneId: 'drone-1', trail: [{ lat: 50, lng: 30 }], tasks: [{ lat: 50.2, lng: 30.2 }, { lat: 50.3, lng: 30.3 }] });
+    expect(store().drones['drone-1']).toMatchObject({ trail: [{ lat: 50, lng: 30 }], tasks: [{ lat: 50.2, lng: 30.2 }, { lat: 50.3, lng: 30.3 }] });
+    store().apply({ type: 'drone_tasks', droneId: 'drone-9', trail: [], tasks: [{ lat: 50, lng: 30 }] });
+    expect(store().drones['drone-9']).toBeUndefined();
+  });
+
+  it('treats missing or malformed task lists from the server as empty', () => {
+    store().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
+    store().apply({ type: 'drone_tasks', droneId: 'drone-1', trail: 'x', tasks: [{ lat: 'a' }] } as never);
     expect(store().drones['drone-1']).toMatchObject({ trail: [], tasks: [] });
     store().apply({ type: 'mission_snapshot', running: true, drones: [{ droneId: 'drone-2', callsign: 'BA-02', status: 'idle', progress: 100, position: null, heading: null, altitudeM: null, speedMs: 0, batteryPct: 100, crabDeg: 0 }] } as never);
     expect(store().drones['drone-2']).toMatchObject({ trail: [], tasks: [] });

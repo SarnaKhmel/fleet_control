@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { LatLng, ServerMessage } from '../../../shared/protocol.js';
+import { MAX_TASKS, type LatLng, type ServerMessage } from '../../../shared/protocol.js';
 import { createMissionController } from './controller.js';
 import { CONNECT_MS, BOOT_MS, STAGGER_MS } from './schedule.js';
 
@@ -90,7 +90,7 @@ describe('mission controller', () => {
     vi.advanceTimersByTime(BOOT_MS + CONNECT_MS + 3000);
     const last = sent.filter((m) => m.type === 'position' && m.droneId === 'drone-1').at(-1);
     expect(last && last.type === 'position' && last.position).toEqual(single.point);
-    expect(last && last.type === 'position' && last.tasks).toEqual([]);
+    expect(sent.some((m) => m.type === 'drone_tasks')).toBe(false);
     mission.dispose();
   });
 
@@ -173,9 +173,14 @@ describe('mission controller', () => {
     const b = { lat: 50.001, lng: 30 };
     const c = { lat: 50.0015, lng: 30 };
     const start = { lat: 50, lng: 30 };
-    const lastOf = (droneId: string) => {
+    // Last reported task list and flown path, and last reported position, of a drone.
+    const tasksOf = (droneId: string) => {
+      const last = sent.filter((m) => m.type === 'drone_tasks' && m.droneId === droneId).at(-1);
+      return last?.type === 'drone_tasks' ? last : undefined;
+    };
+    const positionOf = (droneId: string) => {
       const last = sent.filter((m) => m.type === 'position' && m.droneId === droneId).at(-1);
-      return last?.type === 'position' ? last : undefined;
+      return last?.type === 'position' ? last.position : undefined;
     };
     const online = () => {
       const mission = createMissionController((m) => sent.push(m));
@@ -188,7 +193,7 @@ describe('mission controller', () => {
     it('reports the new tasks and the departure point at once', () => {
       const mission = online();
       mission.handle({ type: 'move', droneIds: ['drone-1'], target: a });
-      expect(lastOf('drone-1')).toMatchObject({ trail: [start], tasks: [a] });
+      expect(tasksOf('drone-1')).toMatchObject({ trail: [start], tasks: [a] });
       mission.dispose();
     });
 
@@ -196,9 +201,9 @@ describe('mission controller', () => {
       const mission = online();
       mission.handle({ type: 'move', droneIds: ['drone-1'], target: a });
       mission.handle({ type: 'move', droneIds: ['drone-1'], target: b, append: true });
-      expect(lastOf('drone-1')?.tasks).toEqual([a, b]);
+      expect(tasksOf('drone-1')?.tasks).toEqual([a, b]);
       mission.handle({ type: 'move', droneIds: ['drone-1'], target: c });
-      expect(lastOf('drone-1')?.tasks).toEqual([c]);
+      expect(tasksOf('drone-1')?.tasks).toEqual([c]);
       mission.dispose();
     });
 
@@ -207,23 +212,24 @@ describe('mission controller', () => {
       mission.handle({ type: 'move', droneIds: ['drone-1'], target: a });
       mission.handle({ type: 'move', droneIds: ['drone-1'], target: b, append: true });
       vi.advanceTimersByTime(1000);
-      expect(lastOf('drone-1')).toMatchObject({ trail: [start, a], tasks: [b] });
+      expect(tasksOf('drone-1')).toMatchObject({ trail: [start, a], tasks: [b] });
       vi.advanceTimersByTime(5000);
-      expect(lastOf('drone-1')).toMatchObject({ position: b, trail: [start, a, b], tasks: [] });
+      expect(positionOf('drone-1')).toEqual(b);
+      expect(tasksOf('drone-1')).toMatchObject({ trail: [start, a, b], tasks: [] });
       mission.dispose();
     });
 
     it('treats an append as a plain move when the drone has no tasks', () => {
       const mission = online();
       mission.handle({ type: 'move', droneIds: ['drone-1'], target: a, append: true });
-      expect(lastOf('drone-1')).toMatchObject({ trail: [start], tasks: [a] });
+      expect(tasksOf('drone-1')).toMatchObject({ trail: [start], tasks: [a] });
       mission.dispose();
     });
 
-    it('keeps at most ten tasks', () => {
+    it('keeps at most MAX_TASKS tasks', () => {
       const mission = online();
-      for (let i = 0; i < 12; i++) mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.01 + i * 0.001, lng: 30 }, append: true });
-      expect(lastOf('drone-1')?.tasks).toHaveLength(10);
+      for (let i = 0; i < MAX_TASKS + 2; i++) mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.01 + i * 0.0001, lng: 30 }, append: true });
+      expect(tasksOf('drone-1')?.tasks).toHaveLength(MAX_TASKS);
       mission.dispose();
     });
 
@@ -231,9 +237,9 @@ describe('mission controller', () => {
       const mission = online();
       mission.handle({ type: 'route', droneId: 'drone-1', points: [a, b, c] });
       mission.handle({ type: 'remove_task', droneId: 'drone-1', index: 1 });
-      expect(lastOf('drone-1')?.tasks).toEqual([a, c]);
+      expect(tasksOf('drone-1')?.tasks).toEqual([a, c]);
       mission.handle({ type: 'remove_task', droneId: 'drone-1', index: 0 });
-      expect(lastOf('drone-1')).toMatchObject({ trail: [start], tasks: [c] });
+      expect(tasksOf('drone-1')).toMatchObject({ trail: [start], tasks: [c] });
       const before = sent.length;
       mission.handle({ type: 'remove_task', droneId: 'drone-1', index: 5 });
       mission.handle({ type: 'remove_task', droneId: 'drone-9', index: 0 });
@@ -246,10 +252,21 @@ describe('mission controller', () => {
       mission.handle({ type: 'route', droneId: 'drone-1', points: [{ lat: 50.02, lng: 30 }, b] });
       vi.advanceTimersByTime(2000);
       mission.handle({ type: 'hold', droneIds: ['drone-1'] });
-      const held = lastOf('drone-1')!;
-      expect(held).toMatchObject({ trail: [], tasks: [] });
+      expect(tasksOf('drone-1')).toMatchObject({ trail: [], tasks: [] });
+      const held = positionOf('drone-1') as LatLng;
       vi.advanceTimersByTime(3000);
-      expect(lastOf('drone-1')!.position as LatLng).toEqual(held.position);
+      expect(positionOf('drone-1')).toEqual(held);
+      mission.dispose();
+    });
+
+    it('sends the task list only when it changes, not with every position', () => {
+      const mission = online();
+      mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.02, lng: 30 } });
+      const before = sent.filter((m) => m.type === 'drone_tasks').length;
+      vi.advanceTimersByTime(3000); // flying, no point reached yet
+      expect(sent.filter((m) => m.type === 'drone_tasks').length).toBe(before);
+      const position = sent.find((m) => m.type === 'position');
+      expect(position && 'tasks' in position).toBe(false);
       mission.dispose();
     });
 
@@ -267,8 +284,7 @@ describe('mission controller', () => {
       mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.02, lng: 30 } });
       vi.advanceTimersByTime(2000);
       mission.handle({ type: 'move', droneIds: ['drone-1'], target: a });
-      const now = lastOf('drone-1')!;
-      expect(now.trail).toEqual([now.position]);
+      expect(tasksOf('drone-1')?.trail).toEqual([positionOf('drone-1')]);
       mission.dispose();
     });
 
@@ -276,12 +292,11 @@ describe('mission controller', () => {
       const mission = online();
       mission.handle({ type: 'route', droneId: 'drone-1', points: [{ lat: 50.02, lng: 30 }, b] });
       mission.handle({ type: 'update_task', droneId: 'drone-1', index: 1, point: c });
-      expect(lastOf('drone-1')?.tasks).toEqual([{ lat: 50.02, lng: 30 }, c]);
+      expect(tasksOf('drone-1')?.tasks).toEqual([{ lat: 50.02, lng: 30 }, c]);
       vi.advanceTimersByTime(2000);
       mission.handle({ type: 'update_task', droneId: 'drone-1', index: 0, point: a });
-      const turned = lastOf('drone-1')!;
-      expect(turned.tasks).toEqual([a, c]);
-      expect(turned.trail).toEqual([start, turned.position]);
+      expect(tasksOf('drone-1')?.tasks).toEqual([a, c]);
+      expect(tasksOf('drone-1')?.trail).toEqual([start, positionOf('drone-1')]);
       const before = sent.length;
       mission.handle({ type: 'update_task', droneId: 'drone-1', index: 4, point: a });
       mission.handle({ type: 'update_task', droneId: 'drone-9', index: 0, point: a });

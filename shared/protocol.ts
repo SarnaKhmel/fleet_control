@@ -94,7 +94,9 @@ export type ServerMessage =
   | { type: 'mission_snapshot'; running: boolean; drones: SnapshotDrone[] }
   | { type: 'drone_boot'; droneId: string; status: 'booting' | 'connecting'; progress: number }
   | { type: 'drone_online'; telemetry: DroneTelemetry }
-  | { type: 'position'; droneId: string; position: LatLng; heading: number; speedMs: number; altitudeM: number; batteryPct: number; crabDeg: number; trail: LatLng[]; tasks: LatLng[] }
+  | { type: 'position'; droneId: string; position: LatLng; heading: number; speedMs: number; altitudeM: number; batteryPct: number; crabDeg: number; }
+  /** A drone's task list and flown path. Sent only when they change; positions do not carry them. */
+  | { type: 'drone_tasks'; droneId: string; trail: LatLng[]; tasks: LatLng[] }
   | { type: 'mission_error'; reason: MissionErrorReason }
   | { type: 'mission_reset' };
 
@@ -134,7 +136,7 @@ export function isStartLayout(value: unknown): value is StartLayout {
 
 /** Returns the parsed client message, or null for anything malformed or unknown. */
 /** Longest task list a drone keeps (a route has at most this many control points). */
-export const MAX_TASKS = 10;
+export const MAX_TASKS = 500;
 
 /** Control points for one drone's route: 1 to MAX_TASKS valid coordinates. */
 export function isLatLngList(value: unknown): value is LatLng[] {

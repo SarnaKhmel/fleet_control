@@ -32,8 +32,8 @@ interface DroneState {
   crabDeg: number;
 }
 
-// The flown path keeps at most this many points; the oldest are dropped.
-export const TRAIL_MAX_POINTS = 50;
+// The flown path keeps at most this many points (as many as a task list); the oldest are dropped.
+export const TRAIL_MAX_POINTS = MAX_TASKS;
 
 /** The path with one more point, unless the drone is still at the last one. */
 function withTrailPoint(trail: LatLng[], point: LatLng): LatLng[] {
@@ -109,6 +109,7 @@ export function createMissionController(
           // Reached a control point: it joins the flown path, and the drone goes on to the next one, if any.
           drone.trail = withTrailPoint(drone.trail, drone.position);
           drone.target = drone.route.shift() ?? null;
+          reportTasks(droneId, drone);
         } else {
           drone.position = step.position;
         }
@@ -121,7 +122,7 @@ export function createMissionController(
     }
   }
 
-  /** Sends the drone's current state, including the point it flies to. */
+  /** Sends the drone's position and flight state (many times a second across the fleet: kept small). */
   function report(droneId: string, drone: DroneState) {
     broadcast({
       type: 'position',
@@ -132,9 +133,12 @@ export function createMissionController(
       altitudeM: drone.altitudeM,
       batteryPct: drone.batteryPct,
       crabDeg: drone.crabDeg,
-      trail: drone.trail,
-      tasks: tasksOf(drone),
     });
+  }
+
+  /** Sends the drone's task list and flown path; called only when one of them changes. */
+  function reportTasks(droneId: string, drone: DroneState) {
+    broadcast({ type: 'drone_tasks', droneId, trail: drone.trail, tasks: tasksOf(drone) });
   }
 
   /** The drone's task list: the current target first, then the rest of the route. */
@@ -153,8 +157,7 @@ export function createMissionController(
     drone.course = null;
     if (turn) drone.trail = withTrailPoint(drone.trail, drone.position);
     else drone.trail = first ? [drone.position] : [];
-    // Report at once, so the operator sees the new tasks without waiting for the next tick.
-    report(droneId, drone);
+    reportTasks(droneId, drone);
   }
 
   /** Sends the drones to the target in formation: as their only task, or appended to their tasks. */
@@ -169,7 +172,7 @@ export function createMissionController(
       if (current.length >= MAX_TASKS) return;
       if (current.length > 0) {
         drone.route.push(targets[i]);
-        report(id, drone);
+        reportTasks(id, drone);
       } else {
         setTasks(id, drone, [targets[i]]);
       }
@@ -192,7 +195,7 @@ export function createMissionController(
       setTasks(droneId, drone, tasks.slice(1), true);
     } else {
       drone.route.splice(index - 1, 1);
-      report(droneId, drone);
+      reportTasks(droneId, drone);
     }
   }
 
@@ -207,7 +210,7 @@ export function createMissionController(
       setTasks(droneId, drone, [point, ...tasks.slice(1)], true);
     } else {
       drone.route[index - 1] = point;
-      report(droneId, drone);
+      reportTasks(droneId, drone);
     }
   }
 
@@ -228,7 +231,7 @@ export function createMissionController(
         drone.target = null;
         drone.route = [];
         drone.trail = [];
-        report(id, drone);
+        reportTasks(id, drone);
       }
     }
   }
