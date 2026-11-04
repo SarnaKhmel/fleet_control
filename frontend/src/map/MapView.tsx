@@ -141,19 +141,17 @@ export function MapView() {
       const mission = useMissionStore.getState();
       debugLog('map click', {
         point,
-        modes: { drawing: mission.drawing, picking: mission.picking, route: mission.routeMode, move: mission.moveMode, phase: mission.phase },
+        modes: { drawing: mission.drawing, picking: mission.picking, phase: mission.phase },
         selected: useSelectionStore.getState().selectedIds,
         shift: !!event.originalEvent?.shiftKey,
       });
       // Mode clicks take priority: zone drawing, then start points, else the location.
       if (mission.drawing) mission.drawClick(point);
       else if (mission.picking) mission.addPoint(point);
-      else if (mission.routeMode) mission.addRoutePoint(point);
-      // Ctrl+click (Cmd+click on a Mac) appends the point to the drones' tasks instead of replacing them.
-      else if (mission.moveMode) moveOnlineDrones(point, append);
       // Shift+click with drones selected sets their course toward the clicked point.
       else if (event.originalEvent?.shiftKey && useSelectionStore.getState().selectedIds.length > 0) headOnlineDronesToward(point);
-      // With drones selected, a plain click sends them to that point (Esc clears the selection).
+      // With drones selected, a click sends them to that point (Esc clears the selection); Ctrl+click
+      // (Cmd+click on a Mac) appends the point to their tasks instead of replacing them.
       else if (useSelectionStore.getState().selectedIds.length > 0) moveOnlineDrones(point, append);
       else useLocationStore.getState().select(point);
     });
@@ -210,15 +208,6 @@ export function MapView() {
     map.setStyle(style);
     styleRef.current = style;
   }, [theme, view]);
-
-  // Numbered markers for the control points of the route being built.
-  const routePoints = useMissionStore((state) => state.routePoints);
-  const routeMarkersRef = useRef<Marker[]>([]);
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    routeMarkersRef.current = syncStartMarkers(map, routeMarkersRef.current, routePoints, 'control');
-  }, [routePoints]);
 
   // Numbered markers for the picked start points.
   useEffect(() => {

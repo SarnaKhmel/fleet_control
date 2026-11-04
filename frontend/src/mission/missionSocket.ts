@@ -75,7 +75,7 @@ export function sendClientMessage(message: ClientMessage): boolean {
 }
 
 /**
- * Sends a move for the selected online drones, or for all online drones when none is selected.
+ * Sends a move for the selected online drones.
  * With `append` the point goes to the end of each drone's tasks instead of replacing them.
  */
 export function moveOnlineDrones(target: LatLng, append = false): number {
@@ -83,7 +83,7 @@ export function moveOnlineDrones(target: LatLng, append = false): number {
     .filter(([, drone]) => drone.status === 'idle')
     .map(([id]) => id);
   const selected = useSelectionStore.getState().selectedIds;
-  const droneIds = selected.length > 0 ? online.filter((id) => selected.includes(id)) : online;
+  const droneIds = online.filter((id) => selected.includes(id));
   debugLog('move click', { target, append, selected, online, sending: droneIds });
   if (droneIds.length === 0) return 0;
   const message: ClientMessage = append ? { type: 'move', droneIds, target, append } : { type: 'move', droneIds, target };
@@ -120,15 +120,4 @@ export function headOnlineDronesToward(target: LatLng): number {
   const { east, north } = toMetersFrom(from, target);
   const headingDeg = ((Math.atan2(east, north) * 180) / Math.PI + 360) % 360;
   return sendClientMessage({ type: 'heading', droneIds: ids, headingDeg }) ? ids.length : 0;
-}
-
-/** Gives every selected online drone the same ordered control points, each as its own route. */
-export function sendRouteToSelected(points: LatLng[]): number {
-  const drones = useMissionStore.getState().drones;
-  const ids = useSelectionStore.getState().selectedIds.filter((id) => drones[id]?.status === 'idle');
-  let sent = 0;
-  for (const droneId of ids) {
-    if (sendClientMessage({ type: 'route', droneId, points })) sent++;
-  }
-  return sent;
 }

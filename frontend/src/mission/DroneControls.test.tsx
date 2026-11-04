@@ -10,7 +10,7 @@ const position = (lat: number, altitudeM: number) => ({ type: 'position' as cons
 describe('DroneControls', () => {
   beforeEach(() => {
     useSelectionStore.setState({ selectedIds: [] });
-    useMissionStore.setState({ phase: 'running', drones: { 'drone-1': online }, moveMode: false, routeMode: false, routePoints: [] });
+    useMissionStore.setState({ phase: 'running', drones: { 'drone-1': online } });
   });
   afterEach(() => useMissionStore.setState({ phase: 'idle', drones: {} }));
 

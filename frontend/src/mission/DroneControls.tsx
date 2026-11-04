@@ -1,8 +1,6 @@
 import { DRONE_COUNT, GROUND_AMSL_M } from '../../../shared/protocol';
 import { useTranslation } from 'react-i18next';
-import { useShallow } from 'zustand/react/shallow';
 import { useMissionStore } from './missionStore';
-import { sendRouteToSelected } from './missionSocket';
 import { useSelectionStore } from './selection';
 
 const DRONE_IDS = Array.from({ length: DRONE_COUNT }, (_, i) => `drone-${i + 1}`);
@@ -69,69 +67,12 @@ export function DroneStatusList() {
   );
 }
 
-// Drone commands: status, move to a point and control-point routes. Kept apart from the mission settings,
-// so they stay available while the mission runs.
+// Drone section of the sidebar: the status list, kept apart from the mission settings so it stays
+// available while the mission runs. Drones are commanded on the map: select them, then click.
 export function DroneControls() {
-  const { t } = useTranslation();
-  // Only the command fields: drone updates must not re-render the controls.
-  const state = useMissionStore(
-    useShallow((s) => ({
-      phase: s.phase,
-      moveMode: s.moveMode,
-      routeMode: s.routeMode,
-      routePoints: s.routePoints,
-      setMoveMode: s.setMoveMode,
-      setRouteMode: s.setRouteMode,
-      clearRoute: s.clearRoute,
-    })),
-  );
-  const selectedIds = useSelectionStore((s) => s.selectedIds);
   return (
     <div className="drone-controls">
       <DroneStatusList />
-        <fieldset>
-          <legend>{t('mission.drones')}</legend>
-          <button
-            type="button"
-            aria-pressed={state.moveMode}
-            disabled={state.phase !== 'running'}
-            onClick={() => state.setMoveMode(!state.moveMode)}
-          >
-            {state.moveMode ? t('mission.moveOn') : t('mission.move')}
-          </button>
-        </fieldset>
-
-        <fieldset>
-          <legend>{t('mission.route')}</legend>
-          <button
-            type="button"
-            aria-pressed={state.routeMode}
-            disabled={state.phase !== 'running'}
-            onClick={() => state.setRouteMode(!state.routeMode)}
-          >
-            {state.routeMode ? t('mission.routeOn') : t('mission.routeAdd')}
-          </button>
-          <span className="muted">{t('mission.routePoints', { count: state.routePoints.length })}</span>
-          <button
-            type="button"
-            disabled={state.routePoints.length === 0 || state.phase !== 'running' || selectedIds.length === 0}
-            onClick={() => {
-              // The route goes to the selected drones; without a selection nothing is sent and the points stay.
-              if (sendRouteToSelected(state.routePoints) > 0) {
-                state.clearRoute();
-                state.setRouteMode(false);
-              }
-            }}
-          >
-            {t('mission.routeSend')}
-          </button>
-          {selectedIds.length === 0 && <p className="muted">{t('mission.routeSelectFirst')}</p>}
-          <button type="button" onClick={state.clearRoute} disabled={state.routePoints.length === 0}>
-            {t('mission.routeClear')}
-          </button>
-        </fieldset>
-
-
     </div>
   );
 }

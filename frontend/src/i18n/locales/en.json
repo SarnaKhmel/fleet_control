@@ -122,19 +122,10 @@
     "drawSecond": "Click the opposite corner.",
     "backToZone": "Back to mission zone",
     "drones": "Drones",
-    "move": "Move drones to a point",
-    "moveOn": "Moving: click the map (stop)",
     "online": "Online {{count}}/{{total}}",
     "selectHint": "Click a drone here or on the map to see its details and path. Shift+click adds more drones.",
     "resetConfirm": "Confirm reset: all drones stop",
-    "locked": "Mission is running: zone and start points are fixed. Reset to change them.",
-    "route": "Route of the selected drone",
-    "routeAdd": "Add control points",
-    "routeOn": "Adding: click the map (stop)",
-    "routePoints": "Control points: {{count}}/10",
-    "routeSend": "Send route",
-    "routeClear": "Clear points",
-    "routeSelectFirst": "Select a drone on the map first (click it, or Shift+drag a box)."
+    "locked": "Mission is running: zone and start points are fixed. Reset to change them."
   },
   "sidebar": {
     "label": "Side panel",

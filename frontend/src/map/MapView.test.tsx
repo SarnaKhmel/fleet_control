@@ -42,7 +42,9 @@ describe('MapView', () => {
   });
 
   it('ignores a map click that comes from a marker', () => {
-    useMissionStore.setState({ phase: 'running', routeMode: true, routePoints: [] });
+    vi.mocked(moveOnlineDrones).mockClear();
+    useMissionStore.setState({ phase: 'running', picking: false, drawing: false });
+    useSelectionStore.setState({ selectedIds: ['drone-1'] });
     render(<MapView />);
     const marker = document.createElement('div');
     marker.className = 'maplibregl-marker';
@@ -50,16 +52,17 @@ describe('MapView', () => {
     act(() => {
       mapInstances[0].emit('click', { lngLat: { lat: 50.1, lng: 30.2 }, originalEvent: { target: label } } as never);
     });
-    expect(useMissionStore.getState().routePoints).toEqual([]);
+    expect(moveOnlineDrones).not.toHaveBeenCalled();
     act(() => {
       mapInstances[0].emit('click', { lngLat: { lat: 50.1, lng: 30.2 }, originalEvent: { target: document.body } } as never);
     });
-    expect(useMissionStore.getState().routePoints).toEqual([{ lat: 50.1, lng: 30.2 }]);
-    useMissionStore.setState({ phase: 'idle', routeMode: false, routePoints: [] });
+    expect(moveOnlineDrones).toHaveBeenCalledOnce();
+    useSelectionStore.setState({ selectedIds: [] });
+    useMissionStore.setState({ phase: 'idle' });
   });
 
   it('with drones selected, a click replaces their tasks and Ctrl+click appends to them', () => {
-    useMissionStore.setState({ phase: 'running', picking: false, drawing: false, routeMode: false, moveMode: false });
+    useMissionStore.setState({ phase: 'running', picking: false, drawing: false });
     useSelectionStore.setState({ selectedIds: ['drone-1'] });
     render(<MapView />);
     act(() => mapInstances[0].emit('click', { lngLat: { lat: 50.1, lng: 30.2 }, originalEvent: { target: document.body } } as never));
@@ -70,16 +73,18 @@ describe('MapView', () => {
     useMissionStore.setState({ phase: 'idle' });
   });
 
-  it('adds control points after a start made with start-point picking left on', () => {
-    useMissionStore.setState({ phase: 'idle', picking: true, routeMode: false, routePoints: [], drones: {} });
+  it('moves the selected drones after a start made with start-point picking left on', () => {
+    vi.mocked(moveOnlineDrones).mockClear();
+    useMissionStore.setState({ phase: 'idle', picking: true, drones: {} });
     useMissionStore.getState().markStarting();
-    useMissionStore.getState().setRouteMode(true);
+    useSelectionStore.setState({ selectedIds: ['drone-1'] });
     render(<MapView />);
     act(() => {
       mapInstances[0].emit('click', { lngLat: { lat: 50.2, lng: 30.3 } });
     });
-    expect(useMissionStore.getState().routePoints).toEqual([{ lat: 50.2, lng: 30.3 }]);
-    useMissionStore.setState({ phase: 'idle', routeMode: false, routePoints: [] });
+    expect(moveOnlineDrones).toHaveBeenCalledWith({ lat: 50.2, lng: 30.3 }, false);
+    useSelectionStore.setState({ selectedIds: [] });
+    useMissionStore.setState({ phase: 'idle' });
   });
 
   it('moves a drone marker on a position update without re-rendering the map component', () => {

@@ -5,7 +5,7 @@ import { useSelectionStore } from './selection';
 
 /**
  * Clears everything the operator built: a running mission (on the server too), drone selection, start
- * and control points, the route, the modes and the zone. Map view and settings are kept.
+ * points, the modes and the zone. Map view and settings are kept.
  */
 export function resetEverything(): void {
   if (useMissionStore.getState().phase === 'running') sendClientMessage({ type: 'mission_reset' });
@@ -18,9 +18,6 @@ export function resetEverything(): void {
     points: [],
     clusterRadiusM: 500,
     picking: false,
-    moveMode: false,
-    routeMode: false,
-    routePoints: [],
     drawing: false,
     drawAnchor: null,
     drawCursor: null,
