@@ -41,3 +41,26 @@ describe('MapView', () => {
     expect(mapInstances[0].style).toBe('https://tiles.openfreemap.org/styles/bright');
   });
 });
+
+describe('3D buildings', () => {
+  beforeEach(() => {
+    mapInstances.length = 0;
+    useThemeStore.setState({ theme: 'dark' });
+    useMapViewStore.setState({ view: 'auto', buildings3d: true });
+  });
+
+  it('adds the extrusion layer on style load and tilts the camera', () => {
+    render(<MapView />);
+    act(() => mapInstances[0].emit('style.load', {} as never));
+    expect(mapInstances[0].getLayer('3d-buildings')).toBeTruthy();
+    expect(mapInstances[0].pitch).toBe(50);
+  });
+
+  it('hides the layer and flattens the camera when turned off', () => {
+    render(<MapView />);
+    act(() => mapInstances[0].emit('style.load', {} as never));
+    act(() => useMapViewStore.getState().setBuildings3d(false));
+    expect(mapInstances[0].getLayer('3d-buildings')?.visibility).toBe('none');
+    expect(mapInstances[0].pitch).toBe(0);
+  });
+});

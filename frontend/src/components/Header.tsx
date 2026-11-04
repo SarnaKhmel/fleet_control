@@ -13,6 +13,8 @@ export function Header() {
   const choose = useLocationStore((state) => state.choose);
   const mapView = useMapViewStore((state) => state.view);
   const setMapView = useMapViewStore((state) => state.setView);
+  const buildings3d = useMapViewStore((state) => state.buildings3d);
+  const setBuildings3d = useMapViewStore((state) => state.setBuildings3d);
   const [coords, setCoords] = useState('');
   const [invalid, setInvalid] = useState(false);
 
@@ -58,6 +60,9 @@ export function Header() {
           <option value="auto">{t('header.mapAuto')}</option>
           <option value="landscape">{t('header.mapLandscape')}</option>
         </select>
+        <button type="button" aria-pressed={buildings3d} onClick={() => setBuildings3d(!buildings3d)}>
+          {t(buildings3d ? 'header.buildings3dOn' : 'header.buildings3dOff')}
+        </button>
         <select
           aria-label={t('header.language')}
           value={i18n.language}

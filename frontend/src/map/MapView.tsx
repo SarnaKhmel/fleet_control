@@ -6,7 +6,14 @@ import './mapWorker';
 import { useThemeStore } from '../theme/themeStore';
 import { useLocationStore } from '../location/locationStore';
 import { DEFAULT_CENTER, DEFAULT_ZOOM, mapStyleFor, useMapViewStore } from './mapStyles';
+import { addBuildingsLayer, BUILDINGS_LAYER_ID, BUILDING_COLORS, TILT_3D_PITCH } from './buildings';
 import { CONTROL_POINT_SIDC, natoElement } from '../symbology/nato';
+
+function applyBuildingVisibility(map: MapLibreMap, on: boolean) {
+  if (map.getLayer(BUILDINGS_LAYER_ID)) {
+    map.setLayoutProperty(BUILDINGS_LAYER_ID, 'visibility', on ? 'visible' : 'none');
+  }
+}
 
 export function MapView() {
   const { t } = useTranslation();
@@ -16,6 +23,7 @@ export function MapView() {
   const styleRef = useRef<string | null>(null);
   const theme = useThemeStore((state) => state.theme);
   const view = useMapViewStore((state) => state.view);
+  const buildings3d = useMapViewStore((state) => state.buildings3d);
   const selected = useLocationStore((state) => state.selected);
   const focusTick = useLocationStore((state) => state.focusTick);
 
@@ -27,6 +35,13 @@ export function MapView() {
       style,
       center: [DEFAULT_CENTER.lng, DEFAULT_CENTER.lat],
       zoom: DEFAULT_ZOOM,
+    });
+    // Style changes (theme, map view) drop custom layers, so re-add them on every style load.
+    map.on('style.load', () => {
+      const current = useThemeStore.getState().theme;
+      addBuildingsLayer(map, current);
+      map.setPitch(useMapViewStore.getState().buildings3d ? TILT_3D_PITCH : 0);
+      applyBuildingVisibility(map, useMapViewStore.getState().buildings3d);
     });
     map.on('click', (event) => {
       useLocationStore.getState().select({ lat: event.lngLat.lat, lng: event.lngLat.lng });
@@ -43,10 +58,25 @@ export function MapView() {
   // Switch the basemap when the theme or the map view changes; skip if the style is already loaded.
   useEffect(() => {
     const style = mapStyleFor(theme, view);
-    if (!mapRef.current || styleRef.current === style) return;
-    mapRef.current.setStyle(style);
+    const map = mapRef.current;
+    if (!map || styleRef.current === style) return;
+    map.setStyle(style);
     styleRef.current = style;
   }, [theme, view]);
+
+  // Recolor buildings with the theme; 3D on/off = tilt + layer visibility.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.getLayer(BUILDINGS_LAYER_ID)) return;
+    map.setPaintProperty(BUILDINGS_LAYER_ID, 'fill-extrusion-color', BUILDING_COLORS[theme]);
+  }, [theme]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    applyBuildingVisibility(map, buildings3d);
+    map.setPitch(buildings3d ? TILT_3D_PITCH : 0);
+  }, [buildings3d]);
 
   // Fly to a location chosen from the header or the saved list (not on plain map clicks).
   useEffect(() => {

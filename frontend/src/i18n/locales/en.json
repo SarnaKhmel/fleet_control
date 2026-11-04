@@ -12,7 +12,9 @@
     "coordinatesInvalid": "Enter lat, lng, e.g. 50.45, 30.52",
     "mapView": "Map view",
     "mapAuto": "Map: by theme",
-    "mapLandscape": "Map: landscape"
+    "mapLandscape": "Map: landscape",
+    "buildings3dOn": "3D buildings: on",
+    "buildings3dOff": "3D buildings: off"
   },
   "map": {
     "label": "Map"

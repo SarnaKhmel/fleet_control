@@ -12,7 +12,9 @@
     "coordinatesInvalid": "Введіть широту, довготу, напр. 50.45, 30.52",
     "mapView": "Вигляд карти",
     "mapAuto": "Карта: за темою",
-    "mapLandscape": "Карта: ландшафт"
+    "mapLandscape": "Карта: ландшафт",
+    "buildings3dOn": "3D будівлі: увімк.",
+    "buildings3dOff": "3D будівлі: вимк."
   },
   "map": {
     "label": "Карта"

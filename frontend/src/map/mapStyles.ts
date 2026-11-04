@@ -15,6 +15,8 @@ export const MAP_VIEW_KEY = 'fleet.mapView';
 interface MapViewState {
   view: MapView;
   setView: (view: MapView) => void;
+  buildings3d: boolean;
+  setBuildings3d: (on: boolean) => void;
 }
 
 export const useMapViewStore = create<MapViewState>()(
@@ -22,6 +24,8 @@ export const useMapViewStore = create<MapViewState>()(
     (set) => ({
       view: 'auto',
       setView: (view) => set({ view }),
+      buildings3d: true,
+      setBuildings3d: (buildings3d) => set({ buildings3d }),
     }),
     { name: MAP_VIEW_KEY },
   ),

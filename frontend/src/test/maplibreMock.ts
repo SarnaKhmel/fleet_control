@@ -8,6 +8,8 @@ export class FakeMap {
   style: string;
   handlers: Record<string, Handler[]> = {};
   lastFlyTo: { center: [number, number]; zoom: number } | null = null;
+  layers: Record<string, { id: string; visibility?: string; color?: string }> = {};
+  pitch = 0;
 
   constructor(options: { style: string }) {
     this.style = options.style;
@@ -22,6 +24,21 @@ export class FakeMap {
   }
   setStyle(style: string) {
     this.style = style;
+  }
+  getLayer(id: string) {
+    return this.layers[id];
+  }
+  addLayer(spec: { id: string }) {
+    this.layers[spec.id] = { id: spec.id };
+  }
+  setLayoutProperty(id: string, name: string, value: string) {
+    if (name === 'visibility') this.layers[id].visibility = value;
+  }
+  setPaintProperty(id: string, name: string, value: string) {
+    if (name === 'fill-extrusion-color') this.layers[id].color = value;
+  }
+  setPitch(pitch: number) {
+    this.pitch = pitch;
   }
   flyTo(options: { center: [number, number]; zoom: number }) {
     this.lastFlyTo = options;
