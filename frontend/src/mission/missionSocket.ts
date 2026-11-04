@@ -1,5 +1,6 @@
 import type { ClientMessage, ServerMessage } from '../../../shared/protocol';
 import { useMissionStore } from './missionStore';
+import { useSelectionStore } from './selection';
 import type { LatLng } from '../../../shared/protocol';
 
 const SERVER_TYPES = new Set(['drone_boot', 'drone_online', 'position', 'mission_error', 'mission_reset']);
@@ -45,11 +46,13 @@ export function sendClientMessage(message: ClientMessage): boolean {
   return true;
 }
 
-/** Sends a move for every drone that is online. Returns how many drones were sent. */
+/** Sends a move for the selected online drones, or for all online drones when none is selected. */
 export function moveOnlineDrones(target: LatLng): number {
-  const droneIds = Object.entries(useMissionStore.getState().drones)
+  const online = Object.entries(useMissionStore.getState().drones)
     .filter(([, drone]) => drone.status === 'idle')
     .map(([id]) => id);
+  const selected = useSelectionStore.getState().selectedIds;
+  const droneIds = selected.length > 0 ? online.filter((id) => selected.includes(id)) : online;
   if (droneIds.length === 0) return 0;
   return sendClientMessage({ type: 'move', droneIds, target }) ? droneIds.length : 0;
 }

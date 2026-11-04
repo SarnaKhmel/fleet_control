@@ -18,6 +18,7 @@ import { effectiveCenter, useMissionStore } from '../mission/missionStore';
 import { syncStartMarkers } from '../mission/startMarkers';
 import { syncDroneMarkers } from '../mission/droneMarkers';
 import { moveOnlineDrones } from '../mission/missionSocket';
+import { dronesInScreenBox, useSelectionStore, type ScreenPoint } from '../mission/selection';
 import { boxesOverlap, boxOf, registerZoneFitter, zoneBoxOf } from '../mission/zoneView';
 import { registerViewReset } from './viewReset';
 import { areaRing } from '../../../shared/mission/area';
@@ -86,13 +87,53 @@ export function MapView() {
       if (sourceId === TERRAIN_SOURCE_ID) useMapIssueStore.getState().setIssue('terrain');
       else if (!sourceId) useMapIssueStore.getState().setIssue('style');
     });
+    // Shift+drag selects drones in a box, so MapLibre's own Shift+drag zoom is turned off.
+    map.boxZoom.disable();
+    let boxStart: ScreenPoint | null = null;
+    let boxEl: HTMLDivElement | null = null;
+    let suppressNextClick = false;
+    const drawBox = (end: ScreenPoint) => {
+      if (!boxStart || !boxEl) return;
+      boxEl.style.left = `${Math.min(boxStart.x, end.x)}px`;
+      boxEl.style.top = `${Math.min(boxStart.y, end.y)}px`;
+      boxEl.style.width = `${Math.abs(end.x - boxStart.x)}px`;
+      boxEl.style.height = `${Math.abs(end.y - boxStart.y)}px`;
+    };
+    map.on('mousedown', (event) => {
+      if (!event.originalEvent.shiftKey || useMissionStore.getState().drawing) return;
+      boxStart = { x: event.point.x, y: event.point.y };
+      boxEl = document.createElement('div');
+      boxEl.className = 'selection-box';
+      containerRef.current?.appendChild(boxEl);
+      map.dragPan.disable();
+    });
+    map.on('mouseup', (event) => {
+      if (!boxStart) return;
+      const positions: Record<string, ScreenPoint> = {};
+      for (const [id, drone] of Object.entries(useMissionStore.getState().drones)) {
+        if (!drone.position) continue;
+        const p = map.project([drone.position.lng, drone.position.lat]);
+        positions[id] = { x: p.x, y: p.y };
+      }
+      useSelectionStore.getState().select(dronesInScreenBox(positions, boxStart, { x: event.point.x, y: event.point.y }));
+      boxEl?.remove();
+      boxStart = null;
+      boxEl = null;
+      map.dragPan.enable();
+      suppressNextClick = true;
+    });
     map.on('click', (event) => {
+      if (suppressNextClick) {
+        suppressNextClick = false;
+        return;
+      }
       const point = { lat: event.lngLat.lat, lng: event.lngLat.lng };
       const mission = useMissionStore.getState();
       // Mode clicks take priority: zone drawing, then start points, else the location.
       if (mission.drawing) mission.drawClick(point);
       else if (mission.picking) mission.addPoint(point);
       else if (mission.moveMode) moveOnlineDrones(point);
+      else if (useSelectionStore.getState().selectedIds.length > 0) useSelectionStore.getState().clear();
       else useLocationStore.getState().select(point);
     });
     // Tell the UI whether the mission zone is still on screen, and register the "back to zone" action.
@@ -125,6 +166,7 @@ export function MapView() {
       });
     });
     map.on('mousemove', (event) => {
+      drawBox({ x: event.point.x, y: event.point.y });
       const mission = useMissionStore.getState();
       if (mission.drawing && mission.drawAnchor) mission.setDrawCursor({ lat: event.lngLat.lat, lng: event.lngLat.lng });
     });
@@ -154,11 +196,12 @@ export function MapView() {
   }, [missionPoints]);
 
   // Drones with a known position, drawn as NATO symbols or in our own style.
+  const selectedIds = useSelectionStore((state) => state.selectedIds);
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     droneMarkersRef.current = syncDroneMarkers(map, droneMarkersRef.current, drones, symbolStyle);
-  }, [drones, symbolStyle]);
+  }, [drones, symbolStyle, selectedIds]);
 
   // Approximate front line follows its switch, the loaded zones and the theme.
   const frontEnabled = useFrontLineStore((state) => state.enabled);

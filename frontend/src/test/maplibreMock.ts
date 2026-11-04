@@ -45,6 +45,11 @@ export class FakeMap {
     this.fitted = true;
   }
   fitted = false;
+  boxZoom = { disable() {}, enable() {} };
+  dragPan = { disable() {}, enable() {} };
+  project(lngLat: [number, number]) {
+    return { x: lngLat[0], y: lngLat[1] };
+  }
   addSource(id: string, spec: object) {
     this.sources[id] = spec;
   }

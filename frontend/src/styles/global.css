@@ -1091,3 +1091,18 @@ body,
   border-color: var(--accent);
   color: var(--accent);
 }
+
+.selection-box {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  border: 1px dashed var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.drone-marker.is-selected,
+.maplibregl-marker .nato-symbol.is-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
