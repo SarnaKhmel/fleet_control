@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, act } from '@testing-library/react';
+import { vi } from 'vitest';
 import i18n from './i18n';
 import { App } from './App';
 import { useThemeStore } from './theme/themeStore';
@@ -70,11 +71,22 @@ describe('App', () => {
     expect(document.querySelector('.location-coords')?.textContent).toBe('50.10000, 30.20000');
   });
 
-  it('rejects invalid coordinates in the header', () => {
+  it('finds a city by name through the header search', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [{ lat: '50.4501', lon: '30.5234' }] }));
     render(<App />);
-    fireEvent.change(screen.getByLabelText('Coordinates'), { target: { value: 'north' } });
+    fireEvent.change(screen.getByLabelText('Coordinates'), { target: { value: 'Kyiv' } });
     fireEvent.click(screen.getByRole('button', { name: 'Go' }));
-    expect(screen.getByRole('alert').textContent).toBe('Enter lat, lng, e.g. 50.45, 30.52');
+    expect(await screen.findByText('50.45010, 30.52340')).toBeTruthy();
+    vi.unstubAllGlobals();
+  });
+
+  it('shows an error when the city is not found', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [] }));
+    render(<App />);
+    fireEvent.change(screen.getByLabelText('Coordinates'), { target: { value: 'Nowhere-land' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('City not found');
     expect(useLocationStore.getState().selected).toBeNull();
+    vi.unstubAllGlobals();
   });
 });

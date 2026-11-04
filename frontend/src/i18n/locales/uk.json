@@ -7,14 +7,16 @@
     "switchToLight": "Світла тема",
     "switchToDark": "Темна тема",
     "coordinates": "Координати",
-    "coordinatesPlaceholder": "50.45010, 30.52340",
+    "coordinatesPlaceholder": "50.45, 30.52 або назва міста",
     "go": "Перейти",
-    "coordinatesInvalid": "Введіть широту, довготу, напр. 50.45, 30.52",
+    "coordinatesInvalid": "Введіть координати (широта, довгота) або назву міста",
     "mapView": "Вигляд карти",
     "mapAuto": "Карта: за темою",
     "mapLandscape": "Карта: ландшафт",
     "buildings3dOn": "3D будівлі: увімк.",
-    "buildings3dOff": "3D будівлі: вимк."
+    "buildings3dOff": "3D будівлі: вимк.",
+    "cityNotFound": "Місто не знайдено",
+    "geocodeError": "Пошук не вдався, спробуйте ще раз"
   },
   "map": {
     "label": "Карта"

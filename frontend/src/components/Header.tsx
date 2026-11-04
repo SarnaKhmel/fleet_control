@@ -4,6 +4,7 @@ import { isLanguage, setLanguage, SUPPORTED_LANGUAGES } from '../i18n';
 import { useThemeStore } from '../theme/themeStore';
 import { parseLatLng } from '../location/parseLatLng';
 import { useLocationStore } from '../location/locationStore';
+import { geocodeCity } from '../location/geocode';
 import { useMapViewStore, type MapView } from '../map/mapStyles';
 
 export function Header() {
@@ -16,18 +17,36 @@ export function Header() {
   const buildings3d = useMapViewStore((state) => state.buildings3d);
   const setBuildings3d = useMapViewStore((state) => state.setBuildings3d);
   const [coords, setCoords] = useState('');
-  const [invalid, setInvalid] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searching, setSearching] = useState(false);
 
-  function submitCoordinates(event: FormEvent<HTMLFormElement>) {
+  async function submitCoordinates(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const point = parseLatLng(coords);
-    if (!point) {
-      setInvalid(true);
+    const query = coords.trim();
+    if (!query) return;
+    setError(null);
+
+    const direct = parseLatLng(query);
+    if (direct) {
+      choose(direct);
+      setCoords('');
       return;
     }
-    setInvalid(false);
-    choose(point);
-    setCoords('');
+
+    setSearching(true);
+    try {
+      const point = await geocodeCity(query, i18n.language);
+      if (point) {
+        choose(point);
+        setCoords('');
+      } else {
+        setError(t('header.cityNotFound'));
+      }
+    } catch {
+      setError(t('header.geocodeError'));
+    } finally {
+      setSearching(false);
+    }
   }
 
   return (
@@ -39,16 +58,18 @@ export function Header() {
             aria-label={t('header.coordinates')}
             placeholder={t('header.coordinatesPlaceholder')}
             value={coords}
-            aria-invalid={invalid}
+            aria-invalid={error !== null}
             onChange={(event) => {
               setCoords(event.target.value);
-              setInvalid(false);
+              setError(null);
             }}
           />
-          <button type="submit">{t('header.go')}</button>
-          {invalid && (
+          <button type="submit" disabled={searching}>
+            {t('header.go')}
+          </button>
+          {error && (
             <span role="alert" className="form-error">
-              {t('header.coordinatesInvalid')}
+              {error}
             </span>
           )}
         </form>

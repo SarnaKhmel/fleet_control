@@ -7,14 +7,16 @@
     "switchToLight": "Light theme",
     "switchToDark": "Dark theme",
     "coordinates": "Coordinates",
-    "coordinatesPlaceholder": "50.45010, 30.52340",
+    "coordinatesPlaceholder": "50.45, 30.52 or city name",
     "go": "Go",
-    "coordinatesInvalid": "Enter lat, lng, e.g. 50.45, 30.52",
+    "coordinatesInvalid": "Enter coordinates (lat, lng) or a city name",
     "mapView": "Map view",
     "mapAuto": "Map: by theme",
     "mapLandscape": "Map: landscape",
     "buildings3dOn": "3D buildings: on",
-    "buildings3dOff": "3D buildings: off"
+    "buildings3dOff": "3D buildings: off",
+    "cityNotFound": "City not found",
+    "geocodeError": "Search failed, try again"
   },
   "map": {
     "label": "Map"
