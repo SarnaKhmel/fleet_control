@@ -1,4 +1,4 @@
-import { callsignOf, droneIdOf, GROUND_AMSL_M, isAirborne, takesCommands } from '../../../shared/protocol';
+import { callsignOf, droneIdOf, isAirborne, takesCommands } from '../../../shared/protocol';
 import { useTranslation } from 'react-i18next';
 import { useMissionStore } from './missionStore';
 import { useSelectionStore } from './selection';
@@ -11,9 +11,10 @@ function DroneStatusRow({ droneId, index }: { droneId: string; index: number }) 
   const selected = useSelectionStore((s) => s.selectedIds.includes(droneId));
   const status = useMissionStore((s) => s.drones[droneId]?.status ?? null);
   const bootProgress = useMissionStore((s) => s.drones[droneId]?.progress ?? 0);
+  // Height above the ground under the drone, which follows the terrain.
   const heightM = useMissionStore((s) => {
-    const altitudeM = s.drones[droneId]?.altitudeM;
-    return altitudeM == null ? null : Math.round(altitudeM - GROUND_AMSL_M);
+    const drone = s.drones[droneId];
+    return drone?.altitudeM == null || drone.groundM == null ? null : Math.round(drone.altitudeM - drone.groundM);
   });
   const online = status !== null && status !== 'booting' && status !== 'connecting';
   const progress = online ? 100 : status ? bootProgress : 0;

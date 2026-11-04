@@ -22,8 +22,17 @@ export function isDroneCount(value: unknown): value is number {
 export const MISSION_DEFAULT_AREA_KM = 50;
 export const MISSION_MAX_AREA_KM = 500;
 export const CLUSTER_MAX_RADIUS_M = 5000;
-/** Launch site altitude above sea level, meters. Drones take off from here. */
+/** Ground altitude above sea level, meters, used where the terrain is not known (no elevation tile). */
 export const GROUND_AMSL_M = 150;
+
+/** Height a drone holds above the ground under it, meters: the default and the range the operator can set. */
+export const DEFAULT_ALTITUDE_AGL_M = 60;
+export const MIN_ALTITUDE_AGL_M = 20;
+export const MAX_ALTITUDE_AGL_M = 500;
+/** Cruise speed over the ground, m/s: the default and the range the operator can set. */
+export const DEFAULT_CRUISE_SPEED_MS = 10;
+export const MIN_CRUISE_SPEED_MS = 3;
+export const MAX_CRUISE_SPEED_MS = 30;
 
 export interface LatLng {
   lat: number;
@@ -98,6 +107,8 @@ export type ClientMessage =
   | { type: 'hold'; droneIds: string[] }
   /** Lands the drones where they are; their tasks are dropped. A later move takes them up again. */
   | { type: 'land'; droneIds: string[] }
+  /** Sets the height above the ground and/or the cruise speed of the drones (at least one of the two). */
+  | { type: 'set_flight'; droneIds: string[]; altitudeAglM?: number; cruiseSpeedMs?: number }
   /** Drops one task (0 = the current one) from a drone's list. */
   | { type: 'remove_task'; droneId: string; index: number }
   /** Moves one task of a drone's list to another point. */
@@ -119,9 +130,13 @@ export interface SnapshotDrone {
   position: LatLng | null;
   heading: number | null;
   altitudeM: number | null;
+  /** Ground elevation under the drone (AMSL); null until online. */
+  groundM: number | null;
   speedMs: number;
   batteryPct: number;
   crabDeg: number;
+  altitudeAglM: number;
+  cruiseSpeedMs: number;
   /** Path flown for the current task list: where the drone set off, then each point it reached or turned at. */
   trail: LatLng[];
   /** Points the drone still has to fly to, the current one first. */
@@ -133,9 +148,12 @@ export type ServerMessage =
   | { type: 'mission_snapshot'; running: boolean; droneCount: number; drones: SnapshotDrone[] }
   | { type: 'drone_boot'; droneId: string; status: 'booting' | 'connecting'; progress: number }
   | { type: 'drone_online'; telemetry: DroneTelemetry }
-  | { type: 'position'; droneId: string; position: LatLng; heading: number; speedMs: number; altitudeM: number; batteryPct: number; crabDeg: number; }
+  /** `groundM`: ground elevation under the drone (AMSL), so its height above the ground is altitudeM - groundM. */
+  | { type: 'position'; droneId: string; position: LatLng; heading: number; speedMs: number; altitudeM: number; groundM: number; batteryPct: number; crabDeg: number; }
   /** A drone's task list and flown path. Sent only when they change; positions do not carry them. */
   | { type: 'drone_tasks'; droneId: string; trail: LatLng[]; tasks: LatLng[] }
+  /** The height above ground and cruise speed the drone keeps. Sent when it comes online and on a change. */
+  | { type: 'drone_settings'; droneId: string; altitudeAglM: number; cruiseSpeedMs: number }
   /** An online drone's state changed (see FlightStatus). Sent only on a change. */
   | { type: 'drone_status'; droneId: string; status: FlightStatus }
   | { type: 'mission_error'; reason: MissionErrorReason }
@@ -215,6 +233,18 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
   }
   if (message.type === 'land' && isDroneIds(message.droneIds)) {
     return { type: 'land', droneIds: message.droneIds };
+  }
+  if (message.type === 'set_flight' && isDroneIds(message.droneIds)) {
+    const inRange = (v: unknown, min: number, max: number) => v === undefined || (isFiniteNumber(v) && v >= min && v <= max);
+    const { altitudeAglM, cruiseSpeedMs } = message;
+    if (altitudeAglM === undefined && cruiseSpeedMs === undefined) return null;
+    if (!inRange(altitudeAglM, MIN_ALTITUDE_AGL_M, MAX_ALTITUDE_AGL_M) || !inRange(cruiseSpeedMs, MIN_CRUISE_SPEED_MS, MAX_CRUISE_SPEED_MS)) return null;
+    return {
+      type: 'set_flight',
+      droneIds: message.droneIds,
+      ...(altitudeAglM !== undefined ? { altitudeAglM: altitudeAglM as number } : {}),
+      ...(cruiseSpeedMs !== undefined ? { cruiseSpeedMs: cruiseSpeedMs as number } : {}),
+    };
   }
   if (message.type === 'remove_task' && isDroneId(message.droneId) && isTaskIndex(message.index)) {
     return { type: 'remove_task', droneId: message.droneId, index: message.index };

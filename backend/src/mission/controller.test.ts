@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_TASKS, type LatLng, type ServerMessage } from '../../../shared/protocol.js';
 import { createMissionController } from './controller.js';
+import { NO_TERRAIN, type Terrain } from '../terrain/terrain.js';
+import { toMetersFrom } from '../../../shared/mission/area.js';
 import { CONNECT_MS, BOOT_MS, STAGGER_MS } from './schedule.js';
 
 const area = { center: { lat: 50, lng: 30 }, widthKm: 200, heightKm: 200 };
@@ -239,10 +241,114 @@ describe('mission controller', () => {
         mission.handle({ type: 'remove_task', droneId: 'drone-1', index: 0 });
         mission.handle({ type: 'update_task', droneId: 'drone-1', index: 0, point: { lat: 50, lng: 30 } });
         mission.handle({ type: 'heading', droneIds: ['drone-1'], headingDeg: 90 });
+        mission.handle({ type: 'set_flight', droneIds: ['drone-1'], altitudeAglM: 100 });
         vi.advanceTimersByTime(5000);
         expect(sent).toEqual([]);
         mission.dispose();
       });
+    });
+  });
+
+  describe('height and speed', () => {
+    const positions = () => sent.filter((m) => m.type === 'position') as Extract<ServerMessage, { type: 'position' }>[];
+    function online(terrain: Terrain) {
+      const mission = createMissionController((m) => sent.push(m), undefined, terrain);
+      mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1 });
+      vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
+      return mission;
+    }
+
+    it('takes off from the ground the terrain gives and holds the set height above it', () => {
+      const mission = online({ elevationAt: () => 300 });
+      const first = sent.find((m) => m.type === 'drone_online');
+      expect(first?.type === 'drone_online' && first.telemetry.position_and_kinematics.gps.altitude_amsl_m).toBe(300);
+      expect(sent.find((m) => m.type === 'drone_settings')).toEqual({ type: 'drone_settings', droneId: 'drone-1', altitudeAglM: 60, cruiseSpeedMs: 10 });
+      vi.advanceTimersByTime(10_000);
+      expect(positions().at(-1)).toMatchObject({ altitudeM: 360, groundM: 300 });
+      mission.handle({ type: 'set_flight', droneIds: ['drone-1'], altitudeAglM: 200 });
+      expect(sent.at(-1)).toEqual({ type: 'drone_settings', droneId: 'drone-1', altitudeAglM: 200, cruiseSpeedMs: 10 });
+      vi.advanceTimersByTime(10_000);
+      expect(positions().at(-1)?.altitudeM).toBe(500);
+      mission.dispose();
+    });
+
+    it('follows rising and falling ground, climbing early enough to keep its height', () => {
+      // A ridge north of the start: up 10 % from 200 m, then down again past 50.04.
+      const ridge = (lat: number) => 200 + Math.max(0, Math.min(lat - 50.01, 50.07 - lat)) * 111_000 * 0.1;
+      const mission = online({ elevationAt: (p) => ridge(p.lat) });
+      vi.advanceTimersByTime(10_000);
+      mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.08, lng: 30 } });
+      sent = [];
+      vi.advanceTimersByTime(120_000);
+      const heights = positions().map((m) => m.altitudeM - ridge(m.position.lat));
+      expect(Math.min(...heights)).toBeGreaterThan(55);
+      expect(positions().every((m) => m.groundM === ridge(m.position.lat))).toBe(true);
+      expect(positions().at(-1)?.altitudeM).toBeCloseTo(260, 0);
+      mission.dispose();
+    });
+
+    it('starts climbing before a slope too steep to climb on the spot', () => {
+      // 50 % up for 400 m: steeper than the climb rate allows at cruise speed, so it must start early.
+      const ramp = (lat: number) => 200 + Math.max(0, Math.min((lat - 50.02) * 111_000, 400)) * 0.5;
+      const mission = online({ elevationAt: (p) => ramp(p.lat) });
+      vi.advanceTimersByTime(10_000);
+      mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.05, lng: 30 } });
+      sent = [];
+      vi.advanceTimersByTime(60_000);
+      const heights = positions().map((m) => m.altitudeM - ramp(m.position.lat));
+      expect(Math.min(...heights)).toBeGreaterThan(30);
+      mission.dispose();
+    });
+
+    it('never flies into the ground, even at a cliff too steep to climb in time', () => {
+      const cliff = (lat: number) => (lat > 50.02 ? 600 : 200);
+      const mission = online({ elevationAt: (p) => cliff(p.lat) });
+      vi.advanceTimersByTime(10_000);
+      mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.05, lng: 30 } });
+      sent = [];
+      vi.advanceTimersByTime(60_000);
+      expect(positions().every((m) => m.altitudeM >= cliff(m.position.lat))).toBe(true);
+      mission.dispose();
+    });
+
+    it('keeps the last known ground while the terrain under it is still unknown', () => {
+      let known = true;
+      const mission = online({ elevationAt: () => (known ? 300 : null) });
+      vi.advanceTimersByTime(10_000);
+      known = false;
+      vi.advanceTimersByTime(5000);
+      expect(positions().at(-1)).toMatchObject({ altitudeM: 360, groundM: 300 });
+      mission.dispose();
+    });
+
+    it('flies at the cruise speed set for it', () => {
+      const mission = online(NO_TERRAIN);
+      mission.handle({ type: 'set_flight', droneIds: ['drone-1'], cruiseSpeedMs: 25 });
+      mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 51, lng: 30 } });
+      sent = [];
+      vi.advanceTimersByTime(3000);
+      const [a, b] = positions().slice(-2);
+      expect(b.speedMs).toBe(25);
+      const { north } = toMetersFrom(a.position, b.position);
+      expect(north).toBeCloseTo(250, 0); // 25 m/s for 10 simulated seconds
+      mission.dispose();
+    });
+
+    it('lands on the ground under it', () => {
+      const mission = online({ elevationAt: () => 420 });
+      vi.advanceTimersByTime(10_000);
+      mission.handle({ type: 'land', droneIds: ['drone-1'] });
+      vi.advanceTimersByTime(10_000);
+      expect(positions().at(-1)).toMatchObject({ altitudeM: 420, groundM: 420, speedMs: 0 });
+      mission.dispose();
+    });
+
+    it('gives the ground, height and speed settings in the snapshot', () => {
+      const mission = online({ elevationAt: () => 300 });
+      mission.handle({ type: 'set_flight', droneIds: ['drone-1'], altitudeAglM: 120, cruiseSpeedMs: 15 });
+      const snap = mission.snapshot();
+      expect(snap.type === 'mission_snapshot' && snap.drones[0]).toMatchObject({ groundM: 300, altitudeAglM: 120, cruiseSpeedMs: 15 });
+      mission.dispose();
     });
   });
 

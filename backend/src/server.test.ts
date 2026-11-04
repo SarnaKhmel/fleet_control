@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import WebSocket from 'ws';
 import { createServer } from './server.js';
+import { NO_TERRAIN } from './terrain/terrain.js';
 
 describe('createServer', () => {
   let close: (() => void) | undefined;
@@ -8,7 +9,7 @@ describe('createServer', () => {
   afterEach(() => close?.());
 
   it('accepts WebSocket connections', async () => {
-    const wss = createServer(0);
+    const wss = createServer(0, NO_TERRAIN);
     close = () => wss.close();
     await new Promise<void>((resolve) => wss.on('listening', () => resolve()));
     const port = (wss.address() as { port: number }).port;
@@ -25,7 +26,7 @@ describe('createServer', () => {
 
 describe('mission over WebSocket', () => {
   it('sends an error for a start outside the mission area', async () => {
-    const wss = createServer(0);
+    const wss = createServer(0, NO_TERRAIN);
     await new Promise<void>((resolve) => wss.on('listening', () => resolve()));
     const port = (wss.address() as { port: number }).port;
     const socket = new WebSocket(`ws://localhost:${port}`);

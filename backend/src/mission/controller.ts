@@ -1,10 +1,11 @@
-import { MAX_TASKS, type ClientMessage, type FlightStatus, type LatLng, type MissionArea, type ServerMessage, type SnapshotDrone, type StartLayout } from '../../../shared/protocol.js';
+import { DEFAULT_ALTITUDE_AGL_M, DEFAULT_CRUISE_SPEED_MS, MAX_TASKS, type ClientMessage, type FlightStatus, type LatLng, type MissionArea, type ServerMessage, type SnapshotDrone, type StartLayout } from '../../../shared/protocol.js';
 import { BOOT_MS, buildSchedule, CONNECT_MS, DroneSchedule, resolveStarts } from './schedule.js';
 import { buildTelemetry } from './telemetry.js';
-import { toMetersFrom } from '../../../shared/mission/area.js';
+import { offsetLatLng, toMetersFrom } from '../../../shared/mission/area.js';
+import { NO_TERRAIN, type Terrain } from '../terrain/terrain.js';
 import { serverLog } from '../log.js';
 import { droneStateAt } from './schedule.js';
-import { bearingTo, BATTERY_DRAIN_PER_TICK, BATTERY_LINK_DRAIN_PER_TICK, CLIMB_RATE_MS, DRONE_SPEED_MS, formationTargets, GROUND_AMSL_M, HOVER_ALT_M, SIM_TIME_SCALE, TICK_MS, windStep } from './kinematics.js';
+import { bearingTo, BATTERY_DRAIN_PER_TICK, BATTERY_LINK_DRAIN_PER_TICK, CLIMB_RATE_MS, formationTargets, GROUND_AMSL_M, SIM_TIME_SCALE, TICK_MS, windStep } from './kinematics.js';
 
 // Interval between "booting" progress messages, ms: several steps per boot, so the bar moves smoothly.
 export const PROGRESS_STEP_MS = 250;
@@ -27,6 +28,12 @@ interface DroneState {
   /** Path flown for the current task list: where the drone set off, then every point it reached or turned at. */
   trail: LatLng[];
   altitudeM: number;
+  /** Ground elevation under the drone (AMSL): from the terrain, or the last known while its tile loads. */
+  groundM: number;
+  /** Height above the ground the drone keeps in the air, set by the operator. */
+  altitudeAglM: number;
+  /** Ground speed the drone flies at, set by the operator. */
+  cruiseSpeedMs: number;
   batteryPct: number;
   speedMs: number;
   crabDeg: number;
@@ -45,6 +52,9 @@ function statusOf(drone: DroneState): FlightStatus {
   return drone.target || drone.course !== null ? 'moving' : 'idle';
 }
 
+// Seconds of flight ahead whose ground the drone looks at to climb in time for rising terrain.
+export const LOOKAHEAD_S = 30;
+
 // The flown path keeps at most this many points (as many as a task list); the oldest are dropped.
 export const TRAIL_MAX_POINTS = MAX_TASKS;
 
@@ -62,6 +72,7 @@ function withTrailPoint(trail: LatLng[], point: LatLng): LatLng[] {
 export function createMissionController(
   broadcast: (message: ServerMessage) => void,
   now: () => string = () => new Date().toISOString(),
+  terrain: Terrain = NO_TERRAIN,
 ): MissionController {
   let timers: ReturnType<typeof setTimeout>[] = [];
   let ticker: ReturnType<typeof setInterval> | undefined;
@@ -92,8 +103,27 @@ export function createMissionController(
       broadcast({ type: 'drone_boot', droneId: entry.droneId, status: 'connecting', progress: 0 }),
     );
     later(entry.startAtMs + BOOT_MS + CONNECT_MS, () => {
-      drones.set(entry.droneId, { position: entry.start, heading: 0, target: null, course: null, route: [], trail: [], altitudeM: GROUND_AMSL_M, batteryPct: 100, speedMs: 0, crabDeg: 0, phase: 'air', status: 'idle' });
-      broadcast({ type: 'drone_online', telemetry: buildTelemetry(entry, now()) });
+      const groundM = terrain.elevationAt(entry.start) ?? GROUND_AMSL_M;
+      const drone: DroneState = {
+        position: entry.start,
+        heading: 0,
+        target: null,
+        course: null,
+        route: [],
+        trail: [],
+        altitudeM: groundM,
+        groundM,
+        altitudeAglM: DEFAULT_ALTITUDE_AGL_M,
+        cruiseSpeedMs: DEFAULT_CRUISE_SPEED_MS,
+        batteryPct: 100,
+        speedMs: 0,
+        crabDeg: 0,
+        phase: 'air',
+        status: 'idle',
+      };
+      drones.set(entry.droneId, drone);
+      broadcast({ type: 'drone_online', telemetry: buildTelemetry(entry, now(), groundM) });
+      reportSettings(entry.droneId, drone);
     });
   }
 
@@ -138,7 +168,7 @@ export function createMissionController(
     drone.phase = phase;
     drone.speedMs = 0;
     drone.crabDeg = 0;
-    drone.altitudeM = GROUND_AMSL_M;
+    drone.altitudeM = drone.groundM;
     drone.trail = withTrailPoint(drone.trail, drone.position);
     report(droneId, drone);
     reportTasks(droneId, drone);
@@ -160,11 +190,14 @@ export function createMissionController(
     const dtS = (TICK_MS / 1000) * SIM_TIME_SCALE;
     for (const [droneId, drone] of drones) {
       if (drone.phase === 'lost_link' || drone.phase === 'destroyed') continue;
+      drone.groundM = groundAt(drone, drone.position);
       if (drone.phase === 'landing') {
         drone.speedMs = 0;
         drone.crabDeg = 0;
-        drone.altitudeM = Math.max(GROUND_AMSL_M, drone.altitudeM - CLIMB_RATE_MS * dtS);
-        if (drone.altitudeM === GROUND_AMSL_M) drone.phase = 'landed';
+        drone.altitudeM = Math.max(drone.groundM, drone.altitudeM - CLIMB_RATE_MS * dtS);
+        if (drone.altitudeM === drone.groundM) drone.phase = 'landed';
+      } else if (drone.phase === 'landed') {
+        drone.altitudeM = drone.groundM;
       } else if (drone.phase === 'air') {
         flyStep(droneId, drone, dtS);
       }
@@ -179,14 +212,38 @@ export function createMissionController(
     }
   }
 
-  /** A drone in the air: climbs to hover altitude and takes a step toward its target or along its course. */
+  /** Ground elevation at a point for this drone: the terrain, or the ground under the drone while unknown. */
+  function groundAt(drone: DroneState, point: LatLng): number {
+    return terrain.elevationAt(point) ?? drone.groundM;
+  }
+
+  /**
+   * Holds the set height above the ground. It climbs early for rising ground: the target height counts
+   * the highest ground under the drone and LOOKAHEAD_S of flight ahead, and the climb rate is limited.
+   * It never goes below the ground under it.
+   */
+  function holdHeight(drone: DroneState, track: number | null, dtS: number) {
+    let ground = drone.groundM;
+    if (track !== null) {
+      const aheadM = drone.cruiseSpeedMs * LOOKAHEAD_S;
+      const rad = (track * Math.PI) / 180;
+      for (const share of [0.5, 1]) {
+        const point = offsetLatLng(drone.position, aheadM * share * Math.sin(rad), aheadM * share * Math.cos(rad));
+        ground = Math.max(ground, groundAt(drone, point));
+      }
+    }
+    const change = ground + drone.altitudeAglM - drone.altitudeM;
+    const maxStep = CLIMB_RATE_MS * dtS;
+    drone.altitudeM = Math.max(drone.groundM, drone.altitudeM + Math.max(-maxStep, Math.min(maxStep, change)));
+  }
+
+  /** A drone in the air: takes a step toward its target or along its course, keeping its height above ground. */
   function flyStep(droneId: string, drone: DroneState, dtS: number) {
-    if (drone.altitudeM < GROUND_AMSL_M + HOVER_ALT_M) drone.altitudeM = Math.min(GROUND_AMSL_M + HOVER_ALT_M, drone.altitudeM + CLIMB_RATE_MS * dtS);
     let crabDeg = 0;
     // Flying to a target or along a course: the nose is turned into the wind to hold the ground track.
     const track = drone.target ? bearingTo(drone.position, drone.target) : drone.course;
     if (track !== null) {
-      const step = windStep(drone.position, track, wind, DRONE_SPEED_MS, dtS);
+      const step = windStep(drone.position, track, wind, drone.cruiseSpeedMs, dtS);
       crabDeg = step.crabDeg;
       if (drone.target && distanceReached(drone.position, drone.target, step.groundSpeedMs * dtS)) {
         drone.position = drone.target;
@@ -200,8 +257,10 @@ export function createMissionController(
       }
       drone.heading = step.heading;
     }
-    drone.speedMs = drone.target || drone.course !== null ? DRONE_SPEED_MS : 0;
+    drone.speedMs = drone.target || drone.course !== null ? drone.cruiseSpeedMs : 0;
     drone.crabDeg = crabDeg;
+    drone.groundM = groundAt(drone, drone.position);
+    holdHeight(drone, drone.target || drone.course !== null ? track : null, dtS);
   }
 
   /** Sends the drone's position and flight state (many times a second across the fleet: kept small). */
@@ -213,9 +272,27 @@ export function createMissionController(
       heading: drone.heading,
       speedMs: drone.speedMs,
       altitudeM: drone.altitudeM,
+      groundM: drone.groundM,
       batteryPct: drone.batteryPct,
       crabDeg: drone.crabDeg,
     });
+  }
+
+  /** Sends the height above ground and cruise speed the drone keeps; called when they change. */
+  function reportSettings(droneId: string, drone: DroneState) {
+    broadcast({ type: 'drone_settings', droneId, altitudeAglM: drone.altitudeAglM, cruiseSpeedMs: drone.cruiseSpeedMs });
+  }
+
+  /** Sets the height above ground and/or cruise speed of the drones that take commands. */
+  function setFlight(droneIds: string[], altitudeAglM: number | undefined, cruiseSpeedMs: number | undefined) {
+    serverLog('set flight', { droneIds, altitudeAglM, cruiseSpeedMs });
+    for (const id of droneIds) {
+      const drone = commandable(id);
+      if (!drone) continue;
+      if (altitudeAglM !== undefined) drone.altitudeAglM = altitudeAglM;
+      if (cruiseSpeedMs !== undefined) drone.cruiseSpeedMs = cruiseSpeedMs;
+      reportSettings(id, drone);
+    }
   }
 
   /** Sends the drone's task list and flown path; called only when one of them changes. */
@@ -336,6 +413,8 @@ export function createMissionController(
     droneCount = count;
     startedAt = Date.now();
     schedule = buildSchedule(starts.points);
+    // Start loading the ground under the start points, so it is known when the drones come online.
+    for (const entry of schedule) terrain.elevationAt(entry.start);
     schedule.forEach(scheduleDrone);
     ticker = setInterval(tick, TICK_MS);
   }
@@ -366,6 +445,9 @@ export function createMissionController(
         position: live?.position ?? null,
         heading: live?.heading ?? null,
         altitudeM: live?.altitudeM ?? null,
+        groundM: live?.groundM ?? null,
+        altitudeAglM: live?.altitudeAglM ?? DEFAULT_ALTITUDE_AGL_M,
+        cruiseSpeedMs: live?.cruiseSpeedMs ?? DEFAULT_CRUISE_SPEED_MS,
         speedMs: live?.speedMs ?? 0,
         batteryPct: live?.batteryPct ?? 100,
         crabDeg: live?.crabDeg ?? 0,
@@ -391,6 +473,7 @@ export function createMissionController(
       else if (running && message.type === 'update_task') updateTask(message.droneId, message.index, message.point);
       else if (running && message.type === 'heading') setHeading(message.droneIds, message.headingDeg);
       else if (running && message.type === 'land') land(message.droneIds);
+      else if (running && message.type === 'set_flight') setFlight(message.droneIds, message.altitudeAglM, message.cruiseSpeedMs);
       else if (running && message.type === 'route') setRoute(message.droneId, message.points);
       // A command can start or stop a drone (idle <-> moving, landing): its new status goes out now.
       for (const [id, drone] of drones) syncStatus(id, drone);

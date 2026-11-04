@@ -5,6 +5,7 @@ import { useSelectionStore } from '../mission/selection';
 import { useMissionStore } from '../mission/missionStore';
 import { DroneDetails } from '../drones/DroneDetails';
 import { LandSelectedButton } from '../drones/LandSelectedButton';
+import { FlightSettings } from '../drones/FlightSettings';
 
 // One selected drone. It subscribes to that drone only, so other drones' updates do not re-render it.
 function SelectedDrone({ droneId, defaultOpen }: { droneId: string; defaultOpen: boolean }) {
@@ -55,6 +56,7 @@ export function RightPanel() {
           ×
         </button>
       </div>
+      {selectedIds.length > 0 && <FlightSettings />}
       {selectedIds.length > 0 && <LandSelectedButton />}
       {selectedIds.map((id) => (
         <SelectedDrone key={id} droneId={id} defaultOpen={selectedIds.length === 1} />

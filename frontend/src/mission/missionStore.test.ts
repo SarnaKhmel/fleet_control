@@ -57,7 +57,7 @@ describe('mission store', () => {
 
   it('applies boot messages to the roster without a position', () => {
     store().apply({ type: 'drone_boot', droneId: 'drone-1', status: 'booting', progress: 40 });
-    expect(store().drones['drone-1']).toEqual({ callsign: 'drone-1', status: 'booting', progress: 40, position: null, heading: null, altitudeM: null, speedMs: 0, batteryPct: 100, crabDeg: 0, trail: [], tasks: [] });
+    expect(store().drones['drone-1']).toEqual({ callsign: 'drone-1', status: 'booting', progress: 40, position: null, heading: null, altitudeM: null, groundM: null, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] });
   });
 
   it('takes the position and heading from the first telemetry', () => {
@@ -102,7 +102,7 @@ describe('mission store', () => {
   it('moves a known drone on position messages and keeps its tasks', () => {
     store().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
     store().apply({ type: 'drone_tasks', droneId: 'drone-1', trail: [{ lat: 50, lng: 30 }], tasks: [{ lat: 50.2, lng: 30.2 }] });
-    store().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 90, speedMs: 10, altitudeM: 210, batteryPct: 97, crabDeg: -4 });
+    store().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 90, speedMs: 10, altitudeM: 210, groundM: 150, batteryPct: 97, crabDeg: -4 });
     expect(store().drones['drone-1']).toMatchObject({ position: { lat: 50.1, lng: 30.1 }, heading: 90, trail: [{ lat: 50, lng: 30 }], tasks: [{ lat: 50.2, lng: 30.2 }] });
   });
 
@@ -118,7 +118,7 @@ describe('mission store', () => {
   it('takes the drone status from drone_status and keeps where it fell and its tasks', () => {
     store().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
     store().apply({ type: 'drone_tasks', droneId: 'drone-1', trail: [{ lat: 50, lng: 30 }, { lat: 50.1, lng: 30.1 }], tasks: [{ lat: 50.2, lng: 30.2 }] });
-    store().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 90, speedMs: 0, altitudeM: 150, batteryPct: 0, crabDeg: 0 });
+    store().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 90, speedMs: 0, altitudeM: 150, groundM: 150, batteryPct: 0, crabDeg: 0 });
     store().apply({ type: 'drone_status', droneId: 'drone-1', status: 'moving' });
     expect(store().drones['drone-1'].status).toBe('moving');
     store().apply({ type: 'drone_status', droneId: 'drone-1', status: 'destroyed' });
@@ -127,11 +127,22 @@ describe('mission store', () => {
     expect(store().drones['drone-9']).toBeUndefined();
   });
 
+  it('takes the ground under the drone from positions and its height and speed settings from drone_settings', () => {
+    store().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30, altitude_amsl_m: 300 }, relative_altitude_m: 0, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
+    expect(store().drones['drone-1']).toMatchObject({ altitudeM: 300, groundM: 300, altitudeAglM: 60, cruiseSpeedMs: 10 });
+    store().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30 }, heading: 0, speedMs: 10, altitudeM: 420, groundM: 330, batteryPct: 99, crabDeg: 0 });
+    expect(store().drones['drone-1']).toMatchObject({ altitudeM: 420, groundM: 330 });
+    store().apply({ type: 'drone_settings', droneId: 'drone-1', altitudeAglM: 150, cruiseSpeedMs: 20 });
+    expect(store().drones['drone-1']).toMatchObject({ altitudeAglM: 150, cruiseSpeedMs: 20, groundM: 330 });
+    store().apply({ type: 'drone_settings', droneId: 'drone-9', altitudeAglM: 150, cruiseSpeedMs: 20 });
+    expect(store().drones['drone-9']).toBeUndefined();
+  });
+
   it('treats missing or malformed task lists from the server as empty', () => {
     store().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
     store().apply({ type: 'drone_tasks', droneId: 'drone-1', trail: 'x', tasks: [{ lat: 'a' }] } as never);
     expect(store().drones['drone-1']).toMatchObject({ trail: [], tasks: [] });
-    store().apply({ type: 'mission_snapshot', running: true, drones: [{ droneId: 'drone-2', callsign: 'BA-02', status: 'idle', progress: 100, position: null, heading: null, altitudeM: null, speedMs: 0, batteryPct: 100, crabDeg: 0 }] } as never);
+    store().apply({ type: 'mission_snapshot', running: true, drones: [{ droneId: 'drone-2', callsign: 'BA-02', status: 'idle', progress: 100, position: null, heading: null, altitudeM: null, groundM: null, speedMs: 0, batteryPct: 100, crabDeg: 0 }] } as never);
     expect(store().drones['drone-2']).toMatchObject({ trail: [], tasks: [] });
   });
 
@@ -155,7 +166,7 @@ describe('mission store', () => {
       type: 'mission_snapshot',
       running: true,
       droneCount: 5,
-      drones: [{ droneId: 'drone-1', callsign: 'BA-01', status: 'idle', progress: 100, position: { lat: 50, lng: 30 }, heading: 10, altitudeM: 210, speedMs: 0, batteryPct: 99, crabDeg: 0, trail: [], tasks: [] }],
+      drones: [{ droneId: 'drone-1', callsign: 'BA-01', status: 'idle', progress: 100, position: { lat: 50, lng: 30 }, heading: 10, altitudeM: 210, groundM: 150, speedMs: 0, batteryPct: 99, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] }],
     });
     expect(store().phase).toBe('running');
     expect(store().droneCount).toBe(5);

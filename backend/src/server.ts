@@ -1,12 +1,13 @@
 import { WebSocket, WebSocketServer } from 'ws';
 import { parseClientMessage, type ServerMessage } from '../../shared/protocol.js';
 import { createMissionController } from './mission/controller.js';
+import { createTerrain, type Terrain } from './terrain/terrain.js';
 
 export const DEFAULT_PORT = 8080;
 
 // WebSocket server for the dashboard. Mission messages are validated and handled by the mission
 // controller; every server message goes to all connected clients (one shared mission).
-export function createServer(port = DEFAULT_PORT): WebSocketServer {
+export function createServer(port = DEFAULT_PORT, terrain: Terrain = createTerrain()): WebSocketServer {
   const wss = new WebSocketServer({ port });
   const broadcast = (message: ServerMessage) => {
     const data = JSON.stringify(message);
@@ -14,7 +15,7 @@ export function createServer(port = DEFAULT_PORT): WebSocketServer {
       if (client.readyState === WebSocket.OPEN) client.send(data);
     }
   };
-  const mission = createMissionController(broadcast);
+  const mission = createMissionController(broadcast, undefined, terrain);
 
   wss.on('connection', (socket) => {
     // A client that connects or reconnects during a mission gets the current state first.

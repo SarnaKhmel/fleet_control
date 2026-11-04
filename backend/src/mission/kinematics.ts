@@ -1,15 +1,16 @@
 import { offsetLatLng, toMetersFrom } from '../../../shared/mission/area.js';
 import { windCorrection } from '../../../shared/flight/wind.js';
-import { GROUND_AMSL_M, type LatLng } from '../../../shared/protocol.js';
+import { DEFAULT_ALTITUDE_AGL_M, DEFAULT_CRUISE_SPEED_MS, GROUND_AMSL_M, type LatLng } from '../../../shared/protocol.js';
 
 export { GROUND_AMSL_M };
 
-export const DRONE_SPEED_MS = 10;
+/** Default cruise speed; each drone's own can be set by the operator. */
+export const DRONE_SPEED_MS = DEFAULT_CRUISE_SPEED_MS;
 export const TICK_MS = 1000;
 // Simulated time runs this many times faster than real time, so drones visibly cross the map.
 export const SIM_TIME_SCALE = 10;
 // Takeoff: drones climb from the ground to a hover altitude, then keep it until they are given a move.
-export const HOVER_ALT_M = 60;
+export const HOVER_ALT_M = DEFAULT_ALTITUDE_AGL_M;
 export const CLIMB_RATE_MS = 3;
 // Simulated battery use in the air (flying or hovering): a full charge lasts about 40 minutes of mission time.
 export const BATTERY_DRAIN_PER_TICK = 100 / (40 * 60);

@@ -104,7 +104,7 @@ describe('MapView', () => {
     expect(marker.lngLat).toEqual([30, 50]);
     const before = renders;
     act(() => {
-      useMissionStore.getState().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 0, speedMs: 10, altitudeM: 210, batteryPct: 99, crabDeg: 0 });
+      useMissionStore.getState().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 0, speedMs: 10, altitudeM: 210, groundM: 150, batteryPct: 99, crabDeg: 0 });
     });
     expect(marker.lngLat).toEqual([30.1, 50.1]);
     expect(renders).toBe(before);

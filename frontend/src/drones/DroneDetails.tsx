@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { GROUND_AMSL_M, takesCommands } from '../../../shared/protocol';
+import { takesCommands } from '../../../shared/protocol';
 import { Accordion } from '../sidebar/Accordion';
 import { batteryLevel } from '../mission/battery';
 import type { DroneView } from '../mission/missionStore';
@@ -28,7 +28,8 @@ export function DroneDetails({ droneId, drone, defaultOpen }: DroneDetailsProps)
   const { t } = useTranslation();
   const callsign = drone?.callsign ?? droneId;
   const online = takesCommands(drone?.status) && drone?.altitudeM != null;
-  const altitude = online ? `${Math.round(drone!.altitudeM! - GROUND_AMSL_M)} m` : '—';
+  // Height above the ground under the drone, which follows the terrain.
+  const altitude = online && drone!.groundM !== null ? `${Math.round(drone!.altitudeM! - drone!.groundM)} m` : '—';
   const battery = drone ? `${Math.round(drone.batteryPct)}%` : '—';
   const status = drone?.status ? t(`mission.status.${drone.status}`) : t('mission.status.offline');
   // A drone that is out (lost link, destroyed) lies where it came down: its spot and unfinished route stay on view.
@@ -47,6 +48,8 @@ export function DroneDetails({ droneId, drone, defaultOpen }: DroneDetailsProps)
         <dd>{status}</dd>
         <dt>{t('drone.altitude')}</dt>
         <dd>{altitude}</dd>
+        <dt>{t('drone.settings')}</dt>
+        <dd>{online ? `${drone!.altitudeAglM} m · ${drone!.cruiseSpeedMs} m/s` : '—'}</dd>
         <dt>{t('drone.heading')}</dt>
         <dd>{online && drone?.heading !== null ? `${Math.round(drone!.heading!)}°` : '—'}</dd>
         <dt>{t('drone.speed')}</dt>

@@ -9,7 +9,7 @@ vi.mock('../mission/missionSocket', async (importOriginal) => ({
   landSelectedDrones: vi.fn(),
 }));
 
-const drone = (status: DroneView['status']): DroneView => ({ callsign: 'BA-01', status, progress: 100, position: { lat: 50, lng: 30 }, heading: 0, altitudeM: 210, speedMs: 0, batteryPct: 100, crabDeg: 0, trail: [], tasks: [] });
+const drone = (status: DroneView['status']): DroneView => ({ callsign: 'BA-01', status, progress: 100, position: { lat: 50, lng: 30 }, heading: 0, altitudeM: 210, groundM: 150, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] });
 
 describe('LandSelectedButton', () => {
   beforeEach(() => {

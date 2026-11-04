@@ -6,7 +6,7 @@ import { toMetersFrom } from '../../../shared/mission/area';
 import { useWindStore } from '../wind/windStore';
 import { debugLog } from '../log';
 
-const SERVER_TYPES = new Set(['mission_snapshot', 'drone_boot', 'drone_online', 'position', 'drone_tasks', 'drone_status', 'mission_error', 'mission_reset']);
+const SERVER_TYPES = new Set(['mission_snapshot', 'drone_boot', 'drone_online', 'position', 'drone_tasks', 'drone_status', 'drone_settings', 'mission_error', 'mission_reset']);
 
 /** Parses a server message, or null for anything unknown or malformed. Trust boundary for the client. */
 export function parseServerMessage(raw: unknown): ServerMessage | null {
@@ -110,6 +110,18 @@ export function landSelectedDrones(): number {
   const droneIds = landableSelected(useMissionStore.getState().drones, useSelectionStore.getState().selectedIds);
   if (droneIds.length === 0) return 0;
   return sendClientMessage({ type: 'land', droneIds }) ? droneIds.length : 0;
+}
+
+/** Selected drones whose height and speed can be set: those that take commands. */
+export function commandableSelected(drones: Record<string, { status: string }>, selectedIds: string[]): string[] {
+  return selectedIds.filter((id) => takesCommands(drones[id]?.status));
+}
+
+/** Sets the height above ground and/or cruise speed of the selected drones. Returns how many were sent. */
+export function setSelectedFlight(settings: { altitudeAglM?: number; cruiseSpeedMs?: number }): number {
+  const droneIds = commandableSelected(useMissionStore.getState().drones, useSelectionStore.getState().selectedIds);
+  if (droneIds.length === 0) return 0;
+  return sendClientMessage({ type: 'set_flight', droneIds, ...settings }) ? droneIds.length : 0;
 }
 
 /** Drops all of a drone's tasks: it hovers where it is. */

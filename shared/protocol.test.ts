@@ -82,6 +82,20 @@ describe('parseClientMessage', () => {
     expect(parseClientMessage({ type: 'land', droneIds: Array.from({ length: MAX_DRONES + 1 }, (_, i) => `drone-${i}`) })).toBeNull();
   });
 
+  it('accepts set_flight with a height and/or a speed inside their ranges', () => {
+    const ids = ['drone-1'];
+    expect(parseClientMessage({ type: 'set_flight', droneIds: ids, altitudeAglM: 120 })).toEqual({ type: 'set_flight', droneIds: ids, altitudeAglM: 120 });
+    expect(parseClientMessage({ type: 'set_flight', droneIds: ids, cruiseSpeedMs: 15 })).toEqual({ type: 'set_flight', droneIds: ids, cruiseSpeedMs: 15 });
+    expect(parseClientMessage({ type: 'set_flight', droneIds: ids, altitudeAglM: 20, cruiseSpeedMs: 30, extra: 1 })).toEqual({ type: 'set_flight', droneIds: ids, altitudeAglM: 20, cruiseSpeedMs: 30 });
+    expect(parseClientMessage({ type: 'set_flight', droneIds: ids })).toBeNull();
+    expect(parseClientMessage({ type: 'set_flight', droneIds: ids, altitudeAglM: 19 })).toBeNull();
+    expect(parseClientMessage({ type: 'set_flight', droneIds: ids, altitudeAglM: 501 })).toBeNull();
+    expect(parseClientMessage({ type: 'set_flight', droneIds: ids, cruiseSpeedMs: 2 })).toBeNull();
+    expect(parseClientMessage({ type: 'set_flight', droneIds: ids, cruiseSpeedMs: 31 })).toBeNull();
+    expect(parseClientMessage({ type: 'set_flight', droneIds: ids, cruiseSpeedMs: '10' })).toBeNull();
+    expect(parseClientMessage({ type: 'set_flight', droneIds: [], altitudeAglM: 100 })).toBeNull();
+  });
+
   it('tells which drones take commands and which are in the air', () => {
     expect(['idle', 'moving', 'landing', 'landed', 'lost_link', 'destroyed', 'booting', null].map(takesCommands)).toEqual([true, true, true, true, false, false, false, false]);
     expect(['idle', 'moving', 'landing', 'landed', 'lost_link', 'destroyed', 'booting', null].map(isAirborne)).toEqual([true, true, true, false, false, false, false, false]);

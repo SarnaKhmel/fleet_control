@@ -11,10 +11,12 @@ const drone: DroneView = {
   progress: 100,
   position: { lat: 50.1, lng: 30.2 },
   heading: 92,
-  altitudeM: 210,
+  altitudeM: 210, groundM: 150,
   speedMs: 10,
   batteryPct: 88,
   crabDeg: -4,
+  altitudeAglM: 60,
+  cruiseSpeedMs: 10,
   trail: [],
   tasks: [],
 };
@@ -77,7 +79,7 @@ describe('DroneDetails', () => {
   });
 
   it('keeps warning about the battery of a landed drone, which still takes commands', () => {
-    render(<DroneDetails droneId="drone-1" drone={{ ...drone, status: 'landed', altitudeM: 150, batteryPct: 20 }} defaultOpen />);
+    render(<DroneDetails droneId="drone-1" drone={{ ...drone, status: 'landed', altitudeM: 150, groundM: 150, batteryPct: 20 }} defaultOpen />);
     expect(screen.getByText('landed')).toBeTruthy();
     expect(screen.getByRole('alert').className).toContain('is-low');
     expect(screen.getByText('0 m · 20%')).toBeTruthy();

@@ -4,8 +4,8 @@ import { RightPanel } from './RightPanel';
 import { useMissionStore, type DroneView } from '../mission/missionStore';
 import { useSelectionStore } from '../mission/selection';
 
-const drone = (callsign: string): DroneView => ({ callsign, status: 'idle', progress: 100, position: { lat: 50, lng: 30 }, heading: 0, altitudeM: 210, speedMs: 0, batteryPct: 100, crabDeg: 0, trail: [], tasks: [] });
-const position = (droneId: string, heading: number) => ({ type: 'position' as const, droneId, position: { lat: 50.1, lng: 30 }, heading, speedMs: 10, altitudeM: 210, batteryPct: 99, crabDeg: 0 });
+const drone = (callsign: string): DroneView => ({ callsign, status: 'idle', progress: 100, position: { lat: 50, lng: 30 }, heading: 0, altitudeM: 210, groundM: 150, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] });
+const position = (droneId: string, heading: number) => ({ type: 'position' as const, droneId, position: { lat: 50.1, lng: 30 }, heading, speedMs: 10, altitudeM: 210, groundM: 150, batteryPct: 99, crabDeg: 0 });
 
 describe('RightPanel', () => {
   beforeEach(() => {

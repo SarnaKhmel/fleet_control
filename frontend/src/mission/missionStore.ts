@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import {
+  DEFAULT_ALTITUDE_AGL_M,
+  DEFAULT_CRUISE_SPEED_MS,
   DEFAULT_DRONE_COUNT,
   MAX_DRONES,
   isLatLng,
@@ -27,6 +29,12 @@ export interface DroneView {
   position: LatLng | null;
   /** Altitude above sea level, meters; null until online. */
   altitudeM: number | null;
+  /** Ground elevation under the drone (AMSL); its height above the ground is altitudeM - groundM. */
+  groundM: number | null;
+  /** Height above the ground the drone keeps in the air, as set by the operator. */
+  altitudeAglM: number;
+  /** Cruise speed the drone flies at, as set by the operator. */
+  cruiseSpeedMs: number;
   speedMs: number;
   batteryPct: number;
   /** Crab angle: how far the nose is turned into the wind, degrees (negative = left). */
@@ -178,6 +186,9 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
               position: null,
               heading: null,
               altitudeM: null,
+              groundM: null,
+              altitudeAglM: prev?.altitudeAglM ?? DEFAULT_ALTITUDE_AGL_M,
+              cruiseSpeedMs: prev?.cruiseSpeedMs ?? DEFAULT_CRUISE_SPEED_MS,
               speedMs: 0,
               batteryPct: 100,
               crabDeg: 0,
@@ -202,6 +213,10 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
               },
               heading: message.telemetry.position_and_kinematics.heading_deg,
               altitudeM: message.telemetry.position_and_kinematics.gps.altitude_amsl_m,
+              // It comes online on the ground: the ground is where it stands.
+              groundM: message.telemetry.position_and_kinematics.gps.altitude_amsl_m - (message.telemetry.position_and_kinematics.relative_altitude_m ?? 0),
+              altitudeAglM: get().drones[message.telemetry.meta.drone_id]?.altitudeAglM ?? DEFAULT_ALTITUDE_AGL_M,
+              cruiseSpeedMs: get().drones[message.telemetry.meta.drone_id]?.cruiseSpeedMs ?? DEFAULT_CRUISE_SPEED_MS,
               speedMs: 0,
               batteryPct: message.telemetry.power_system.battery_remaining_pct,
               crabDeg: 0,
@@ -222,6 +237,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
               position: message.position,
               heading: message.heading,
               altitudeM: message.altitudeM,
+              groundM: message.groundM,
               speedMs: message.speedMs,
               batteryPct: message.batteryPct,
               crabDeg: message.crabDeg,
@@ -241,6 +257,12 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
         });
         return;
       }
+      case 'drone_settings': {
+        const drone = get().drones[message.droneId];
+        if (!drone) return;
+        set({ drones: { ...get().drones, [message.droneId]: { ...drone, altitudeAglM: message.altitudeAglM, cruiseSpeedMs: message.cruiseSpeedMs } } });
+        return;
+      }
       case 'drone_status': {
         const drone = get().drones[message.droneId];
         if (!drone) return;
@@ -257,6 +279,9 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
             position: d.position,
             heading: d.heading,
             altitudeM: d.altitudeM,
+            groundM: d.groundM ?? null,
+            altitudeAglM: d.altitudeAglM ?? DEFAULT_ALTITUDE_AGL_M,
+            cruiseSpeedMs: d.cruiseSpeedMs ?? DEFAULT_CRUISE_SPEED_MS,
             speedMs: d.speedMs,
             batteryPct: d.batteryPct,
             crabDeg: d.crabDeg,

@@ -157,7 +157,7 @@
   "drone": {
     "panelTitle": "Drones",
     "status": "Status",
-    "altitude": "Altitude",
+    "altitude": "Height above ground",
     "heading": "Heading",
     "speed": "Ground speed",
     "crab": "Crab angle",
@@ -177,6 +177,11 @@
     },
     "tasksUnfinished": "Route it did not finish:",
     "land": "Land ({{count}})",
-    "landHint": "Land the selected drones where they are. A click on the map takes them up again."
+    "landHint": "Land the selected drones where they are. A click on the map takes them up again.",
+    "settings": "Set",
+    "flight": "Flight",
+    "flightAltitude": "Height above ground, m",
+    "flightSpeed": "Speed, m/s",
+    "flightApply": "Apply ({{count}})"
   }
 }
