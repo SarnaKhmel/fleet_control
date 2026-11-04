@@ -1,4 +1,5 @@
 import ms from 'milsymbol';
+import type { UnitKind, UnitSide } from '../../../shared/mission/units';
 
 // NATO APP-6 / MIL-STD-2525 symbols, generated from SIDC codes by milsymbol.
 // Letter SIDC layout: S <affiliation> <dimension> <status> <function...>.
@@ -25,15 +26,35 @@ export function targetSidc(status: TargetStatus): string {
 // Generic control point (tactical graphic: dot between two bars), APP-6 family GGGPGPC.
 export const CONTROL_POINT_SIDC = 'GGGPGPC-----';
 
-export function natoSymbol(sidc: string, size = 32) {
-  return new ms.Symbol(sidc, { size });
+// Ground unit function codes (MIL-STD-2525C), and a modifier for a unit dug in at a position
+// (installation). EW is "signals intelligence / electronic warfare"; radar is ground sensor equipment.
+const UNIT_FUNCTION: Record<UnitKind, string> = {
+  infantry: 'UCI---',
+  position: 'UCI---',
+  vehicle: 'UCA---',
+  artillery: 'UCF---',
+  air_defense: 'UCD---',
+  ew: 'UUMSE-',
+  radar: 'ESR---',
+};
+
+/** Ground unit: hostile for the enemy, friendly for allies. */
+export function unitSidc(side: UnitSide, kind: UnitKind): string {
+  const affiliation = side === 'enemy' ? 'H' : 'F';
+  const modifier = kind === 'position' ? 'H-' : '--';
+  return `S${affiliation}GP${UNIT_FUNCTION[kind]}${modifier}---`;
+}
+
+/** `direction`: the direction-of-movement arrow, degrees, for a unit on the move. */
+export function natoSymbol(sidc: string, size = 32, direction?: number) {
+  return new ms.Symbol(sidc, direction === undefined ? { size } : { size, direction });
 }
 
 /** Symbol as a DOM element, for use as a MapLibre marker. */
-export function natoElement(sidc: string, size = 32): HTMLElement {
+export function natoElement(sidc: string, size = 32, direction?: number): HTMLElement {
   const el = document.createElement('div');
   el.className = 'nato-symbol';
-  el.innerHTML = natoSymbol(sidc, size).asSVG();
+  el.innerHTML = natoSymbol(sidc, size, direction).asSVG();
   return el;
 }
 

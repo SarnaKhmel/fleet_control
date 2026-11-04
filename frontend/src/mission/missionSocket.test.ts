@@ -28,6 +28,8 @@ describe('parseServerMessage', () => {
   it('accepts new seen ground', () => {
     const recon = { type: 'recon_cells', grid: { origin: { lat: 50, lng: 30 }, cellM: 100 }, cells: [[0, 1]] };
     expect(parseServerMessage(JSON.stringify(recon))).toEqual(recon);
+    const units = { type: 'units', units: [{ id: 'enemy-1', side: 'enemy', kind: 'radar', position: { lat: 50, lng: 30 }, headingDeg: null, speedMs: 0, source: 'intel', detectedByDroneId: null }] };
+    expect(parseServerMessage(JSON.stringify(units))).toEqual(units);
   });
 
   it('drops unknown types, bad JSON and non-strings', () => {

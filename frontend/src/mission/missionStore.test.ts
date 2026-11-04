@@ -162,6 +162,22 @@ describe('mission store', () => {
     expect(store()).toMatchObject({ reconGrid: null, reconCells: [] });
   });
 
+  it('keeps the known units by id: a newer report replaces one, a snapshot replaces all, a reset or new start clears them', () => {
+    const enemy = { id: 'enemy-1', side: 'enemy' as const, kind: 'vehicle' as const, position: { lat: 50.1, lng: 30 }, headingDeg: 90, speedMs: 6, source: 'drone' as const, detectedByDroneId: 'drone-1' };
+    const ally = { ...enemy, id: 'ally-1', side: 'ally' as const, kind: 'infantry' as const, headingDeg: null, speedMs: 0, source: 'intel' as const, detectedByDroneId: null };
+    store().apply({ type: 'units', units: [enemy, ally] });
+    store().apply({ type: 'units', units: [{ ...enemy, position: { lat: 50.2, lng: 30 } }] });
+    expect(Object.keys(store().units)).toEqual(['enemy-1', 'ally-1']);
+    expect(store().units['enemy-1'].position).toEqual({ lat: 50.2, lng: 30 });
+    store().apply({ type: 'mission_snapshot', running: true, droneCount: 3, drones: [], units: [ally] });
+    expect(Object.keys(store().units)).toEqual(['ally-1']);
+    store().apply({ type: 'mission_reset' });
+    expect(store().units).toEqual({});
+    store().apply({ type: 'units', units: [enemy] });
+    store().markStarting();
+    expect(store().units).toEqual({});
+  });
+
   it('treats missing or malformed task lists from the server as empty', () => {
     store().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
     store().apply({ type: 'drone_tasks', droneId: 'drone-1', trail: 'x', tasks: [{ lat: 'a' }] } as never);

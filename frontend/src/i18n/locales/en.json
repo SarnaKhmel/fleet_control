@@ -77,6 +77,14 @@
     "targetConfirmed": "Target confirmed — hostile",
     "targetEngaged": "Target engaged — hostile",
     "targetNeutralized": "Target neutralized — destroyed",
+    "enemyInfantry": "Enemy infantry",
+    "enemyPosition": "Enemy dug-in position",
+    "enemyVehicle": "Enemy armoured vehicles (the arrow: on the move, where to)",
+    "enemyArtillery": "Enemy artillery",
+    "enemyAirDefense": "Enemy air defence",
+    "enemyEw": "Enemy electronic warfare",
+    "enemyRadar": "Enemy radar",
+    "allyInfantry": "Allied unit (sees 2 km around)",
     "wind": "Wind compass: the arrow shows where the wind blows toward; speed in m/s"
   },
   "frontLine": {
@@ -188,5 +196,26 @@
     "flightApply": "Apply ({{count}})",
     "range": "Range",
     "rangeHint": "How far it can still fly on its charge at its cruise speed: against the wind and with it"
+  },
+  "unit": {
+    "side": {
+      "enemy": "Enemy",
+      "ally": "Ally"
+    },
+    "kind": {
+      "infantry": "infantry",
+      "position": "dug-in position",
+      "vehicle": "armoured vehicles",
+      "artillery": "artillery",
+      "air_defense": "air defence",
+      "ew": "electronic warfare",
+      "radar": "radar"
+    },
+    "source": {
+      "intel": "known from intelligence",
+      "drone": "found by {{callsign}}",
+      "ally": "seen by allies"
+    },
+    "moving": "moving {{speed}} km/h, course {{heading}}°"
   }
 }

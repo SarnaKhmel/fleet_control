@@ -23,6 +23,7 @@ import { addRangeLayer, syncRange } from '../mission/rangeLayer';
 import { addReconLayer, syncRecon } from '../mission/reconLayer';
 import { useWindStore } from '../wind/windStore';
 import { syncTaskMarkers } from '../mission/taskMarkers';
+import { syncUnitMarkers } from '../mission/unitMarkers';
 import { headOnlineDronesToward, moveOnlineDrones } from '../mission/missionSocket';
 import { dronesInScreenBox, useSelectionStore, type ScreenPoint } from '../mission/selection';
 import { boxesOverlap, boxOf, registerZoneFitter, zoneBoxOf } from '../mission/zoneView';
@@ -250,10 +251,19 @@ export function MapView() {
       syncWaypoints(map, drones, selectedIds, theme);
       syncTaskMarkers(map, drones, selectedIds);
     };
+    // Known enemy and allied units: they change only when one is found or one in sight moves.
+    const syncUnits = () => {
+      const { units, drones } = useMissionStore.getState();
+      syncUnitMarkers(map, units, (droneId) => drones[droneId]?.callsign ?? droneId);
+    };
     sync();
+    syncUnits();
     const unsubscribe = [
       useMissionStore.subscribe((state, previous) => {
         if (state.drones !== previous.drones) sync();
+      }),
+      useMissionStore.subscribe((state, previous) => {
+        if (state.units !== previous.units) syncUnits();
       }),
       useSelectionStore.subscribe((state, previous) => {
         if (state.selectedIds !== previous.selectedIds) sync();

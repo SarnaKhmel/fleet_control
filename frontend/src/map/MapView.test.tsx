@@ -138,6 +138,26 @@ describe('MapView', () => {
     useMissionStore.setState({ phase: 'idle', drones: {}, reconGrid: null, reconCells: [] });
   });
 
+  it('puts a found enemy on the map and follows it, without re-rendering the map component', () => {
+    useMissionStore.setState({ phase: 'running', drones: {}, units: {} });
+    let renders = 0;
+    render(
+      <Profiler id="map" onRender={() => renders++}>
+        <MapView />
+      </Profiler>,
+    );
+    const before = renders;
+    const enemy = { id: 'enemy-1', side: 'enemy' as const, kind: 'vehicle' as const, position: { lat: 50.2, lng: 30.1 }, headingDeg: 0, speedMs: 6, source: 'ally' as const, detectedByDroneId: null };
+    act(() => useMissionStore.getState().apply({ type: 'units', units: [enemy] }));
+    const marker = markerInstances.at(-1)!;
+    expect(marker.element?.getAttribute('aria-label')).toMatch(/^Enemy: armoured vehicles/);
+    act(() => useMissionStore.getState().apply({ type: 'units', units: [{ ...enemy, position: { lat: 50.21, lng: 30.1 } }] }));
+    expect(marker.lngLat).toEqual([30.1, 50.21]);
+    expect(renders).toBe(before);
+    act(() => useMissionStore.getState().apply({ type: 'mission_reset' }));
+    expect(marker.added).toBe(false);
+  });
+
   it('updates drone paths while map tiles are still loading', () => {
     useMissionStore.setState({ phase: 'running', drones: {} });
     render(<MapView />);

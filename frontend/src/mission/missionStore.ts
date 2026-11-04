@@ -17,6 +17,7 @@ import {
 } from '../../../shared/protocol';
 import { areaFromCorners, areaRing, isInsideArea } from '../../../shared/mission/area';
 import type { ReconCell, ReconGrid } from '../../../shared/mission/recon';
+import type { MissionUnit } from '../../../shared/mission/units';
 import { DEFAULT_CENTER } from '../map/mapStyles';
 import { useLocationStore } from '../location/locationStore';
 
@@ -77,6 +78,8 @@ export interface MissionState {
   reconGrid: ReconGrid | null;
   /** Cells seen so far, each once (the server sends only new ones). */
   reconCells: ReconCell[];
+  /** Enemy and allied units known so far, by id; an enemy out of sight stays where it was last seen. */
+  units: Record<string, MissionUnit>;
   error: MissionErrorReason | null;
   setCenter: (center: LatLng | null) => void;
   setSize: (widthKm: number, heightKm: number) => void;
@@ -150,6 +153,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   drones: {},
   reconGrid: null,
   reconCells: [],
+  units: {},
   error: null,
   setCenter: (center) => (locked(get) ? undefined : set({ center, zoneChosen: true })),
   setSize: (widthKm, heightKm) => (locked(get) ? undefined : set({ widthKm, heightKm, zoneChosen: true })),
@@ -184,7 +188,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   },
   clearPoints: () => (locked(get) ? undefined : set({ points: [] })),
   // Setup modes end with the start: their buttons lock, and a left-on mode would swallow every map click.
-  markStarting: () => set({ phase: 'running', drones: {}, reconGrid: null, reconCells: [], error: null, picking: false, drawing: false, drawAnchor: null, drawCursor: null }),
+  markStarting: () => set({ phase: 'running', drones: {}, reconGrid: null, reconCells: [], units: {}, error: null, picking: false, drawing: false, drawAnchor: null, drawCursor: null }),
   apply: (message) => {
     switch (message.type) {
       case 'drone_boot': {
@@ -292,6 +296,12 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
         set({ drones: { ...get().drones, [message.droneId]: { ...drone, status: message.status, cause: message.cause ?? null } } });
         return;
       }
+      case 'units': {
+        const units = { ...get().units };
+        for (const unit of message.units) units[unit.id] = unit;
+        set({ units });
+        return;
+      }
       case 'recon_cells':
         set({ reconGrid: message.grid, reconCells: [...get().reconCells, ...message.cells] });
         return;
@@ -324,6 +334,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
           error: null,
           reconGrid: message.recon?.grid ?? null,
           reconCells: message.recon?.cells ?? [],
+          units: Object.fromEntries((message.units ?? []).map((unit) => [unit.id, unit])),
           ...(message.running ? { droneCount: message.droneCount } : {}),
         });
         return;
@@ -332,7 +343,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
         set({ phase: 'idle', error: message.reason });
         return;
       case 'mission_reset':
-        set({ phase: 'idle', drones: {}, reconGrid: null, reconCells: [], error: null });
+        set({ phase: 'idle', drones: {}, reconGrid: null, reconCells: [], units: {}, error: null });
         return;
     }
   },
