@@ -43,7 +43,11 @@
     "title": "Вітер",
     "label": "{{speed}} м/с на {{dir}} ({{deg}}°)",
     "loading": "Завантаження вітру…",
-    "unavailable": "Вітер недоступний"
+    "unavailable": "Вітер недоступний",
+    "temperature": "Температура повітря",
+    "humidity": "Відносна вологість",
+    "tempValue": "{{value}}°C",
+    "humidityValue": "{{value}}%"
   },
   "compass": {
     "N": "Пн",
@@ -57,7 +61,9 @@
   },
   "menu": {
     "open": "Меню",
-    "legend": "Умовні позначки"
+    "legend": "Умовні позначки",
+    "title": "Меню",
+    "close": "Закрити"
   },
   "legend": {
     "title": "Умовні позначки",

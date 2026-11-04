@@ -43,7 +43,11 @@
     "title": "Wind",
     "label": "{{speed}} m/s toward {{dir}} ({{deg}}°)",
     "loading": "Loading wind…",
-    "unavailable": "Wind unavailable"
+    "unavailable": "Wind unavailable",
+    "temperature": "Air temperature",
+    "humidity": "Relative humidity",
+    "tempValue": "{{value}}°C",
+    "humidityValue": "{{value}}%"
   },
   "compass": {
     "N": "N",
@@ -57,7 +61,9 @@
   },
   "menu": {
     "open": "Menu",
-    "legend": "Legend"
+    "legend": "Legend",
+    "title": "Menu",
+    "close": "Close"
   },
   "legend": {
     "title": "Legend",
