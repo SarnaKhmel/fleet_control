@@ -19,8 +19,21 @@ export function missionRing(state: MissionState) {
 }
 
 
-/** Draws or updates the zone rectangle. */
+/** Removes the zone rectangle from the map. */
+export function removeMissionArea(map: MapLibreMap): void {
+  if (map.getLayer(MISSION_LINE_ID)) map.removeLayer(MISSION_LINE_ID);
+  if (map.getSource(MISSION_SOURCE_ID)) map.removeSource(MISSION_SOURCE_ID);
+}
+
+/**
+ * Draws the zone only while it is being drawn or while a mission runs.
+ * Before the start the zone exists in the state (for validation) but is not on the map.
+ */
 export function syncMissionArea(map: MapLibreMap, state: MissionState, theme: Theme): void {
+  if (!state.drawing && state.phase !== 'running') {
+    removeMissionArea(map);
+    return;
+  }
   const data = {
     type: 'FeatureCollection',
     features: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [missionRing(state).map((p) => [p.lng, p.lat])] } }],

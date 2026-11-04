@@ -6,7 +6,8 @@ import { useMissionStore } from './missionStore';
 export function ZoneReturnButton() {
   const { t } = useTranslation();
   const visible = useMissionStore((state) => state.zoneVisible);
-  if (visible) return null;
+  const running = useMissionStore((state) => state.phase === 'running');
+  if (visible || !running) return null;
   return (
     <button type="button" className="zone-return" onClick={fitMissionZone}>
       {t('mission.backToZone')}

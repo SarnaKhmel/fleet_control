@@ -11,12 +11,12 @@ describe('ZoneReturnButton', () => {
     const { rerender } = render(<ZoneReturnButton />);
     expect(screen.queryByRole('button', { name: 'Back to mission zone' })).toBeNull();
 
-    useMissionStore.setState({ zoneVisible: false });
+    useMissionStore.setState({ zoneVisible: false, phase: 'running' });
     rerender(<ZoneReturnButton />);
     fireEvent.click(screen.getByRole('button', { name: 'Back to mission zone' }));
     expect(fit).toHaveBeenCalled();
 
     registerZoneFitter(null);
-    useMissionStore.setState({ zoneVisible: true });
+    useMissionStore.setState({ zoneVisible: true, phase: 'idle' });
   });
 });

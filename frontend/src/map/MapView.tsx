@@ -162,15 +162,20 @@ export function MapView() {
   const frontEnabled = useFrontLineStore((state) => state.enabled);
   const frontZones = useFrontLineStore((state) => state.zones);
   const missionCenter = useMissionStore((state) => state.center);
+  const missionPhase = useMissionStore((state) => state.phase);
+  const missionDrawing = useMissionStore((state) => state.drawing);
   const missionWidth = useMissionStore((state) => state.widthKm);
   const missionHeight = useMissionStore((state) => state.heightKm);
   const drawCursor = useMissionStore((state) => state.drawCursor);
   const drawAnchor = useMissionStore((state) => state.drawAnchor);
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    syncMissionArea(map, useMissionStore.getState(), theme);
-  }, [missionCenter, missionWidth, missionHeight, drawCursor, drawAnchor, theme]);
+    if (!map) return;
+    // isStyleLoaded can stay false for a moment after a source change; run once the map is idle.
+    const run = () => syncMissionArea(map, useMissionStore.getState(), theme);
+    if (map.isStyleLoaded()) run();
+    else map.once('idle', run);
+  }, [missionCenter, missionWidth, missionHeight, missionPhase, missionDrawing, drawCursor, drawAnchor, theme]);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
