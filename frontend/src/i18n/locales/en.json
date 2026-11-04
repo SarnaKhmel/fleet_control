@@ -106,6 +106,11 @@
       "booting": "booting",
       "connecting": "connecting",
       "idle": "online"
-    }
+    },
+    "draw": "Draw zone on map",
+    "drawingOn": "Drawing: click the map (stop)",
+    "drawFirst": "Click the first corner.",
+    "drawSecond": "Click the opposite corner.",
+    "backToZone": "Back to mission zone"
   }
 }

@@ -53,4 +53,15 @@ describe('mission store', () => {
     store().apply({ type: 'mission_reset' });
     expect(store().drones).toEqual({});
   });
+
+  it('draws a zone from two clicks and sets its center and size', () => {
+    store().setDrawing(true);
+    store().drawClick({ lat: 50, lng: 30 });
+    expect(store().drawAnchor).toEqual({ lat: 50, lng: 30 });
+    store().drawClick({ lat: 50.1, lng: 30.2 });
+    expect(store().drawing).toBe(false);
+    expect(store().drawAnchor).toBeNull();
+    expect(store().widthKm).toBeGreaterThan(1);
+    expect(store().heightKm).toBeGreaterThan(1);
+  });
 });

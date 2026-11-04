@@ -38,3 +38,14 @@ export function areaRing(area: MissionArea): LatLng[] {
   const ring = corners.map(([e, n]) => offsetLatLng(area.center, e, n));
   return [...ring, ring[0]];
 }
+
+/** Zone from two opposite corners: its center and size in km, sizes clamped to [1, max] km. */
+export function areaFromCorners(a: LatLng, b: LatLng, maxKm: number): { center: LatLng; widthKm: number; heightKm: number } {
+  const { east, north } = toMetersFrom(a, b);
+  const clamp = (km: number) => Math.min(maxKm, Math.max(1, km));
+  return {
+    center: offsetLatLng(a, east / 2, north / 2),
+    widthKm: clamp(Math.abs(east) / 1000),
+    heightKm: clamp(Math.abs(north) / 1000),
+  };
+}

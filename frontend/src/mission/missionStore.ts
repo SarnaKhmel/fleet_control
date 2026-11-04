@@ -2,12 +2,13 @@ import { create } from 'zustand';
 import {
   DRONE_COUNT,
   MISSION_DEFAULT_AREA_KM,
+  MISSION_MAX_AREA_KM,
   type LatLng,
   type MissionErrorReason,
   type ServerMessage,
   type StartLayout,
 } from '../../../shared/protocol';
-import { isInsideArea, areaRing } from '../../../shared/mission/area';
+import { areaFromCorners, areaRing, isInsideArea } from '../../../shared/mission/area';
 import { DEFAULT_CENTER } from '../map/mapStyles';
 import { useLocationStore } from '../location/locationStore';
 
@@ -31,6 +32,12 @@ export interface MissionState {
   points: LatLng[];
   clusterRadiusM: number;
   picking: boolean;
+  /** Drawing the zone: two clicks give opposite corners. */
+  drawing: boolean;
+  drawAnchor: LatLng | null;
+  drawCursor: LatLng | null;
+  /** Whether the zone is at least partly on screen (set by the map). */
+  zoneVisible: boolean;
   phase: MissionPhase;
   drones: Record<string, DroneView>;
   error: MissionErrorReason | null;
@@ -39,6 +46,11 @@ export interface MissionState {
   setLayoutKind: (kind: LayoutKind) => void;
   setClusterRadius: (meters: number) => void;
   setPicking: (picking: boolean) => void;
+  setDrawing: (drawing: boolean) => void;
+  /** Map click while drawing: the first click sets a corner, the second closes the zone. */
+  drawClick: (point: LatLng) => void;
+  setDrawCursor: (point: LatLng | null) => void;
+  setZoneVisible: (visible: boolean) => void;
   addPoint: (point: LatLng) => void;
   clearPoints: () => void;
   apply: (message: ServerMessage) => void;
@@ -76,6 +88,10 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   points: [],
   clusterRadiusM: 500,
   picking: false,
+  drawing: false,
+  drawAnchor: null,
+  drawCursor: null,
+  zoneVisible: true,
   phase: 'idle',
   drones: {},
   error: null,
@@ -84,6 +100,18 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   setLayoutKind: (layoutKind) => set({ layoutKind, points: [] }),
   setClusterRadius: (clusterRadiusM) => set({ clusterRadiusM }),
   setPicking: (picking) => set({ picking }),
+  setDrawing: (drawing) => set({ drawing, drawAnchor: null, drawCursor: null }),
+  drawClick: (point) => {
+    const { drawAnchor } = get();
+    if (!drawAnchor) {
+      set({ drawAnchor: point, drawCursor: point });
+      return;
+    }
+    const zone = areaFromCorners(drawAnchor, point, MISSION_MAX_AREA_KM);
+    set({ ...zone, drawing: false, drawAnchor: null, drawCursor: null });
+  },
+  setDrawCursor: (drawCursor) => set({ drawCursor }),
+  setZoneVisible: (zoneVisible) => set({ zoneVisible }),
   addPoint: (point) => {
     const { layoutKind, points } = get();
     const max = layoutKind === 'separate' ? DRONE_COUNT : 1;

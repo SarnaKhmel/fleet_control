@@ -39,6 +39,12 @@ export function MissionPanel() {
 
       <fieldset>
         <legend>{t('mission.area')}</legend>
+        <button type="button" aria-pressed={state.drawing} onClick={() => state.setDrawing(!state.drawing)}>
+          {state.drawing ? t('mission.drawingOn') : t('mission.draw')}
+        </button>
+        {state.drawing && (
+          <span className="muted">{state.drawAnchor ? t('mission.drawSecond') : t('mission.drawFirst')}</span>
+        )}
         <label>
           {t('mission.width')}
           <input type="number" min={1} max={500} value={state.widthKm} onChange={(e) => state.setSize(Number(e.target.value), state.heightKm)} />

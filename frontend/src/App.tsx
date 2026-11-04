@@ -4,6 +4,7 @@ import { MapIssueBanner } from './map/MapIssueBanner';
 import { FrontLineAttribution } from './frontline/FrontLineAttribution';
 import { ScaleBar } from './map/ScaleBar';
 import { MissionPanel } from './mission/MissionPanel';
+import { ZoneReturnButton } from './mission/ZoneReturnButton';
 import { LocationPanel } from './location/LocationPanel';
 import { WindCompass } from './wind/WindCompass';
 
@@ -17,6 +18,7 @@ export function App() {
         <FrontLineAttribution />
         <ScaleBar />
         <MissionPanel />
+        <ZoneReturnButton />
         <LocationPanel />
         <WindCompass />
       </main>

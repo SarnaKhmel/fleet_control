@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { areaRing, isInsideArea, offsetLatLng, toMetersFrom } from './area';
+import { areaFromCorners, areaRing, isInsideArea, offsetLatLng, toMetersFrom } from './area';
 
 const area = { center: { lat: 50, lng: 30 }, widthKm: 200, heightKm: 200 };
 
@@ -30,5 +30,22 @@ describe('areaRing', () => {
     const m = toMetersFrom(area.center, p);
     expect(m.east).toBeCloseTo(12_000, -1);
     expect(m.north).toBeCloseTo(-7_000, -1);
+  });
+});
+
+describe('areaFromCorners', () => {
+  it('builds the zone between two opposite corners', () => {
+    const z = areaFromCorners({ lat: 50, lng: 30 }, offsetLatLng({ lat: 50, lng: 30 }, 40_000, 20_000), 500);
+    expect(z.widthKm).toBeCloseTo(40, 0);
+    expect(z.heightKm).toBeCloseTo(20, 0);
+    const mid = toMetersFrom({ lat: 50, lng: 30 }, z.center);
+    expect(mid.east).toBeCloseTo(20_000, -1);
+    expect(mid.north).toBeCloseTo(10_000, -1);
+  });
+
+  it('clamps the size to the allowed range', () => {
+    const z = areaFromCorners({ lat: 50, lng: 30 }, offsetLatLng({ lat: 50, lng: 30 }, 900_000, 0.2), 500);
+    expect(z.widthKm).toBe(500);
+    expect(z.heightKm).toBe(1);
   });
 });

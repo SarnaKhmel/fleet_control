@@ -14,9 +14,11 @@ import { metersPerPixel } from './scale';
 import { useMapIssueStore } from './mapIssue';
 import { syncFrontLine } from '../frontline/frontLine';
 import { syncMissionArea } from '../mission/missionLayer';
-import { useMissionStore } from '../mission/missionStore';
+import { effectiveCenter, useMissionStore } from '../mission/missionStore';
 import { syncStartMarkers } from '../mission/startMarkers';
 import { syncDroneMarkers } from '../mission/droneMarkers';
+import { boxesOverlap, boxOf, registerZoneFitter, zoneBoxOf } from '../mission/zoneView';
+import { areaRing } from '../../../shared/mission/area';
 import { useSymbolStyleStore } from '../mission/symbolStyle';
 import { useFrontLineStore } from '../frontline/frontLine';
 import { CONTROL_POINT_SIDC, natoElement } from '../symbology/nato';
@@ -84,9 +86,35 @@ export function MapView() {
     });
     map.on('click', (event) => {
       const point = { lat: event.lngLat.lat, lng: event.lngLat.lng };
-      // While picking start points, clicks set the mission start instead of the location.
-      if (useMissionStore.getState().picking) useMissionStore.getState().addPoint(point);
+      const mission = useMissionStore.getState();
+      // Mode clicks take priority: zone drawing, then start points, else the location.
+      if (mission.drawing) mission.drawClick(point);
+      else if (mission.picking) mission.addPoint(point);
       else useLocationStore.getState().select(point);
+    });
+    // Tell the UI whether the mission zone is still on screen, and register the "back to zone" action.
+    const updateZoneVisibility = () => {
+      const mission = useMissionStore.getState();
+      const b = map.getBounds();
+      const view = { west: b.getWest(), east: b.getEast(), south: b.getSouth(), north: b.getNorth() };
+      const zone = zoneBoxOf(effectiveCenter(mission), mission.widthKm, mission.heightKm);
+      mission.setZoneVisible(boxesOverlap(view, zone));
+    };
+    map.on('move', updateZoneVisibility);
+    registerZoneFitter(() => {
+      const mission = useMissionStore.getState();
+      const z = boxOf(areaRing({ center: effectiveCenter(mission), widthKm: mission.widthKm, heightKm: mission.heightKm }));
+      map.fitBounds(
+        [
+          [z.west, z.south],
+          [z.east, z.north],
+        ],
+        { padding: 24, duration: 800 },
+      );
+    });
+    map.on('mousemove', (event) => {
+      const mission = useMissionStore.getState();
+      if (mission.drawing && mission.drawAnchor) mission.setDrawCursor({ lat: event.lngLat.lat, lng: event.lngLat.lng });
     });
     mapRef.current = map;
     styleRef.current = style;
@@ -126,11 +154,13 @@ export function MapView() {
   const missionCenter = useMissionStore((state) => state.center);
   const missionWidth = useMissionStore((state) => state.widthKm);
   const missionHeight = useMissionStore((state) => state.heightKm);
+  const drawCursor = useMissionStore((state) => state.drawCursor);
+  const drawAnchor = useMissionStore((state) => state.drawAnchor);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
     syncMissionArea(map, useMissionStore.getState(), theme);
-  }, [missionCenter, missionWidth, missionHeight, theme]);
+  }, [missionCenter, missionWidth, missionHeight, drawCursor, drawAnchor, theme]);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
