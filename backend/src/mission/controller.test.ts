@@ -60,6 +60,14 @@ describe('mission controller', () => {
     mission.dispose();
   });
 
+  it('brings all three drones online within four seconds', () => {
+    const mission = createMissionController((m) => sent.push(m));
+    mission.handle({ type: 'mission_start', area, layout: single });
+    vi.advanceTimersByTime(4000);
+    expect(sent.filter((m) => m.type === 'drone_online')).toHaveLength(3);
+    mission.dispose();
+  });
+
   it('moves an online drone toward a target and reports positions', () => {
     const mission = createMissionController((m) => sent.push(m));
     mission.handle({ type: 'mission_start', area, layout: single });
@@ -78,8 +86,11 @@ describe('mission controller', () => {
     const mission = createMissionController((m) => sent.push(m));
     mission.handle({ type: 'mission_start', area, layout: single });
     mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.02, lng: 30 } });
-    vi.advanceTimersByTime(3000);
-    expect(sent.some((m) => m.type === 'position')).toBe(false);
+    // Once online, the drone only climbs: the move it got while booting was not kept.
+    vi.advanceTimersByTime(BOOT_MS + CONNECT_MS + 3000);
+    const last = sent.filter((m) => m.type === 'position' && m.droneId === 'drone-1').at(-1);
+    expect(last && last.type === 'position' && last.position).toEqual(single.point);
+    expect(last && last.type === 'position' && last.tasks).toEqual([]);
     mission.dispose();
   });
 

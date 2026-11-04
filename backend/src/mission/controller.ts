@@ -6,8 +6,8 @@ import { serverLog } from '../log.js';
 import { droneStateAt } from './schedule.js';
 import { bearingTo, BATTERY_DRAIN_PER_TICK, CLIMB_RATE_MS, DRONE_SPEED_MS, formationTargets, GROUND_AMSL_M, HOVER_ALT_M, SIM_TIME_SCALE, TICK_MS, windStep } from './kinematics.js';
 
-// Interval between "booting" progress messages, simulated ms.
-export const PROGRESS_STEP_MS = 1000;
+// Interval between "booting" progress messages, ms: several steps per boot, so the bar moves smoothly.
+export const PROGRESS_STEP_MS = 250;
 
 export interface MissionController {
   handle(message: ClientMessage): void;

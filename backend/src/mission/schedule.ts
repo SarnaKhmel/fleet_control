@@ -1,10 +1,12 @@
 import { DRONE_COUNT, type DroneStatus, type LatLng, type MissionArea, type StartLayout } from '../../../shared/protocol.js';
 import { isInsideArea } from '../../../shared/mission/area.js';
 
-// Timeline of the mission start. All timings are simulated milliseconds since mission_start.
-export const STAGGER_MS = 3000;
-export const BOOT_MS = 4000;
-export const CONNECT_MS = 2000;
+// Timeline of the mission start, in milliseconds since mission_start. Short on purpose: it is a
+// simulation, so the stages (booting, connecting, online, one drone after another) only need to be
+// visible, not realistic. All three drones are online after 2 × STAGGER_MS + BOOT_MS + CONNECT_MS = 4 s.
+export const STAGGER_MS = 1000;
+export const BOOT_MS = 1500;
+export const CONNECT_MS = 500;
 
 export interface DroneSchedule {
   droneId: string;
