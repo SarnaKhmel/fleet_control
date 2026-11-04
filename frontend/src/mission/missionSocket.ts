@@ -25,18 +25,31 @@ export function missionSocketUrl(): string {
 }
 
 let socket: WebSocket | null = null;
+let retryTimer: ReturnType<typeof setTimeout> | undefined;
+let retryDelayMs = 1000;
+const MAX_RETRY_DELAY_MS = 10_000;
 
-/** Opens the connection once and routes server messages into the mission store. */
-export function startMissionSocket(url = missionSocketUrl()): void {
-  if (socket) return;
+function connect(url: string) {
   socket = new WebSocket(url);
+  socket.onopen = () => {
+    retryDelayMs = 1000;
+  };
   socket.onmessage = (event) => {
     const message = parseServerMessage(event.data);
     if (message) useMissionStore.getState().apply(message);
   };
   socket.onclose = () => {
     socket = null;
+    // Reconnect with a growing pause, so a restarted server is picked up without a page reload.
+    retryTimer = setTimeout(() => connect(url), retryDelayMs);
+    retryDelayMs = Math.min(retryDelayMs * 2, MAX_RETRY_DELAY_MS);
   };
+}
+
+/** Opens the connection and keeps it alive: reconnects after the server restarts. */
+export function startMissionSocket(url = missionSocketUrl()): void {
+  if (socket || retryTimer) return;
+  connect(url);
 }
 
 /** Sends an intent to the server. Returns false when not connected. */
