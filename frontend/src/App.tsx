@@ -5,6 +5,7 @@ import { FrontLineAttribution } from './frontline/FrontLineAttribution';
 import { ScaleBar } from './map/ScaleBar';
 import { ZoneReturnButton } from './mission/ZoneReturnButton';
 import { Sidebar } from './sidebar/Sidebar';
+import { SettingsPanel } from './components/SettingsPanel';
 
 export function App() {
   return (
@@ -12,6 +13,7 @@ export function App() {
       <Header />
       <div className="workspace">
         <Sidebar />
+        <SettingsPanel />
       <main className="map-area">
         <MapView />
         <MapIssueBanner />

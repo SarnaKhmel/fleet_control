@@ -969,3 +969,125 @@ body,
   background: var(--panel);
   border: 1px solid var(--border);
 }
+
+/* Header gear and the settings drawer on the right. */
+.gear-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.gear-button:hover,
+.gear-button[aria-expanded='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+
+.settings-group {
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.settings-group h3 {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.settings-row select,
+.settings-row button {
+  min-height: 2rem;
+  padding: 0 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings-row button:hover,
+.settings-row select:hover {
+  border-color: var(--accent);
+}
+
+.settings-row button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Right-side settings panel: same surface and layout as the left side panel. */
+.sidebar.sidebar-right {
+  left: auto;
+  right: 0;
+  border-right: none;
+  border-left: 1px solid var(--border);
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.25);
+}
+
+.sidebar-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sidebar-right .sidebar-top {
+  justify-content: space-between;
+}
+
+.sidebar-right .settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.sidebar-right .settings-row span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.sidebar-right .settings-row select,
+.sidebar-right .settings-row button {
+  min-height: 2rem;
+  padding: 0 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.sidebar-right .settings-row button:hover,
+.sidebar-right .settings-row select:hover {
+  border-color: var(--accent);
+}
+
+.sidebar-right .settings-row button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}

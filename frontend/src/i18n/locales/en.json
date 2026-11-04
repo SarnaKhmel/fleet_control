@@ -127,5 +127,16 @@
     "location": "Location",
     "collapse": "Collapse panel",
     "expand": "Expand panel"
+  },
+  "settings": {
+    "open": "Settings",
+    "title": "Settings",
+    "close": "Close settings",
+    "general": "General",
+    "theme": "Theme",
+    "map": "Map",
+    "buildings": "3D buildings",
+    "frontLine": "Front line",
+    "drones": "Drones"
   }
 }
