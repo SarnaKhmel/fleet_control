@@ -1,4 +1,5 @@
 import { offsetLatLng, toMetersFrom } from '../../../shared/mission/area.js';
+import { windCorrection } from '../../../shared/flight/wind.js';
 import { GROUND_AMSL_M, type LatLng } from '../../../shared/protocol.js';
 
 export { GROUND_AMSL_M };
@@ -33,4 +34,35 @@ export function formationTargets(center: LatLng, count: number): LatLng[] {
 export function advanceAlong(from: LatLng, headingDeg: number, distanceM: number): LatLng {
   const rad = (headingDeg * Math.PI) / 180;
   return offsetLatLng(from, distanceM * Math.sin(rad), distanceM * Math.cos(rad));
+}
+
+/** Bearing (degrees clockwise from north) from one point to another. */
+export function bearingTo(from: LatLng, to: LatLng): number {
+  const { east, north } = toMetersFrom(from, to);
+  return ((Math.atan2(east, north) * 180) / Math.PI + 360) % 360;
+}
+
+/**
+ * One step of flight along a desired ground track in a wind. The nose is turned into the wind by the
+ * crab angle that keeps the ground track; the drone then advances by its ground speed. If the wind is too
+ * strong to hold the track, the drone flies its nose along the track and is pushed off it.
+ */
+export function windStep(
+  position: LatLng,
+  trackDeg: number,
+  wind: { speedMs: number; fromDeg: number },
+  airspeedMs: number,
+  dtS: number,
+): { position: LatLng; heading: number; crabDeg: number; groundSpeedMs: number } {
+  const corr = windCorrection(trackDeg, airspeedMs, wind);
+  if (!corr.feasible) {
+    const pushed = advanceAlong(position, trackDeg, airspeedMs * dtS);
+    return { position: pushed, heading: trackDeg, crabDeg: 0, groundSpeedMs: airspeedMs };
+  }
+  return {
+    position: advanceAlong(position, trackDeg, corr.groundSpeedMs * dtS),
+    heading: corr.headingDeg,
+    crabDeg: corr.correctionDeg,
+    groundSpeedMs: corr.groundSpeedMs,
+  };
 }

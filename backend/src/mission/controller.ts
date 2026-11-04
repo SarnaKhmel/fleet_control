@@ -1,8 +1,9 @@
 import type { ClientMessage, LatLng, MissionArea, ServerMessage, StartLayout } from '../../../shared/protocol.js';
 import { BOOT_MS, buildSchedule, CONNECT_MS, DroneSchedule, resolveStarts } from './schedule.js';
 import { buildTelemetry } from './telemetry.js';
+import { toMetersFrom } from '../../../shared/mission/area.js';
 import { droneStateAt } from './schedule.js';
-import { advanceAlong, BATTERY_DRAIN_PER_TICK, CLIMB_RATE_MS, DRONE_SPEED_MS, formationTargets, GROUND_AMSL_M, HOVER_ALT_M, stepToward, TICK_MS } from './kinematics.js';
+import { bearingTo, BATTERY_DRAIN_PER_TICK, CLIMB_RATE_MS, DRONE_SPEED_MS, formationTargets, GROUND_AMSL_M, HOVER_ALT_M, TICK_MS, windStep } from './kinematics.js';
 
 // Interval between "booting" progress messages, simulated ms.
 export const PROGRESS_STEP_MS = 1000;
@@ -23,6 +24,7 @@ interface DroneState {
   altitudeM: number;
   batteryPct: number;
   speedMs: number;
+  crabDeg: number;
 }
 
 /**
@@ -37,6 +39,8 @@ export function createMissionController(
   let ticker: ReturnType<typeof setInterval> | undefined;
   let running = false;
   let startedAt = 0;
+  // Wind at the mission location, as last reported by the dashboard (Open-Meteo, 10 m).
+  let wind = { speedMs: 0, fromDeg: 0 };
   let schedule: DroneSchedule[] = [];
   const drones = new Map<string, DroneState>();
 
@@ -59,9 +63,15 @@ export function createMissionController(
       broadcast({ type: 'drone_boot', droneId: entry.droneId, status: 'connecting', progress: 0 }),
     );
     later(entry.startAtMs + BOOT_MS + CONNECT_MS, () => {
-      drones.set(entry.droneId, { position: entry.start, heading: 0, target: null, course: null, altitudeM: GROUND_AMSL_M, batteryPct: 100, speedMs: 0 });
+      drones.set(entry.droneId, { position: entry.start, heading: 0, target: null, course: null, altitudeM: GROUND_AMSL_M, batteryPct: 100, speedMs: 0, crabDeg: 0 });
       broadcast({ type: 'drone_online', telemetry: buildTelemetry(entry, now()) });
     });
+  }
+
+  /** True when a step of `stepM` meters reaches the target. */
+  function distanceReached(from: LatLng, to: LatLng, stepM: number): boolean {
+    const { east, north } = toMetersFrom(from, to);
+    return Math.hypot(east, north) <= stepM;
   }
 
   /** One simulated second: climbing drones gain altitude; drones with a target take a step toward it. */
@@ -71,17 +81,23 @@ export function createMissionController(
       if (climbing) drone.altitudeM = Math.min(GROUND_AMSL_M + HOVER_ALT_M, drone.altitudeM + CLIMB_RATE_MS * (TICK_MS / 1000));
       const moving = drone.target !== null || drone.course !== null;
       if (!moving && !climbing) continue;
-      const stepM = DRONE_SPEED_MS * (TICK_MS / 1000);
-      if (drone.target) {
-        const step = stepToward(drone.position, drone.target, stepM);
-        drone.position = step.position;
+      const dtS = TICK_MS / 1000;
+      let crabDeg = 0;
+      // Flying to a target or along a course: the nose is turned into the wind to hold the ground track.
+      const track = drone.target ? bearingTo(drone.position, drone.target) : drone.course;
+      if (track !== null) {
+        const step = windStep(drone.position, track, wind, DRONE_SPEED_MS, dtS);
+        crabDeg = step.crabDeg;
+        if (drone.target && distanceReached(drone.position, drone.target, step.groundSpeedMs * dtS)) {
+          drone.position = drone.target;
+          drone.target = null;
+        } else {
+          drone.position = step.position;
+        }
         drone.heading = step.heading;
-        if (step.arrived) drone.target = null;
-      } else if (drone.course !== null) {
-        drone.position = advanceAlong(drone.position, drone.course, stepM);
-        drone.heading = drone.course;
       }
       drone.speedMs = drone.target || drone.course !== null ? DRONE_SPEED_MS : 0;
+      drone.crabDeg = crabDeg;
       drone.batteryPct = Math.max(0, drone.batteryPct - BATTERY_DRAIN_PER_TICK);
       broadcast({
         type: 'position',
@@ -91,6 +107,7 @@ export function createMissionController(
         speedMs: drone.speedMs,
         altitudeM: drone.altitudeM,
         batteryPct: drone.batteryPct,
+        crabDeg,
       });
     }
   }
@@ -161,6 +178,7 @@ export function createMissionController(
         altitudeM: live?.altitudeM ?? null,
         speedMs: live?.speedMs ?? 0,
         batteryPct: live?.batteryPct ?? 100,
+        crabDeg: live?.crabDeg ?? 0,
       });
     }
     return { type: 'mission_snapshot', running: true, drones: list };
@@ -169,7 +187,8 @@ export function createMissionController(
   return {
     snapshot,
     handle(message) {
-      if (message.type === 'mission_start') start(message.area, message.layout);
+      if (message.type === 'wind') wind = { speedMs: message.speedMs, fromDeg: message.fromDeg };
+      else if (message.type === 'mission_start') start(message.area, message.layout);
       else if (message.type === 'mission_reset') {
         stop();
         broadcast({ type: 'mission_reset' });

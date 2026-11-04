@@ -123,4 +123,18 @@ describe('mission controller', () => {
     expect(last.type === 'position' && last.heading).toBe(0);
     mission.dispose();
   });
+
+  it('turns the nose into a crosswind so the drone still tracks the target', () => {
+    const mission = createMissionController((m) => sent.push(m));
+    mission.handle({ type: 'wind', speedMs: 3, fromDeg: 270 }); // wind blows east, pushing a northbound drone right
+    mission.handle({ type: 'mission_start', area, layout: single });
+    vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
+    sent = [];
+    mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.02, lng: 30 } });
+    vi.advanceTimersByTime(2000);
+    const last = sent.filter((m) => m.type === 'position' && m.droneId === 'drone-1').at(-1);
+    expect(last && last.type === 'position' && last.crabDeg).toBeLessThan(-10);
+    expect(last && last.type === 'position' && last.heading).toBeGreaterThan(330);
+    mission.dispose();
+  });
 });

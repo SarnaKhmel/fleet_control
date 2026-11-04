@@ -57,7 +57,8 @@ export type ClientMessage =
   | { type: 'mission_start'; area: MissionArea; layout: StartLayout }
   | { type: 'mission_reset' }
   | { type: 'move'; droneIds: string[]; target: LatLng }
-  | { type: 'heading'; droneIds: string[]; headingDeg: number };
+  | { type: 'heading'; droneIds: string[]; headingDeg: number }
+  | { type: 'wind'; speedMs: number; fromDeg: number };
 
 // ---- Server → client ----
 
@@ -74,13 +75,14 @@ export interface SnapshotDrone {
   altitudeM: number | null;
   speedMs: number;
   batteryPct: number;
+  crabDeg: number;
 }
 
 export type ServerMessage =
   | { type: 'mission_snapshot'; running: boolean; drones: SnapshotDrone[] }
   | { type: 'drone_boot'; droneId: string; status: 'booting' | 'connecting'; progress: number }
   | { type: 'drone_online'; telemetry: DroneTelemetry }
-  | { type: 'position'; droneId: string; position: LatLng; heading: number; speedMs: number; altitudeM: number; batteryPct: number }
+  | { type: 'position'; droneId: string; position: LatLng; heading: number; speedMs: number; altitudeM: number; batteryPct: number; crabDeg: number }
   | { type: 'mission_error'; reason: MissionErrorReason }
   | { type: 'mission_reset' };
 
@@ -132,6 +134,9 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
   }
   if (message.type === 'move' && isDroneIds(message.droneIds) && isLatLng(message.target)) {
     return { type: 'move', droneIds: message.droneIds, target: message.target };
+  }
+  if (message.type === 'wind' && isFiniteNumber(message.speedMs) && message.speedMs >= 0 && message.speedMs <= 60 && isFiniteNumber(message.fromDeg) && message.fromDeg >= 0 && message.fromDeg < 360) {
+    return { type: 'wind', speedMs: message.speedMs, fromDeg: message.fromDeg };
   }
   if (message.type === 'heading' && isDroneIds(message.droneIds) && isFiniteNumber(message.headingDeg) && message.headingDeg >= 0 && message.headingDeg < 360) {
     return { type: 'heading', droneIds: message.droneIds, headingDeg: message.headingDeg };

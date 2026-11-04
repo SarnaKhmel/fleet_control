@@ -25,6 +25,8 @@ export interface DroneView {
   altitudeM: number | null;
   speedMs: number;
   batteryPct: number;
+  /** Crab angle: how far the nose is turned into the wind, degrees (negative = left). */
+  crabDeg: number;
   heading: number | null;
 }
 
@@ -153,6 +155,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
               altitudeM: null,
               speedMs: 0,
               batteryPct: 100,
+              crabDeg: 0,
             },
           },
         });
@@ -174,6 +177,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
               altitudeM: message.telemetry.position_and_kinematics.gps.altitude_amsl_m,
               speedMs: 0,
               batteryPct: message.telemetry.power_system.battery_remaining_pct,
+              crabDeg: 0,
             },
           },
         });
@@ -191,6 +195,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
               altitudeM: message.altitudeM,
               speedMs: message.speedMs,
               batteryPct: message.batteryPct,
+              crabDeg: message.crabDeg,
             },
           },
         });
@@ -208,6 +213,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
             altitudeM: d.altitudeM,
             speedMs: d.speedMs,
             batteryPct: d.batteryPct,
+            crabDeg: d.crabDeg,
           };
         }
         set({ phase: message.running ? 'running' : 'idle', drones, error: null });

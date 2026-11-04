@@ -3,6 +3,7 @@ import { useMissionStore } from './missionStore';
 import { useSelectionStore } from './selection';
 import type { LatLng } from '../../../shared/protocol';
 import { toMetersFrom } from '../../../shared/mission/area';
+import { useWindStore } from '../wind/windStore';
 
 const SERVER_TYPES = new Set(['mission_snapshot', 'drone_boot', 'drone_online', 'position', 'mission_error', 'mission_reset']);
 
@@ -34,6 +35,8 @@ function connect(url: string) {
   socket = new WebSocket(url);
   socket.onopen = () => {
     retryDelayMs = 1000;
+    const { status, wind } = useWindStore.getState();
+    if (status === 'ready') sendClientMessage({ type: 'wind', speedMs: wind.speedMs, fromDeg: wind.fromDeg });
   };
   socket.onmessage = (event) => {
     const message = parseServerMessage(event.data);
@@ -51,6 +54,12 @@ function connect(url: string) {
 export function startMissionSocket(url = missionSocketUrl()): void {
   if (socket || retryTimer) return;
   connect(url);
+  // The server flies drones through the same wind the operator sees.
+  useWindStore.subscribe((state, previous) => {
+    if (state.status === 'ready' && (state.wind !== previous.wind || previous.status !== 'ready')) {
+      sendClientMessage({ type: 'wind', speedMs: state.wind.speedMs, fromDeg: state.wind.fromDeg });
+    }
+  });
 }
 
 /** Sends an intent to the server. Returns false when not connected. */
