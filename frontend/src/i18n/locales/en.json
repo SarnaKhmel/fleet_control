@@ -26,7 +26,8 @@
     "issue": {
       "style": "Map is unavailable. Check your connection and reload.",
       "terrain": "Terrain is unavailable: elevation is not shown."
-    }
+    },
+    "resetView": "Default view"
   },
   "location": {
     "title": "Location",

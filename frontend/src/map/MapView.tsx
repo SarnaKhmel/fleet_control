@@ -18,6 +18,7 @@ import { effectiveCenter, useMissionStore } from '../mission/missionStore';
 import { syncStartMarkers } from '../mission/startMarkers';
 import { syncDroneMarkers } from '../mission/droneMarkers';
 import { boxesOverlap, boxOf, registerZoneFitter, zoneBoxOf } from '../mission/zoneView';
+import { registerViewReset } from './viewReset';
 import { areaRing } from '../../../shared/mission/area';
 import { useSymbolStyleStore } from '../mission/symbolStyle';
 import { useFrontLineStore } from '../frontline/frontLine';
@@ -111,6 +112,15 @@ export function MapView() {
         ],
         { padding: 24, duration: 800 },
       );
+    });
+    registerViewReset(() => {
+      map.easeTo({
+        center: [DEFAULT_CENTER.lng, DEFAULT_CENTER.lat],
+        zoom: DEFAULT_ZOOM,
+        bearing: 0,
+        pitch: useMapViewStore.getState().buildings3d ? TILT_3D_PITCH : 0,
+        duration: 800,
+      });
     });
     map.on('mousemove', (event) => {
       const mission = useMissionStore.getState();

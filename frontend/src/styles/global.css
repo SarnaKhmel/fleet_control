@@ -541,3 +541,17 @@ body,
   cursor: pointer;
   font-weight: 600;
 }
+
+.view-reset {
+  position: absolute;
+  left: 50%;
+  top: 3.4rem;
+  transform: translateX(-50%);
+  z-index: 1;
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem 0.7rem;
+  cursor: pointer;
+}

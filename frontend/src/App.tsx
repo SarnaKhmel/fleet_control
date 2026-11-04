@@ -5,6 +5,7 @@ import { FrontLineAttribution } from './frontline/FrontLineAttribution';
 import { ScaleBar } from './map/ScaleBar';
 import { MissionPanel } from './mission/MissionPanel';
 import { ZoneReturnButton } from './mission/ZoneReturnButton';
+import { ViewResetButton } from './map/ViewResetButton';
 import { LocationPanel } from './location/LocationPanel';
 import { WindCompass } from './wind/WindCompass';
 
@@ -19,6 +20,7 @@ export function App() {
         <ScaleBar />
         <MissionPanel />
         <ZoneReturnButton />
+        <ViewResetButton />
         <LocationPanel />
         <WindCompass />
       </main>
