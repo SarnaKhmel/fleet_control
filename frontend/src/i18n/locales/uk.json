@@ -150,5 +150,15 @@
     "buildings": "3D будівлі",
     "frontLine": "Лінія фронту",
     "drones": "Дрони"
+  },
+  "drone": {
+    "panelTitle": "Дрони",
+    "status": "Стан",
+    "altitude": "Висота",
+    "heading": "Напрям",
+    "speed": "Швидкість",
+    "crab": "Кут атаки",
+    "battery": "Заряд",
+    "position": "Координати"
   }
 }

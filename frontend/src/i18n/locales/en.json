@@ -150,5 +150,15 @@
     "buildings": "3D buildings",
     "frontLine": "Front line",
     "drones": "Drones"
+  },
+  "drone": {
+    "panelTitle": "Drones",
+    "status": "Status",
+    "altitude": "Altitude",
+    "heading": "Heading",
+    "speed": "Ground speed",
+    "crab": "Crab angle",
+    "battery": "Battery",
+    "position": "Position"
   }
 }
