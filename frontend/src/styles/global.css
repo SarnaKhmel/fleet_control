@@ -1,0 +1,54 @@
+/* Design tokens: components use these variables, never hard-coded colors. */
+:root[data-theme='dark'] {
+  --bg: #0b1220;
+  --panel: #111a2b;
+  --border: #22304a;
+  --fg: #e6edf7;
+  --muted: #8a99b3;
+  --accent: #4ea1ff;
+}
+
+:root[data-theme='light'] {
+  --bg: #f5f7fb;
+  --panel: #ffffff;
+  --border: #d5dce8;
+  --fg: #0f1728;
+  --muted: #5b6b85;
+  --accent: #1f6feb;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, sans-serif;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.header-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.header-controls button,
+.header-controls select {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+}

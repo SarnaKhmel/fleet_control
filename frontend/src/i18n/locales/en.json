@@ -1,0 +1,10 @@
+{
+  "app": {
+    "title": "Fleet Mission Control"
+  },
+  "header": {
+    "language": "Language",
+    "switchToLight": "Light theme",
+    "switchToDark": "Dark theme"
+  }
+}
