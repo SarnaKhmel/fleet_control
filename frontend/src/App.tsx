@@ -1,6 +1,7 @@
 import { Header } from './components/Header';
 import { MapView } from './map/MapView';
 import { LocationPanel } from './location/LocationPanel';
+import { WindIndicator } from './wind/WindIndicator';
 
 export function App() {
   return (
@@ -9,6 +10,7 @@ export function App() {
       <main className="map-area">
         <MapView />
         <LocationPanel />
+        <WindIndicator />
       </main>
     </div>
   );
