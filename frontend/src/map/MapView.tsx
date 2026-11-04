@@ -8,7 +8,12 @@ import { useLocationStore } from '../location/locationStore';
 import { DEFAULT_CENTER, DEFAULT_ZOOM, mapStyleFor, useMapViewStore } from './mapStyles';
 import { addBuildingsLayer, BUILDINGS_LAYER_ID, BUILDING_COLORS, TILT_3D_PITCH } from './buildings';
 import { addTerrain, groundElevationAt, TERRAIN_SOURCE_ID } from './terrain';
+import { addBordersLayer, BORDERS_LAYER_ID, BORDER_COLORS } from './borders';
+import { useMapScaleStore } from './mapScaleStore';
+import { metersPerPixel } from './scale';
 import { useMapIssueStore } from './mapIssue';
+import { syncFrontLine } from '../frontline/frontLine';
+import { useFrontLineStore } from '../frontline/frontLine';
 import { CONTROL_POINT_SIDC, natoElement } from '../symbology/nato';
 
 function applyBuildingVisibility(map: MapLibreMap, on: boolean) {
@@ -44,9 +49,17 @@ export function MapView() {
       const current = useThemeStore.getState().theme;
       addTerrain(map);
       addBuildingsLayer(map, current);
+      addBordersLayer(map, current);
+      const front = useFrontLineStore.getState();
+      syncFrontLine(map, { enabled: front.enabled, zones: front.zones, theme: current });
       map.setPitch(useMapViewStore.getState().buildings3d ? TILT_3D_PITCH : 0);
       applyBuildingVisibility(map, useMapViewStore.getState().buildings3d);
     });
+    // Scale bar follows the map center's latitude and zoom.
+    const updateScale = () => useMapScaleStore.getState().setMetersPerPx(metersPerPixel(map.getCenter().lat, map.getZoom()));
+    updateScale();
+    map.on('move', updateScale);
+
     // Elevation is re-read after every idle, so it follows the map once tiles arrive.
     map.on('idle', () => {
       const point = useLocationStore.getState().selected;
@@ -79,11 +92,21 @@ export function MapView() {
     styleRef.current = style;
   }, [theme, view]);
 
+  // Approximate front line follows its switch, the loaded zones and the theme.
+  const frontEnabled = useFrontLineStore((state) => state.enabled);
+  const frontZones = useFrontLineStore((state) => state.zones);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    syncFrontLine(map, { enabled: frontEnabled, zones: frontZones, theme });
+  }, [frontEnabled, frontZones, theme]);
+
   // Recolor buildings with the theme; 3D on/off = tilt + layer visibility.
   useEffect(() => {
     const map = mapRef.current;
     if (!map?.getLayer(BUILDINGS_LAYER_ID)) return;
     map.setPaintProperty(BUILDINGS_LAYER_ID, 'fill-extrusion-color', BUILDING_COLORS[theme]);
+    if (map.getLayer(BORDERS_LAYER_ID)) map.setPaintProperty(BORDERS_LAYER_ID, 'line-color', BORDER_COLORS[theme]);
   }, [theme]);
 
   useEffect(() => {
