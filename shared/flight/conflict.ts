@@ -6,7 +6,7 @@
 export interface Track3D {
   east: number;
   north: number;
-  /** Altitude above the local origin, meters (e.g. AMSL minus the origin's AMSL). */
+  /** Altitude above sea level (AMSL), meters. Sea level is the reference (0). */
   up: number;
   vEast: number;
   vNorth: number;
@@ -27,9 +27,12 @@ export interface Obstacle {
   east: number;
   north: number;
   radiusM: number;
-  /** Top of the obstacle, meters in the local frame. */
+  /** Top of the obstacle, AMSL meters: terrain elevation at its base + its height. */
   topUp: number;
 }
+
+/** Terrain elevation (AMSL meters) at a local position. Flat sea level (0) when no terrain is known. */
+export type GroundElevation = (east: number, north: number) => number;
 
 export interface ConflictResult {
   conflict: boolean;
@@ -67,9 +70,9 @@ export function predictConflict(
   return { conflict: firstConflictS !== null, firstConflictS, minHorizontalM };
 }
 
-/** Converts lat/lng/altitude to the local frame around `origin` (equirectangular, fine for a few km). */
+/** Converts lat/lng/altitude (AMSL) to the local frame around `origin`. Altitude is kept as is. */
 export function toLocal(
-  origin: { lat: number; lng: number; altM: number },
+  origin: { lat: number; lng: number },
   point: { lat: number; lng: number; altM: number },
 ): { east: number; north: number; up: number } {
   const metersPerDegLat = 110_574;
@@ -77,17 +80,17 @@ export function toLocal(
   return {
     east: (point.lng - origin.lng) * metersPerDegLng,
     north: (point.lat - origin.lat) * metersPerDegLat,
-    up: point.altM - origin.altM,
+    up: point.altM,
   };
 }
 
 /**
- * Drone vs. static obstacle. Conflict when the drone is within `horizontalM` of the
- * obstacle's footprint and below its top plus `verticalM` (flying above with margin is safe).
+ * Drone vs. terrain (ground clearance). Conflict when the drone's altitude above the
+ * terrain under it drops below `verticalM`. Sea level is the reference for both.
  */
-export function predictObstacleConflict(
+export function predictTerrainConflict(
   drone: Track3D,
-  obstacle: Obstacle,
+  ground: GroundElevation,
   limits: ConflictLimits = DEFAULT_CONFLICT_LIMITS,
   horizonS = DEFAULT_HORIZON_S,
   stepS = 1,
@@ -98,13 +101,13 @@ export function predictObstacleConflict(
 
   for (let i = 0; i <= steps; i++) {
     const t = i * stepS;
-    const east = drone.east + drone.vEast * t - obstacle.east;
-    const north = drone.north + drone.vNorth * t - obstacle.north;
+    const east = drone.east + drone.vEast * t;
+    const north = drone.north + drone.vNorth * t;
     const up = drone.up + drone.vUp * t;
-    const gap = Math.hypot(east, north) - obstacle.radiusM;
+    const clearance = up - ground(east, north);
 
-    minHorizontalM = Math.min(minHorizontalM, gap);
-    if (firstConflictS === null && gap < limits.horizontalM && up < obstacle.topUp + limits.verticalM) {
+    minHorizontalM = Math.min(minHorizontalM, clearance);
+    if (firstConflictS === null && clearance < limits.verticalM) {
       firstConflictS = t;
     }
   }

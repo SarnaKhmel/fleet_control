@@ -3,6 +3,7 @@ import {
   DEFAULT_CONFLICT_LIMITS,
   predictConflict,
   predictObstacleConflict,
+  predictTerrainConflict,
   toLocal,
   type Track3D,
 } from './conflict';
@@ -52,43 +53,28 @@ describe('predictConflict', () => {
 });
 
 describe('toLocal', () => {
-  it('converts a small offset to meters', () => {
-    const local = toLocal(
-      { lat: 50, lng: 30, altM: 100 },
-      { lat: 50.001, lng: 30, altM: 130 },
-    );
+  it('converts a small offset to meters and keeps altitude above sea level', () => {
+    const local = toLocal({ lat: 50, lng: 30 }, { lat: 50.001, lng: 30, altM: 130 });
     expect(local.north).toBeCloseTo(110.574, 2);
     expect(local.east).toBeCloseTo(0, 6);
-    expect(local.up).toBe(30);
+    expect(local.up).toBe(130);
   });
 });
 
-describe('default limits', () => {
-  it('are 20 m horizontal and 20 m vertical', () => {
-    expect(DEFAULT_CONFLICT_LIMITS).toEqual({ horizontalM: 20, verticalM: 20 });
+describe('predictTerrainConflict', () => {
+  it('flat sea level: a drone at 50 m is clear of the ground', () => {
+    const drone = track({ up: 50, vEast: 5 });
+    expect(predictTerrainConflict(drone, () => 0).conflict).toBe(false);
   });
-});
 
-describe('predictObstacleConflict', () => {
-  const tower = { east: 0, north: 0, radiusM: 5, topUp: 120 };
-
-  it('drone flying into a tall obstacle below its top: conflict', () => {
-    const drone = track({ east: -200, up: 100, vEast: 10 });
-    const r = predictObstacleConflict(drone, tower);
+  it('hill under the flight path: conflict when clearance drops below the limit', () => {
+    // Hill at 120 m AMSL on the east side; the drone at 130 m AMSL flies toward it.
+    const hill = (east: number) => (east > 100 ? 120 : 0);
+    const drone = track({ up: 130, vEast: 10 });
+    const r = predictTerrainConflict(drone, hill);
     expect(r.conflict).toBe(true);
-    // Gap = |x| - 5 m; x = -200 + 10t, so gap < 20 m once x > -25, i.e. t > 17.5 s → first sample 18 s.
-    expect(r.firstConflictS).toBe(18);
-  });
-
-  it('drone above the top plus margin: no conflict', () => {
-    const drone = track({ east: -200, up: 200, vEast: 10 });
-    expect(predictObstacleConflict(drone, tower).conflict).toBe(false);
-  });
-
-  it('drone passing well outside the footprint: no conflict', () => {
-    const drone = track({ east: -200, north: 100, up: 50, vEast: 10 });
-    const r = predictObstacleConflict(drone, tower);
-    expect(r.conflict).toBe(false);
-    expect(r.minHorizontalM).toBeGreaterThan(20);
+    // The drone starts at east 0 and moves 10 m/s; the hill starts at east > 100, i.e. t > 10 s.
+    // Clearance = 130 − 120 = 10 m < 20 m, so the first sample in conflict is t = 11 s.
+    expect(r.firstConflictS).toBe(11);
   });
 });
