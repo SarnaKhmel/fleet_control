@@ -92,7 +92,8 @@ export type MissionErrorReason = 'outside_area' | 'already_running';
 export interface SnapshotDrone {
   droneId: string;
   callsign: string;
-  status: 'booting' | 'connecting' | 'idle';
+  /** `lost_link`: the battery ran out and the drone came down where its position shows. */
+  status: 'booting' | 'connecting' | 'idle' | 'lost_link';
   progress: number;
   position: LatLng | null;
   heading: number | null;
@@ -114,6 +115,8 @@ export type ServerMessage =
   | { type: 'position'; droneId: string; position: LatLng; heading: number; speedMs: number; altitudeM: number; batteryPct: number; crabDeg: number; }
   /** A drone's task list and flown path. Sent only when they change; positions do not carry them. */
   | { type: 'drone_tasks'; droneId: string; trail: LatLng[]; tasks: LatLng[] }
+  /** The drone's battery ran out: it came down at its last position and takes no more commands. */
+  | { type: 'drone_lost'; droneId: string }
   | { type: 'mission_error'; reason: MissionErrorReason }
   | { type: 'mission_reset' };
 

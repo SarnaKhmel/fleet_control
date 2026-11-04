@@ -15,6 +15,10 @@ describe('parseServerMessage', () => {
     expect(parseServerMessage(JSON.stringify(tasks))).toEqual(tasks);
   });
 
+  it('accepts the loss of a drone', () => {
+    expect(parseServerMessage(JSON.stringify({ type: 'drone_lost', droneId: 'drone-1' }))).toEqual({ type: 'drone_lost', droneId: 'drone-1' });
+  });
+
   it('drops unknown types, bad JSON and non-strings', () => {
     expect(parseServerMessage(JSON.stringify({ type: 'move' }))).toBeNull();
     expect(parseServerMessage('{not json')).toBeNull();

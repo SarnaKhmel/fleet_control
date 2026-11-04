@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { GROUND_AMSL_M } from '../../../shared/protocol';
 import { Accordion } from '../sidebar/Accordion';
+import { batteryLevel } from '../mission/battery';
 import type { DroneView } from '../mission/missionStore';
 import { clearDroneTasks, removeDroneTask } from '../mission/missionSocket';
 
@@ -8,6 +9,14 @@ interface DroneDetailsProps {
   droneId: string;
   drone: DroneView | undefined;
   defaultOpen: boolean;
+}
+
+/** The warning to highlight for the drone: lost link, else a low or critical battery; null when all is well. */
+function droneAlert(drone: DroneView | undefined): 'lost' | 'low' | 'critical' | null {
+  if (drone?.status === 'lost_link') return 'lost';
+  if (drone?.status !== 'idle') return null;
+  const level = batteryLevel(drone.batteryPct);
+  return level === 'ok' ? null : level;
 }
 
 /** One drone as a collapsible section: summary in the header, telemetry inside. */
@@ -18,9 +27,17 @@ export function DroneDetails({ droneId, drone, defaultOpen }: DroneDetailsProps)
   const altitude = online ? `${Math.round(drone!.altitudeM! - GROUND_AMSL_M)} m` : '—';
   const battery = drone ? `${Math.round(drone.batteryPct)}%` : '—';
   const status = drone?.status ? t(`mission.status.${drone.status}`) : t('mission.status.offline');
+  // A drone that lost its link lies where it came down: its spot and unfinished route stay on view.
+  const lost = drone?.status === 'lost_link';
+  const alert = droneAlert(drone);
 
   return (
     <Accordion title={callsign} summary={`${altitude} · ${battery}`} defaultOpen={defaultOpen}>
+      {alert && (
+        <p role="alert" className={`drone-alert is-${alert}`}>
+          {t(`drone.alert.${alert}`, { pct: Math.round(drone!.batteryPct) })}
+        </p>
+      )}
       <dl className="drone-facts">
         <dt>{t('drone.status')}</dt>
         <dd>{status}</dd>
@@ -36,13 +53,24 @@ export function DroneDetails({ droneId, drone, defaultOpen }: DroneDetailsProps)
         <dd>{battery}</dd>
         <dt>{t('drone.position')}</dt>
         <dd>
-          {online && drone?.position ? `${drone.position.lat.toFixed(5)}, ${drone.position.lng.toFixed(5)}` : '—'}
+          {(online || lost) && drone?.position ? `${drone.position.lat.toFixed(5)}, ${drone.position.lng.toFixed(5)}` : '—'}
         </dd>
       </dl>
-      {online && (
+      {(online || lost) && (
         <section className="drone-tasks" aria-label={t('drone.tasks')}>
           <h4>{t('drone.tasks')}</h4>
-          {drone!.tasks.length === 0 ? (
+          {lost ? (
+            drone!.tasks.length > 0 && (
+              <>
+                <p className="muted">{t('drone.tasksUnfinished')}</p>
+                <ol>
+                  {drone!.tasks.map((point, index) => (
+                    <li key={`${index}-${point.lat}-${point.lng}`}>{`${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`}</li>
+                  ))}
+                </ol>
+              </>
+            )
+          ) : drone!.tasks.length === 0 ? (
             <p className="muted">{t('drone.tasksEmpty')}</p>
           ) : (
             <>

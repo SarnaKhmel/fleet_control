@@ -1,20 +1,32 @@
 import type { Map as MapLibreMap, Marker as MapLibreMarkerType } from 'maplibre-gl';
 import { Marker } from 'maplibre-gl';
 import { DRONE_SIDC, natoElement } from '../symbology/nato';
+import { batteryLevel } from './battery';
 import type { DroneView } from './missionStore';
 import type { SymbolStyle } from './symbolStyle';
 import { useSelectionStore } from './selection';
+
+/**
+ * Classes that color a drone by its state: a drone that lost its link is grey; otherwise a low battery
+ * is yellow and a critical one red.
+ */
+function stateClasses(drone: DroneView): string[] {
+  if (drone.status === 'lost_link') return ['is-lost_link'];
+  const level = batteryLevel(drone.batteryPct);
+  return level === 'ok' ? [] : [`is-battery-${level}`];
+}
 
 // Drones that have a position: NATO symbol, or our own marker with a heading arrow and status color.
 export function droneElement(drone: DroneView, style: SymbolStyle, selected = false): HTMLElement {
   if (style === 'nato') {
     const el = natoElement(DRONE_SIDC, 30);
     el.setAttribute('aria-label', drone.callsign);
+    el.classList.add(...stateClasses(drone));
     if (selected) el.classList.add('is-selected');
     return el;
   }
   const el = document.createElement('div');
-  el.className = `drone-marker is-${drone.status}${selected ? ' is-selected' : ''}`;
+  el.className = ['drone-marker', `is-${drone.status}`, ...stateClasses(drone), ...(selected ? ['is-selected'] : [])].join(' ');
   el.setAttribute('aria-label', drone.callsign);
   el.innerHTML = `<span class="drone-marker-arrow" style="transform: rotate(${drone.heading ?? 0}deg)"></span><span class="drone-marker-label">${drone.callsign}</span>`;
   return el;
@@ -28,7 +40,7 @@ interface MarkerEntry {
 }
 
 // Markers are kept per drone and reused: a position tick only moves the marker, and the element is
-// rebuilt only when the status, selection or symbol style changes (building SVG each second is costly).
+// rebuilt only when the status, battery level, selection or symbol style changes (building SVG each second is costly).
 const entries = new Map<string, MarkerEntry>();
 
 function setArrowRotation(el: HTMLElement, heading: number | null) {
@@ -46,7 +58,7 @@ export function syncDroneMarkers(map: MapLibreMap, drones: Record<string, DroneV
     if (!drone.position) continue;
     seen.add(id);
     const isSelected = selected.includes(id);
-    const signature = `${style}|${drone.status}|${isSelected}`;
+    const signature = `${style}|${drone.status}|${stateClasses(drone).join()}|${isSelected}`;
     const lngLat: [number, number] = [drone.position.lng, drone.position.lat];
     const entry = entries.get(id);
 

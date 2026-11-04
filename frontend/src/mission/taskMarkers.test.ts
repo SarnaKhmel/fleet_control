@@ -52,4 +52,16 @@ describe('task markers', () => {
     expect(removeDroneTask).toHaveBeenCalledWith('drone-1', 1);
     expect(event.defaultPrevented).toBe(true);
   });
+
+  it('shows the tasks of a lost drone locked: not draggable, no right-click removal', () => {
+    const tasks = [{ lat: 50.1, lng: 30.1 }];
+    syncTaskMarkers(map as never, { 'drone-1': drone(tasks) }, ['drone-1']);
+    syncTaskMarkers(map as never, { 'drone-1': { ...drone(tasks), status: 'lost_link' } }, ['drone-1']);
+    const [marker] = live();
+    expect(live()).toHaveLength(1);
+    expect(marker.draggable).toBe(false);
+    expect(marker.element?.classList.contains('is-locked')).toBe(true);
+    marker.element!.dispatchEvent(new MouseEvent('contextmenu', { cancelable: true }));
+    expect(removeDroneTask).not.toHaveBeenCalled();
+  });
 });

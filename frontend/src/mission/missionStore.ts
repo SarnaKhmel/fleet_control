@@ -19,7 +19,8 @@ export type MissionPhase = 'idle' | 'running';
 
 export interface DroneView {
   callsign: string;
-  status: 'booting' | 'connecting' | 'idle';
+  /** `lost_link`: the battery ran out; the drone lies at `position` and keeps its path and tasks for the map. */
+  status: 'booting' | 'connecting' | 'idle' | 'lost_link';
   progress: number;
   /** Known once the drone is online; null while it is still booting. */
   position: LatLng | null;
@@ -237,6 +238,12 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
             [message.droneId]: { ...drone, trail: pointList(message.trail), tasks: pointList(message.tasks) },
           },
         });
+        return;
+      }
+      case 'drone_lost': {
+        const drone = get().drones[message.droneId];
+        if (!drone) return;
+        set({ drones: { ...get().drones, [message.droneId]: { ...drone, status: 'lost_link', speedMs: 0 } } });
         return;
       }
       case 'mission_snapshot': {

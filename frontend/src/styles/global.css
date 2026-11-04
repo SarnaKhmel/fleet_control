@@ -8,6 +8,7 @@
   --accent: #4ea1ff;
   --symbol-bg: #e6edf7;
   --warning: #f5a524;
+  --danger: #e5484d;
 }
 
 :root[data-theme='light'] {
@@ -19,6 +20,7 @@
   --accent: #1f6feb;
   --symbol-bg: #ffffff;
   --warning: #d97706;
+  --danger: #d93036;
 }
 
 body {
@@ -515,8 +517,38 @@ body,
   border-color: var(--accent);
 }
 
-.drone-marker.is-connecting {
+.drone-marker.is-connecting,
+.drone-marker.is-battery-low {
   border-color: var(--warning);
+}
+
+.drone-marker.is-battery-critical {
+  border-color: var(--danger);
+}
+
+/* Lost link (empty battery): a grey, dashed marker at the spot where the drone came down. */
+.drone-marker.is-lost_link {
+  border-color: var(--muted);
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+.drone-marker.is-lost_link .drone-marker-arrow {
+  display: none;
+}
+
+/* NATO symbols keep their frame; the battery and lost-link state show as a ring around them. */
+.maplibregl-marker .nato-symbol.is-battery-low {
+  box-shadow: 0 0 0 3px var(--warning);
+}
+
+.maplibregl-marker .nato-symbol.is-battery-critical {
+  box-shadow: 0 0 0 3px var(--danger);
+}
+
+.maplibregl-marker .nato-symbol.is-lost_link {
+  filter: grayscale(1);
+  opacity: 0.5;
 }
 
 .drone-marker-arrow {
@@ -1228,6 +1260,26 @@ body,
   color: var(--warning);
 }
 
+.drone-state.is-lost_link {
+  color: var(--danger);
+}
+
+/* Highlighted warning at the top of a drone's details: low battery, critical battery, lost link. */
+.drone-alert {
+  margin: 0 0 0.5rem;
+  padding: 0.4rem 0.55rem;
+  border-left: 3px solid var(--warning);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  font-size: 0.8rem;
+}
+
+.drone-alert.is-critical,
+.drone-alert.is-lost {
+  border-left-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+
 .boot-bar {
   height: 4px;
   margin-top: 0.2rem;
@@ -1313,6 +1365,12 @@ body,
   font-weight: 700;
   cursor: grab;
   box-shadow: 0 0 0 2px var(--bg);
+}
+
+/* Tasks of a drone that lost its link: shown, but they can no longer be moved or removed. */
+.task-marker.is-locked {
+  background: var(--muted);
+  cursor: default;
 }
 
 .header button.btn-danger {

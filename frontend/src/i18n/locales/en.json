@@ -116,7 +116,8 @@
       "offline": "offline",
       "booting": "booting",
       "connecting": "connecting",
-      "idle": "online"
+      "idle": "online",
+      "lost_link": "link lost"
     },
     "draw": "Draw zone on map",
     "drawingOn": "Drawing: click the map (stop)",
@@ -163,6 +164,12 @@
     "taskRemove": "Remove task {{n}}",
     "tasksClear": "Clear all",
     "taskMarker": "{{callsign}} task {{n}}",
-    "taskMarkerHint": "Drag to move the task, right-click to remove it"
+    "taskMarkerHint": "Drag to move the task, right-click to remove it",
+    "alert": {
+      "low": "Low battery: {{pct}}%. Bring the drone back or finish the task.",
+      "critical": "Critical battery: {{pct}}%. The drone will lose its link when it runs out.",
+      "lost": "Link lost: the battery ran out. The drone came down at the position shown."
+    },
+    "tasksUnfinished": "Route it did not finish:"
   }
 }

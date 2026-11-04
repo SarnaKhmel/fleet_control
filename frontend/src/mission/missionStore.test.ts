@@ -115,6 +115,16 @@ describe('mission store', () => {
     expect(store().drones['drone-9']).toBeUndefined();
   });
 
+  it('marks a drone lost on drone_lost and keeps where it fell and its tasks', () => {
+    store().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
+    store().apply({ type: 'drone_tasks', droneId: 'drone-1', trail: [{ lat: 50, lng: 30 }, { lat: 50.1, lng: 30.1 }], tasks: [{ lat: 50.2, lng: 30.2 }] });
+    store().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 90, speedMs: 0, altitudeM: 150, batteryPct: 0, crabDeg: 0 });
+    store().apply({ type: 'drone_lost', droneId: 'drone-1' });
+    expect(store().drones['drone-1']).toMatchObject({ status: 'lost_link', position: { lat: 50.1, lng: 30.1 }, batteryPct: 0, tasks: [{ lat: 50.2, lng: 30.2 }] });
+    store().apply({ type: 'drone_lost', droneId: 'drone-9' });
+    expect(store().drones['drone-9']).toBeUndefined();
+  });
+
   it('treats missing or malformed task lists from the server as empty', () => {
     store().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
     store().apply({ type: 'drone_tasks', droneId: 'drone-1', trail: 'x', tasks: [{ lat: 'a' }] } as never);

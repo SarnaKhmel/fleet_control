@@ -43,6 +43,10 @@ describe('camera view', () => {
     expect(ids).toEqual(['drone-1', 'drone-2']);
   });
 
+  it('shows no camera for a drone that lost its link', () => {
+    expect(cameraFeatures({ 'drone-1': { ...drone, status: 'lost_link' } }, ['drone-1']).features).toEqual([]);
+  });
+
   it('adds the fill and outline once, fills them and follows the theme', () => {
     const map = new FakeMap({ style: 'x' });
     syncCamera(map as never, { 'drone-1': drone }, ['drone-1'], 'dark');

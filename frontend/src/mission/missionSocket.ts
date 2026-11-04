@@ -6,7 +6,7 @@ import { toMetersFrom } from '../../../shared/mission/area';
 import { useWindStore } from '../wind/windStore';
 import { debugLog } from '../log';
 
-const SERVER_TYPES = new Set(['mission_snapshot', 'drone_boot', 'drone_online', 'position', 'drone_tasks', 'mission_error', 'mission_reset']);
+const SERVER_TYPES = new Set(['mission_snapshot', 'drone_boot', 'drone_online', 'position', 'drone_tasks', 'drone_lost', 'mission_error', 'mission_reset']);
 
 /** Parses a server message, or null for anything unknown or malformed. Trust boundary for the client. */
 export function parseServerMessage(raw: unknown): ServerMessage | null {

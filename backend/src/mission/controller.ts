@@ -1,4 +1,4 @@
-import { MAX_TASKS, type ClientMessage, type LatLng, type MissionArea, type ServerMessage, type StartLayout } from '../../../shared/protocol.js';
+import { MAX_TASKS, type ClientMessage, type LatLng, type MissionArea, type ServerMessage, type SnapshotDrone, type StartLayout } from '../../../shared/protocol.js';
 import { BOOT_MS, buildSchedule, CONNECT_MS, DroneSchedule, resolveStarts } from './schedule.js';
 import { buildTelemetry } from './telemetry.js';
 import { toMetersFrom } from '../../../shared/mission/area.js';
@@ -30,6 +30,8 @@ interface DroneState {
   batteryPct: number;
   speedMs: number;
   crabDeg: number;
+  /** The battery ran out: the drone lies where it came down, keeps its path and tasks, takes no commands. */
+  lost: boolean;
 }
 
 // The flown path keeps at most this many points (as many as a task list); the oldest are dropped.
@@ -79,9 +81,31 @@ export function createMissionController(
       broadcast({ type: 'drone_boot', droneId: entry.droneId, status: 'connecting', progress: 0 }),
     );
     later(entry.startAtMs + BOOT_MS + CONNECT_MS, () => {
-      drones.set(entry.droneId, { position: entry.start, heading: 0, target: null, course: null, route: [], trail: [], altitudeM: GROUND_AMSL_M, batteryPct: 100, speedMs: 0, crabDeg: 0 });
+      drones.set(entry.droneId, { position: entry.start, heading: 0, target: null, course: null, route: [], trail: [], altitudeM: GROUND_AMSL_M, batteryPct: 100, speedMs: 0, crabDeg: 0, lost: false });
       broadcast({ type: 'drone_online', telemetry: buildTelemetry(entry, now()) });
     });
+  }
+
+  /** The drone, if it is online and can still take commands. */
+  function commandable(droneId: string): DroneState | undefined {
+    const drone = drones.get(droneId);
+    return drone && !drone.lost ? drone : undefined;
+  }
+
+  /**
+   * Empty battery: the drone comes down where it is. Its flown path ends at that spot and its remaining
+   * tasks stay, so the operator sees where it fell and where it was going until the mission ends.
+   */
+  function loseDrone(droneId: string, drone: DroneState) {
+    serverLog('drone lost', { droneId, position: drone.position });
+    drone.lost = true;
+    drone.speedMs = 0;
+    drone.crabDeg = 0;
+    drone.altitudeM = GROUND_AMSL_M;
+    drone.trail = withTrailPoint(drone.trail, drone.position);
+    report(droneId, drone);
+    reportTasks(droneId, drone);
+    broadcast({ type: 'drone_lost', droneId });
   }
 
   /** True when a step of `stepM` meters reaches the target. */
@@ -93,6 +117,7 @@ export function createMissionController(
   /** One simulated second: climbing drones gain altitude; drones with a target take a step toward it. */
   function tick() {
     for (const [droneId, drone] of drones) {
+      if (drone.lost) continue;
       const climbing = drone.altitudeM < GROUND_AMSL_M + HOVER_ALT_M;
       if (climbing) drone.altitudeM = Math.min(GROUND_AMSL_M + HOVER_ALT_M, drone.altitudeM + CLIMB_RATE_MS * SIM_TIME_SCALE * (TICK_MS / 1000));
       const moving = drone.target !== null || drone.course !== null;
@@ -119,7 +144,8 @@ export function createMissionController(
       drone.speedMs = drone.target || drone.course !== null ? DRONE_SPEED_MS : 0;
       drone.crabDeg = crabDeg;
       drone.batteryPct = Math.max(0, drone.batteryPct - BATTERY_DRAIN_PER_TICK * SIM_TIME_SCALE);
-      report(droneId, drone);
+      if (drone.batteryPct === 0) loseDrone(droneId, drone);
+      else report(droneId, drone);
     }
   }
 
@@ -163,7 +189,7 @@ export function createMissionController(
 
   /** Sends the drones to the target in formation: as their only task, or appended to their tasks. */
   function move(droneIds: string[], target: LatLng, append: boolean) {
-    const online = droneIds.filter((id) => drones.has(id));
+    const online = droneIds.filter((id) => commandable(id));
     serverLog('move', { target, append, requested: droneIds, online });
     const targets = formationTargets(target, online.length);
     online.forEach((id, i) => {
@@ -181,13 +207,13 @@ export function createMissionController(
   }
 
   function setRoute(droneId: string, points: LatLng[]) {
-    const drone = drones.get(droneId);
+    const drone = commandable(droneId);
     if (drone) setTasks(droneId, drone, points);
   }
 
   /** Drops one task; dropping the current one sends the drone on to the next from where it is. */
   function removeTask(droneId: string, index: number) {
-    const drone = drones.get(droneId);
+    const drone = commandable(droneId);
     if (!drone) return;
     const tasks = tasksOf(drone);
     if (index >= tasks.length) return;
@@ -202,7 +228,7 @@ export function createMissionController(
 
   /** Moves one task to another point; moving the current one turns the drone toward it from where it is. */
   function updateTask(droneId: string, index: number, point: LatLng) {
-    const drone = drones.get(droneId);
+    const drone = commandable(droneId);
     if (!drone) return;
     const tasks = tasksOf(drone);
     if (index >= tasks.length) return;
@@ -218,7 +244,7 @@ export function createMissionController(
   function hold(droneIds: string[]) {
     serverLog('hold', { droneIds });
     for (const id of droneIds) {
-      const drone = drones.get(id);
+      const drone = commandable(id);
       if (drone) setTasks(id, drone, []);
     }
   }
@@ -226,7 +252,7 @@ export function createMissionController(
   function setHeading(droneIds: string[], headingDeg: number) {
     serverLog('heading', { headingDeg, droneIds });
     for (const id of droneIds) {
-      const drone = drones.get(id);
+      const drone = commandable(id);
       if (drone) {
         drone.course = headingDeg;
         drone.target = null;
@@ -268,7 +294,7 @@ export function createMissionController(
   function snapshot(): ServerMessage {
     if (!running) return { type: 'mission_snapshot', running: false, droneCount: 0, drones: [] };
     const elapsed = Date.now() - startedAt;
-    const list = [];
+    const list: SnapshotDrone[] = [];
     for (const entry of schedule) {
       const state = droneStateAt(entry, elapsed);
       if (state.status === 'offline') continue;
@@ -276,7 +302,7 @@ export function createMissionController(
       list.push({
         droneId: entry.droneId,
         callsign: entry.callsign,
-        status: state.status as 'booting' | 'connecting' | 'idle',
+        status: live?.lost ? 'lost_link' : (state.status as 'booting' | 'connecting' | 'idle'),
         progress: state.progress,
         position: live?.position ?? null,
         heading: live?.heading ?? null,

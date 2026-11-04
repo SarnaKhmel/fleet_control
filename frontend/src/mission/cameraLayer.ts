@@ -28,12 +28,13 @@ export function cameraSector(position: LatLng, directionDeg: number, fovDeg = CA
   return ring;
 }
 
-/** GeoJSON with one camera sector for every selected drone that has a position and a heading. */
+/** GeoJSON with one camera sector for every selected drone that is in the air with a position and a heading. */
 export function cameraFeatures(drones: Record<string, DroneView>, selectedIds: string[]) {
   const features = [];
   for (const droneId of selectedIds) {
     const drone = drones[droneId];
-    if (!drone?.position || drone.heading === null) continue;
+    // A drone that lost its link has come down: there is no camera picture to show.
+    if (!drone?.position || drone.heading === null || drone.status === 'lost_link') continue;
     // The nose is turned into the wind by the crab angle; the camera looks where the drone goes.
     const ring = cameraSector(drone.position, drone.heading - drone.crabDeg).map((p) => [p.lng, p.lat]);
     features.push({ type: 'Feature', properties: { droneId }, geometry: { type: 'Polygon', coordinates: [ring] } });
