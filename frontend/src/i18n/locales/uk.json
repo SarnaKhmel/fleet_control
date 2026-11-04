@@ -19,7 +19,9 @@
     "geocodeError": "Пошук не вдався, спробуйте ще раз",
     "symbols": "Символи дронів",
     "symbolsNato": "Дрони: NATO",
-    "symbolsCustom": "Дрони: власний стиль"
+    "symbolsCustom": "Дрони: власний стиль",
+    "resetAll": "Скинути все",
+    "resetAllConfirm": "Підтвердити: скинути все"
   },
   "map": {
     "label": "Карта",

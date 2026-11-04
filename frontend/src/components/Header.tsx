@@ -5,6 +5,7 @@ import { parseLatLng } from '../location/parseLatLng';
 import { useLocationStore } from '../location/locationStore';
 import { geocodeCity } from '../location/geocode';
 import { SettingsButton } from './SettingsButton';
+import { ResetAllButton } from './ResetAllButton';
 
 export function Header() {
   const { t, i18n } = useTranslation();
@@ -69,6 +70,7 @@ export function Header() {
             </span>
           )}
         </form>
+        <ResetAllButton />
         <SettingsButton />
       </div>
     </header>

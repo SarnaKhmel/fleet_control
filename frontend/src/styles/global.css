@@ -1220,3 +1220,9 @@ body,
   font-weight: 700;
   box-shadow: 0 0 0 2px var(--bg);
 }
+
+.header button.btn-danger {
+  border-color: var(--warning);
+  color: var(--warning);
+  font-weight: 600;
+}

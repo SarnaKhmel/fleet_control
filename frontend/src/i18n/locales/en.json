@@ -19,7 +19,9 @@
     "geocodeError": "Search failed, try again",
     "symbols": "Drone symbols",
     "symbolsNato": "Drones: NATO",
-    "symbolsCustom": "Drones: own style"
+    "symbolsCustom": "Drones: own style",
+    "resetAll": "Reset all",
+    "resetAllConfirm": "Confirm: reset all"
   },
   "map": {
     "label": "Map",
