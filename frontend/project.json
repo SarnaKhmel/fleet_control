@@ -1,0 +1,23 @@
+{
+  "name": "frontend",
+  "projectType": "application",
+  "sourceRoot": "frontend/src",
+  "targets": {
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": { "command": "vite", "cwd": "frontend" }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": { "command": "tsc --noEmit && vite build", "cwd": "frontend" }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": { "command": "vitest run", "cwd": "frontend" }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": { "command": "tsc --noEmit", "cwd": "frontend" }
+    }
+  }
+}
