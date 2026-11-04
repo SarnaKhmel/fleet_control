@@ -53,7 +53,8 @@ export interface DroneTelemetry {
 
 export type ClientMessage =
   | { type: 'mission_start'; area: MissionArea; layout: StartLayout }
-  | { type: 'mission_reset' };
+  | { type: 'mission_reset' }
+  | { type: 'move'; droneIds: string[]; target: LatLng };
 
 // ---- Server → client ----
 
@@ -62,6 +63,7 @@ export type MissionErrorReason = 'outside_area' | 'already_running';
 export type ServerMessage =
   | { type: 'drone_boot'; droneId: string; status: 'booting' | 'connecting'; progress: number }
   | { type: 'drone_online'; telemetry: DroneTelemetry }
+  | { type: 'position'; droneId: string; position: LatLng; heading: number; speedMs: number }
   | { type: 'mission_error'; reason: MissionErrorReason }
   | { type: 'mission_reset' };
 
@@ -100,12 +102,19 @@ export function isStartLayout(value: unknown): value is StartLayout {
 }
 
 /** Returns the parsed client message, or null for anything malformed or unknown. */
+export function isDroneIds(value: unknown): value is string[] {
+  return Array.isArray(value) && value.length >= 1 && value.length <= DRONE_COUNT && value.every((id) => typeof id === 'string' && id.length > 0 && id.length <= 64);
+}
+
 export function parseClientMessage(raw: unknown): ClientMessage | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const message = raw as Record<string, unknown>;
   if (message.type === 'mission_reset') return { type: 'mission_reset' };
   if (message.type === 'mission_start' && isMissionArea(message.area) && isStartLayout(message.layout)) {
     return { type: 'mission_start', area: message.area, layout: message.layout };
+  }
+  if (message.type === 'move' && isDroneIds(message.droneIds) && isLatLng(message.target)) {
+    return { type: 'move', droneIds: message.droneIds, target: message.target };
   }
   return null;
 }

@@ -32,4 +32,12 @@ describe('parseClientMessage', () => {
     expect(parseClientMessage({ type: 'mission_start', area, layout: { kind: 'single', point: { lat: 91, lng: 30 } } })).toBeNull();
     expect(parseClientMessage({ type: 'mission_start', area, layout: { kind: 'cluster', center: { lat: 50, lng: 30 }, radiusM: 9000 } })).toBeNull();
   });
+
+  it('accepts a move command and rejects malformed ones', () => {
+    const move = { type: 'move', droneIds: ['drone-1', 'drone-2'], target: { lat: 50.4, lng: 30.5 } };
+    expect(parseClientMessage(move)).toEqual(move);
+    expect(parseClientMessage({ ...move, droneIds: [] })).toBeNull();
+    expect(parseClientMessage({ ...move, droneIds: ['a', 'b', 'c', 'd'] })).toBeNull();
+    expect(parseClientMessage({ ...move, target: { lat: 99, lng: 0 } })).toBeNull();
+  });
 });

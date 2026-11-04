@@ -59,4 +59,27 @@ describe('mission controller', () => {
     expect(sent.some((m) => m.type === 'mission_error')).toBe(false);
     mission.dispose();
   });
+
+  it('moves an online drone toward a target and reports positions', () => {
+    const mission = createMissionController((m) => sent.push(m));
+    mission.handle({ type: 'mission_start', area, layout: single });
+    vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
+    sent = [];
+    mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.02, lng: 30 } });
+    vi.advanceTimersByTime(3000);
+    const positions = sent.filter((m) => m.type === 'position');
+    expect(positions.length).toBe(3);
+    const last = positions[2];
+    expect(last.type === 'position' && last.position.lat).toBeGreaterThan(50.0);
+    mission.dispose();
+  });
+
+  it('ignores move for drones that are not online yet', () => {
+    const mission = createMissionController((m) => sent.push(m));
+    mission.handle({ type: 'mission_start', area, layout: single });
+    mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.02, lng: 30 } });
+    vi.advanceTimersByTime(3000);
+    expect(sent.some((m) => m.type === 'position')).toBe(false);
+    mission.dispose();
+  });
 });

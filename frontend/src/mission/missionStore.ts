@@ -32,6 +32,8 @@ export interface MissionState {
   points: LatLng[];
   clusterRadiusM: number;
   picking: boolean;
+  /** Move mode: the next map click sends the online drones to that point. */
+  moveMode: boolean;
   /** Drawing the zone: two clicks give opposite corners. */
   drawing: boolean;
   drawAnchor: LatLng | null;
@@ -46,6 +48,7 @@ export interface MissionState {
   setLayoutKind: (kind: LayoutKind) => void;
   setClusterRadius: (meters: number) => void;
   setPicking: (picking: boolean) => void;
+  setMoveMode: (on: boolean) => void;
   setDrawing: (drawing: boolean) => void;
   /** Map click while drawing: the first click sets a corner, the second closes the zone. */
   drawClick: (point: LatLng) => void;
@@ -88,6 +91,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   points: [],
   clusterRadiusM: 500,
   picking: false,
+  moveMode: false,
   drawing: false,
   drawAnchor: null,
   drawCursor: null,
@@ -100,6 +104,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   setLayoutKind: (layoutKind) => set({ layoutKind, points: [] }),
   setClusterRadius: (clusterRadiusM) => set({ clusterRadiusM }),
   setPicking: (picking) => set({ picking }),
+  setMoveMode: (moveMode) => set({ moveMode }),
   setDrawing: (drawing) => set({ drawing, drawAnchor: null, drawCursor: null }),
   drawClick: (point) => {
     const { drawAnchor } = get();
@@ -155,6 +160,17 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
           },
         });
         return;
+      case 'position': {
+        const drone = get().drones[message.droneId];
+        if (!drone) return;
+        set({
+          drones: {
+            ...get().drones,
+            [message.droneId]: { ...drone, position: message.position, heading: message.heading },
+          },
+        });
+        return;
+      }
       case 'mission_error':
         set({ phase: 'idle', error: message.reason });
         return;

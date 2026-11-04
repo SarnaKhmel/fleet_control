@@ -64,4 +64,10 @@ describe('mission store', () => {
     expect(store().widthKm).toBeGreaterThan(1);
     expect(store().heightKm).toBeGreaterThan(1);
   });
+
+  it('moves a known drone on position messages', () => {
+    store().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30 }, heading_deg: 0 } } } as never);
+    store().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 90, speedMs: 10 });
+    expect(store().drones['drone-1']).toMatchObject({ position: { lat: 50.1, lng: 30.1 }, heading: 90 });
+  });
 });

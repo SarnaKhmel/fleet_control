@@ -17,6 +17,7 @@ import { syncMissionArea } from '../mission/missionLayer';
 import { effectiveCenter, useMissionStore } from '../mission/missionStore';
 import { syncStartMarkers } from '../mission/startMarkers';
 import { syncDroneMarkers } from '../mission/droneMarkers';
+import { moveOnlineDrones } from '../mission/missionSocket';
 import { boxesOverlap, boxOf, registerZoneFitter, zoneBoxOf } from '../mission/zoneView';
 import { registerViewReset } from './viewReset';
 import { areaRing } from '../../../shared/mission/area';
@@ -91,6 +92,7 @@ export function MapView() {
       // Mode clicks take priority: zone drawing, then start points, else the location.
       if (mission.drawing) mission.drawClick(point);
       else if (mission.picking) mission.addPoint(point);
+      else if (mission.moveMode) moveOnlineDrones(point);
       else useLocationStore.getState().select(point);
     });
     // Tell the UI whether the mission zone is still on screen, and register the "back to zone" action.

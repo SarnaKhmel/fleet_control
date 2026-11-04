@@ -118,7 +118,10 @@
     "drawingOn": "Drawing: click the map (stop)",
     "drawFirst": "Click the first corner.",
     "drawSecond": "Click the opposite corner.",
-    "backToZone": "Back to mission zone"
+    "backToZone": "Back to mission zone",
+    "drones": "Drones",
+    "move": "Move drones to a point",
+    "moveOn": "Moving: click the map (stop)"
   },
   "sidebar": {
     "label": "Side panel",

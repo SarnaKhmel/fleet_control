@@ -1,6 +1,7 @@
-import type { ClientMessage, MissionArea, ServerMessage, StartLayout } from '../../../shared/protocol.js';
+import type { ClientMessage, LatLng, MissionArea, ServerMessage, StartLayout } from '../../../shared/protocol.js';
 import { BOOT_MS, buildSchedule, CONNECT_MS, DroneSchedule, resolveStarts } from './schedule.js';
 import { buildTelemetry } from './telemetry.js';
+import { DRONE_SPEED_MS, formationTargets, stepToward, TICK_MS } from './kinematics.js';
 
 // Interval between "booting" progress messages, simulated ms.
 export const PROGRESS_STEP_MS = 1000;
@@ -10,16 +11,24 @@ export interface MissionController {
   dispose(): void;
 }
 
+interface DroneState {
+  position: LatLng;
+  heading: number;
+  target: LatLng | null;
+}
+
 /**
- * Runs the mission start on timers and reports every change through `broadcast`.
- * One mission per server: a second start is refused until mission_reset.
+ * Runs the mission start on timers, moves online drones toward their targets, and reports every
+ * change through `broadcast`. One mission per server: a second start is refused until mission_reset.
  */
 export function createMissionController(
   broadcast: (message: ServerMessage) => void,
   now: () => string = () => new Date().toISOString(),
 ): MissionController {
   let timers: ReturnType<typeof setTimeout>[] = [];
+  let ticker: ReturnType<typeof setInterval> | undefined;
   let running = false;
+  const drones = new Map<string, DroneState>();
 
   function later(ms: number, fn: () => void) {
     timers.push(setTimeout(fn, ms));
@@ -39,9 +48,31 @@ export function createMissionController(
     later(entry.startAtMs + BOOT_MS, () =>
       broadcast({ type: 'drone_boot', droneId: entry.droneId, status: 'connecting', progress: 0 }),
     );
-    later(entry.startAtMs + BOOT_MS + CONNECT_MS, () =>
-      broadcast({ type: 'drone_online', telemetry: buildTelemetry(entry, now()) }),
-    );
+    later(entry.startAtMs + BOOT_MS + CONNECT_MS, () => {
+      drones.set(entry.droneId, { position: entry.start, heading: 0, target: null });
+      broadcast({ type: 'drone_online', telemetry: buildTelemetry(entry, now()) });
+    });
+  }
+
+  /** One simulated second: every drone with a target takes a step toward it. */
+  function tick() {
+    for (const [droneId, drone] of drones) {
+      if (!drone.target) continue;
+      const step = stepToward(drone.position, drone.target, DRONE_SPEED_MS * (TICK_MS / 1000));
+      drone.position = step.position;
+      drone.heading = step.heading;
+      if (step.arrived) drone.target = null;
+      broadcast({ type: 'position', droneId, position: drone.position, heading: drone.heading, speedMs: drone.target ? DRONE_SPEED_MS : 0 });
+    }
+  }
+
+  function move(droneIds: string[], target: LatLng) {
+    const online = droneIds.filter((id) => drones.has(id));
+    const targets = formationTargets(target, online.length);
+    online.forEach((id, i) => {
+      const drone = drones.get(id);
+      if (drone) drone.target = targets[i];
+    });
   }
 
   function start(area: MissionArea, layout: StartLayout) {
@@ -56,24 +87,26 @@ export function createMissionController(
     }
     running = true;
     buildSchedule(starts.points).forEach(scheduleDrone);
+    ticker = setInterval(tick, TICK_MS);
   }
 
-  function reset() {
+  function stop() {
     timers.forEach(clearTimeout);
     timers = [];
+    if (ticker) clearInterval(ticker);
+    ticker = undefined;
+    drones.clear();
     running = false;
-    broadcast({ type: 'mission_reset' });
   }
 
   return {
     handle(message) {
       if (message.type === 'mission_start') start(message.area, message.layout);
-      else reset();
+      else if (message.type === 'mission_reset') {
+        stop();
+        broadcast({ type: 'mission_reset' });
+      } else if (running) move(message.droneIds, message.target);
     },
-    dispose() {
-      timers.forEach(clearTimeout);
-      timers = [];
-      running = false;
-    },
+    dispose: stop,
   };
 }

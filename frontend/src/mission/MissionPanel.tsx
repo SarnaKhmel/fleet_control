@@ -81,6 +81,18 @@ export function MissionPanel() {
         </button>
       </fieldset>
 
+      <fieldset>
+        <legend>{t('mission.drones')}</legend>
+        <button
+          type="button"
+          aria-pressed={state.moveMode}
+          disabled={state.phase !== 'running'}
+          onClick={() => state.setMoveMode(!state.moveMode)}
+        >
+          {state.moveMode ? t('mission.moveOn') : t('mission.move')}
+        </button>
+      </fieldset>
+
       <div className="mission-actions">
         <button type="button" className="btn-primary" onClick={start} disabled={!canStart}>
           {t('mission.start')}

@@ -1,7 +1,8 @@
 import type { ClientMessage, ServerMessage } from '../../../shared/protocol';
 import { useMissionStore } from './missionStore';
+import type { LatLng } from '../../../shared/protocol';
 
-const SERVER_TYPES = new Set(['drone_boot', 'drone_online', 'mission_error', 'mission_reset']);
+const SERVER_TYPES = new Set(['drone_boot', 'drone_online', 'position', 'mission_error', 'mission_reset']);
 
 /** Parses a server message, or null for anything unknown or malformed. Trust boundary for the client. */
 export function parseServerMessage(raw: unknown): ServerMessage | null {
@@ -42,4 +43,13 @@ export function sendClientMessage(message: ClientMessage): boolean {
   if (!socket || socket.readyState !== WebSocket.OPEN) return false;
   socket.send(JSON.stringify(message));
   return true;
+}
+
+/** Sends a move for every drone that is online. Returns how many drones were sent. */
+export function moveOnlineDrones(target: LatLng): number {
+  const droneIds = Object.entries(useMissionStore.getState().drones)
+    .filter(([, drone]) => drone.status === 'idle')
+    .map(([id]) => id);
+  if (droneIds.length === 0) return 0;
+  return sendClientMessage({ type: 'move', droneIds, target }) ? droneIds.length : 0;
 }
