@@ -1,3 +1,5 @@
+import type { ReconCell, ReconGrid } from './mission/recon.js';
+
 // WebSocket protocol shared by the simulator (backend) and the dashboard (frontend).
 // Server is the source of truth; the client sends intents only. Every incoming message is
 // validated with the guards below before it is used.
@@ -165,7 +167,9 @@ export interface SnapshotDrone {
 
 export type ServerMessage =
   /** `droneCount` is the size of the running mission's fleet (0 when none runs); `drones` lists those started so far. */
-  | { type: 'mission_snapshot'; running: boolean; droneCount: number; drones: SnapshotDrone[] }
+  | { type: 'mission_snapshot'; running: boolean; droneCount: number; drones: SnapshotDrone[]; recon?: { grid: ReconGrid; cells: ReconCell[] } }
+  /** Ground the cameras saw for the first time in the last tick, as cells of the grid (only the new ones). */
+  | { type: 'recon_cells'; grid: ReconGrid; cells: ReconCell[] }
   | { type: 'drone_boot'; droneId: string; status: 'booting' | 'connecting'; progress: number }
   | { type: 'drone_online'; telemetry: DroneTelemetry }
   /** `groundM`: ground elevation under the drone (AMSL), so its height above the ground is altitudeM - groundM. */

@@ -443,6 +443,53 @@ describe('mission controller', () => {
     });
   });
 
+  describe('reconnaissance', () => {
+    const reconMessages = () => sent.filter((m) => m.type === 'recon_cells') as Extract<ServerMessage, { type: 'recon_cells' }>[];
+    const allCells = () => reconMessages().flatMap((m) => m.cells.map(([x, y]) => `${x},${y}`));
+    function online() {
+      const mission = createMissionController((m) => sent.push(m));
+      mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1 });
+      vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
+      return mission;
+    }
+
+    it('marks the ground ahead of a flying drone, sending each cell only once', () => {
+      const mission = online();
+      mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.1, lng: 30 } });
+      vi.advanceTimersByTime(20_000);
+      const cells = allCells();
+      expect(cells.length).toBeGreaterThan(200);
+      expect(new Set(cells).size).toBe(cells.length);
+      expect(reconMessages()[0].grid).toEqual({ origin: area.center, cellM: 100 });
+      // The drone flies north from the center: what it saw lies north of the start, none of it far south.
+      const rows = cells.map((c) => Number(c.split(',')[1]));
+      expect(Math.max(...rows)).toBeGreaterThan(30);
+      expect(Math.min(...rows)).toBeGreaterThan(-3);
+      mission.dispose();
+    });
+
+    it('marks nothing new while a hovering drone looks at the same ground', () => {
+      const mission = online();
+      vi.advanceTimersByTime(3000);
+      const before = allCells().length;
+      vi.advanceTimersByTime(10_000);
+      expect(allCells().length).toBe(before);
+      mission.dispose();
+    });
+
+    it('gives everything seen in the snapshot, and forgets it on reset', () => {
+      const mission = online();
+      mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.05, lng: 30.05 } });
+      vi.advanceTimersByTime(10_000);
+      const snap = mission.snapshot();
+      expect(snap.type === 'mission_snapshot' && snap.recon?.cells.map(([x, y]) => `${x},${y}`).sort()).toEqual(allCells().sort());
+      mission.handle({ type: 'mission_reset' });
+      expect(mission.snapshot()).toEqual({ type: 'mission_snapshot', running: false, droneCount: 0, drones: [] });
+      mission.dispose();
+    });
+
+  });
+
   it('gives a snapshot of a running mission and an empty one when idle', () => {
     const mission = createMissionController((m) => sent.push(m));
     expect(mission.snapshot()).toEqual({ type: 'mission_snapshot', running: false, droneCount: 0, drones: [] });

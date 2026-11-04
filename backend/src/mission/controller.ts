@@ -2,6 +2,7 @@ import { DEFAULT_ALTITUDE_AGL_M, DEFAULT_CRUISE_SPEED_MS, MAX_TASKS, type Client
 import { BOOT_MS, buildSchedule, CONNECT_MS, DroneSchedule, resolveStarts } from './schedule.js';
 import { buildTelemetry } from './telemetry.js';
 import { offsetLatLng, toMetersFrom } from '../../../shared/mission/area.js';
+import { coneCells, RECON_CELL_M, type ReconCell, type ReconGrid } from '../../../shared/mission/recon.js';
 import { NO_TERRAIN, type Terrain } from '../terrain/terrain.js';
 import { NO_BUILDINGS, type Buildings } from '../buildings/buildings.js';
 import { buildingAhead, hitOnStep, WARNING_REAL_S } from './obstacles.js';
@@ -91,6 +92,10 @@ export function createMissionController(
   let wind = { speedMs: 0, fromDeg: 0 };
   let schedule: DroneSchedule[] = [];
   const drones = new Map<string, DroneState>();
+  // Ground the cameras have seen this mission: cells of a grid around the mission area center.
+  let reconGrid: ReconGrid | null = null;
+  const reconSeen = new Set<string>();
+  let reconCells: ReconCell[] = [];
 
   function later(ms: number, fn: () => void) {
     timers.push(setTimeout(fn, ms));
@@ -200,6 +205,7 @@ export function createMissionController(
    */
   function tick() {
     const dtS = (TICK_MS / 1000) * SIM_TIME_SCALE;
+    const fresh: ReconCell[] = [];
     for (const [droneId, drone] of drones) {
       if (drone.phase === 'lost_link' || drone.phase === 'destroyed') continue;
       drone.groundM = groundAt(drone, drone.position);
@@ -220,6 +226,7 @@ export function createMissionController(
         }
       }
       updateWarning(droneId, drone);
+      if (drone.phase === 'air' || drone.phase === 'landing') fresh.push(...scan(drone));
       // In the air the drain grows with the airspeed: the cruise speed when flying somewhere, the wind
       // speed when hovering or coming down (it holds its spot against the wind). On the ground: the link only.
       const airspeedMs = drone.target || drone.course !== null ? drone.cruiseSpeedMs : wind.speedMs;
@@ -232,6 +239,21 @@ export function createMissionController(
       report(droneId, drone);
       syncStatus(droneId, drone);
     }
+    if (reconGrid && fresh.length > 0) broadcast({ type: 'recon_cells', grid: reconGrid, cells: fresh });
+  }
+
+  /** Marks what the drone's camera sees (ahead, along the way it flies); returns the cells seen for the first time. */
+  function scan(drone: DroneState): ReconCell[] {
+    if (!reconGrid) return [];
+    const fresh: ReconCell[] = [];
+    for (const cell of coneCells(reconGrid, drone.position, drone.heading - drone.crabDeg)) {
+      const key = `${cell[0]},${cell[1]}`;
+      if (reconSeen.has(key)) continue;
+      reconSeen.add(key);
+      reconCells.push(cell);
+      fresh.push(cell);
+    }
+    return fresh;
   }
 
   /** Ground elevation at a point for this drone: the terrain, or the ground under the drone while unknown. */
@@ -473,6 +495,7 @@ export function createMissionController(
     }
     running = true;
     droneCount = count;
+    reconGrid = { origin: area.center, cellM: RECON_CELL_M };
     startedAt = Date.now();
     schedule = buildSchedule(starts.points);
     // Start loading the ground under the start points, so it is known when the drones come online.
@@ -487,6 +510,9 @@ export function createMissionController(
     if (ticker) clearInterval(ticker);
     ticker = undefined;
     drones.clear();
+    reconGrid = null;
+    reconSeen.clear();
+    reconCells = [];
     running = false;
     droneCount = 0;
   }
@@ -519,7 +545,7 @@ export function createMissionController(
         tasks: live ? tasksOf(live) : [],
       });
     }
-    return { type: 'mission_snapshot', running: true, droneCount, drones: list };
+    return { type: 'mission_snapshot', running: true, droneCount, drones: list, ...(reconGrid ? { recon: { grid: reconGrid, cells: reconCells } } : {}) };
   }
 
   return {
