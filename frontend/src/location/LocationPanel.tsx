@@ -9,8 +9,7 @@ export function LocationPanel() {
   const { clear, save, choose, removeSaved } = useLocationStore.getState();
 
   return (
-    <aside className="location-panel" aria-label={t('location.title')}>
-      <h2>{t('location.title')}</h2>
+    <div className="location-content">
       {selected ? (
         <>
           <p className="location-coords">{formatLatLng(selected)}</p>
@@ -50,6 +49,6 @@ export function LocationPanel() {
           ))}
         </ul>
       )}
-    </aside>
+    </div>
   );
 }

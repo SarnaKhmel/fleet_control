@@ -34,8 +34,7 @@ export function MissionPanel() {
   const drones = Object.entries(state.drones);
 
   return (
-    <aside className="mission-panel" aria-label={t('mission.title')}>
-      <h2>{t('mission.title')}</h2>
+    <div className="mission-panel">
 
       <fieldset>
         <legend>{t('mission.area')}</legend>
@@ -83,7 +82,7 @@ export function MissionPanel() {
       </fieldset>
 
       <div className="mission-actions">
-        <button type="button" onClick={start} disabled={!canStart}>
+        <button type="button" className="btn-primary" onClick={start} disabled={!canStart}>
           {t('mission.start')}
         </button>
         <button type="button" onClick={() => send({ type: 'mission_reset' })}>
@@ -112,6 +111,6 @@ export function MissionPanel() {
           ))}
         </ul>
       )}
-    </aside>
+    </div>
   );
 }

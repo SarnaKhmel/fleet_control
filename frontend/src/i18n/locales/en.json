@@ -113,5 +113,13 @@
     "drawFirst": "Click the first corner.",
     "drawSecond": "Click the opposite corner.",
     "backToZone": "Back to mission zone"
+  },
+  "sidebar": {
+    "label": "Side panel",
+    "wind": "Wind",
+    "mission": "Mission",
+    "location": "Location",
+    "collapse": "Collapse panel",
+    "expand": "Expand panel"
   }
 }

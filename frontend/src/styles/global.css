@@ -542,16 +542,371 @@ body,
   font-weight: 600;
 }
 
-.view-reset {
-  position: absolute;
-  left: 50%;
-  top: 3.4rem;
-  transform: translateX(-50%);
-  z-index: 1;
+
+
+/* Layout: left side panel (accordions) next to the map. */
+.workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.sidebar {
+  width: 17rem;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  overflow: auto;
   background: var(--panel);
+  color: var(--fg);
+  border-right: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+.sidebar.is-collapsed {
+  width: auto;
+}
+
+.sidebar-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sidebar-toggle,
+.view-reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  background: var(--bg);
   color: var(--fg);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 0.35rem 0.7rem;
   cursor: pointer;
+}
+
+.view-reset:hover,
+.sidebar-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.accordion {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.accordion-head {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background: none;
+  color: var(--fg);
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  text-align: left;
+}
+
+.accordion-summary {
+  flex: 1;
+  color: var(--muted);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accordion-body {
+  padding: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.accordion-body[hidden] {
+  display: none;
+}
+
+/* Panels rendered inside the sidebar take the sidebar's layout instead of floating on the map. */
+.sidebar .wind-compass,
+.sidebar .mission-panel,
+.sidebar .location-content {
+  position: static;
+  width: auto;
+  max-height: none;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+}
+
+.sidebar .location-content .location-actions,
+.sidebar .mission-actions {
+  margin-top: 0.4rem;
+}
+
+/* The side panel floats over the map: expanding or collapsing it does not resize the map. */
+.workspace {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.map-area {
+  position: absolute;
+  inset: 0;
+}
+
+.sidebar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 3;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.25);
+}
+
+/* ---- Side panel: a quiet, layered look. Tokens only, no hard-coded colors. ---- */
+.sidebar {
+  width: 18rem;
+  padding: 0;
+  gap: 0;
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-right: 1px solid var(--border);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  transition: width 0.2s ease;
+}
+
+.sidebar.is-collapsed {
+  width: 3rem;
+}
+
+.sidebar-top {
+  padding: 0.6rem 0.6rem 0.5rem;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--border);
+  justify-content: flex-start;
+}
+
+.sidebar-top .view-reset {
+  margin-left: auto;
+}
+
+.sidebar.is-collapsed .sidebar-top {
+  flex-direction: column;
+  padding: 0.6rem 0.4rem;
+}
+
+.sidebar-toggle,
+.view-reset {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  border-color: transparent;
+  background: transparent;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.sidebar-toggle:hover,
+.view-reset:hover {
+  background: var(--bg);
+  border-color: var(--border);
+  color: var(--accent);
+}
+
+.sidebar-toggle:focus-visible,
+.view-reset:focus-visible,
+.sidebar button:focus-visible,
+.sidebar input:focus-visible,
+.sidebar select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.accordion {
+  border: none;
+  border-radius: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.accordion-head {
+  padding: 0.75rem 0.9rem;
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.accordion-head:hover {
+  color: var(--fg);
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+}
+
+.accordion-title {
+  flex: none;
+}
+
+.accordion-summary {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.78rem;
+  color: var(--fg);
+}
+
+.accordion-chevron {
+  flex: none;
+  transition: transform 0.2s ease;
+}
+
+.accordion.is-open .accordion-chevron {
+  transform: rotate(180deg);
+}
+
+.accordion-body {
+  padding: 0.25rem 0.9rem 0.9rem;
+  border-top: none;
+}
+
+.sidebar fieldset {
+  margin: 0 0 0.75rem;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sidebar legend {
+  padding: 0;
+  margin-bottom: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.sidebar label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.sidebar input,
+.sidebar select {
+  height: 2rem;
+  padding: 0 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar button {
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.sidebar button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sidebar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sidebar button[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sidebar .btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.sidebar .btn-primary:hover:not(:disabled) {
+  background: var(--fg);
+  border-color: var(--fg);
+  color: var(--bg);
+}
+
+.sidebar .mission-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.sidebar .mission-panel .muted,
+.sidebar .location-content .muted {
+  font-size: 0.75rem;
+}
+
+.sidebar .wind-compass {
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.6rem;
+}
+
+.sidebar .wind-compass-text {
+  font-size: 0.8125rem;
+}
+
+.sidebar .roster {
+  margin-top: 0.6rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+}
+
+.sidebar .roster li {
+  padding: 0.25rem 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar .location-coords {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.sidebar .saved-list button:first-child {
+  border: none;
+  background: transparent;
+  padding: 0.3rem 0.4rem;
+  min-height: 0;
+}
+
+.sidebar .saved-list button:first-child:hover {
+  background: var(--bg);
+}
+
+.sidebar .mission-actions button {
+  white-space: nowrap;
+  padding: 0 0.5rem;
 }
