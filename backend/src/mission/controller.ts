@@ -2,6 +2,7 @@ import type { ClientMessage, LatLng, MissionArea, ServerMessage, StartLayout } f
 import { BOOT_MS, buildSchedule, CONNECT_MS, DroneSchedule, resolveStarts } from './schedule.js';
 import { buildTelemetry } from './telemetry.js';
 import { toMetersFrom } from '../../../shared/mission/area.js';
+import { serverLog } from '../log.js';
 import { droneStateAt } from './schedule.js';
 import { bearingTo, BATTERY_DRAIN_PER_TICK, CLIMB_RATE_MS, DRONE_SPEED_MS, formationTargets, GROUND_AMSL_M, HOVER_ALT_M, SIM_TIME_SCALE, TICK_MS, windStep } from './kinematics.js';
 
@@ -92,6 +93,7 @@ export function createMissionController(
         crabDeg = step.crabDeg;
         if (drone.target && distanceReached(drone.position, drone.target, step.groundSpeedMs * dtS)) {
           drone.position = drone.target;
+          serverLog('reached', { droneId, point: drone.target, remainingRoute: drone.route.length });
           // Reached a control point: continue to the next one of the route, if any.
           drone.target = drone.route.shift() ?? null;
         } else {
@@ -117,6 +119,7 @@ export function createMissionController(
 
   function move(droneIds: string[], target: LatLng) {
     const online = droneIds.filter((id) => drones.has(id));
+    serverLog('move', { target, requested: droneIds, online });
     const targets = formationTargets(target, online.length);
     online.forEach((id, i) => {
       const drone = drones.get(id);
@@ -138,6 +141,7 @@ export function createMissionController(
   }
 
   function setHeading(droneIds: string[], headingDeg: number) {
+    serverLog('heading', { headingDeg, droneIds });
     for (const id of droneIds) {
       const drone = drones.get(id);
       if (drone) {
@@ -201,6 +205,7 @@ export function createMissionController(
   return {
     snapshot,
     handle(message) {
+      serverLog('client message', message.type);
       if (message.type === 'wind') wind = { speedMs: message.speedMs, fromDeg: message.fromDeg };
       else if (message.type === 'mission_start') start(message.area, message.layout);
       else if (message.type === 'mission_reset') {

@@ -4,6 +4,7 @@ import { useSelectionStore } from './selection';
 import type { LatLng } from '../../../shared/protocol';
 import { toMetersFrom } from '../../../shared/mission/area';
 import { useWindStore } from '../wind/windStore';
+import { debugLog } from '../log';
 
 const SERVER_TYPES = new Set(['mission_snapshot', 'drone_boot', 'drone_online', 'position', 'mission_error', 'mission_reset']);
 
@@ -66,8 +67,10 @@ export function startMissionSocket(url = missionSocketUrl()): void {
 
 /** Sends an intent to the server. Returns false when not connected. */
 export function sendClientMessage(message: ClientMessage): boolean {
-  if (!socket || socket.readyState !== WebSocket.OPEN) return false;
-  socket.send(JSON.stringify(message));
+  const sent = !!socket && socket.readyState === WebSocket.OPEN;
+  debugLog(`send ${message.type}${sent ? '' : ' (NOT SENT: no connection)'}`, message);
+  if (!sent) return false;
+  socket!.send(JSON.stringify(message));
   return true;
 }
 
@@ -78,6 +81,7 @@ export function moveOnlineDrones(target: LatLng): number {
     .map(([id]) => id);
   const selected = useSelectionStore.getState().selectedIds;
   const droneIds = selected.length > 0 ? online.filter((id) => selected.includes(id)) : online;
+  debugLog('move click', { target, selected, online, sending: droneIds });
   if (droneIds.length === 0) return 0;
   return sendClientMessage({ type: 'move', droneIds, target }) ? droneIds.length : 0;
 }

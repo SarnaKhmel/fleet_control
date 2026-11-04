@@ -26,6 +26,7 @@ import { areaRing } from '../../../shared/mission/area';
 import { useSymbolStyleStore } from '../mission/symbolStyle';
 import { useFrontLineStore } from '../frontline/frontLine';
 import { locationPinElement } from './locationPin';
+import { debugLog } from '../log';
 
 function applyBuildingVisibility(map: MapLibreMap, on: boolean) {
   if (map.getLayer(BUILDINGS_LAYER_ID)) {
@@ -132,6 +133,12 @@ export function MapView() {
       }
       const point = { lat: event.lngLat.lat, lng: event.lngLat.lng };
       const mission = useMissionStore.getState();
+      debugLog('map click', {
+        point,
+        modes: { drawing: mission.drawing, picking: mission.picking, route: mission.routeMode, move: mission.moveMode, phase: mission.phase },
+        selected: useSelectionStore.getState().selectedIds,
+        shift: !!event.originalEvent?.shiftKey,
+      });
       // Mode clicks take priority: zone drawing, then start points, else the location.
       if (mission.drawing) mission.drawClick(point);
       else if (mission.picking) mission.addPoint(point);
