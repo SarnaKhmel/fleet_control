@@ -137,4 +137,23 @@ describe('mission controller', () => {
     expect(last && last.type === 'position' && last.heading).toBeGreaterThan(330);
     mission.dispose();
   });
+
+  it('flies a drone through its own control points in order', () => {
+    const mission = createMissionController((m) => sent.push(m));
+    mission.handle({ type: 'mission_start', area, layout: single });
+    vi.advanceTimersByTime(STAGGER_MS * 2 + BOOT_MS + CONNECT_MS);
+    sent = [];
+    mission.handle({
+      type: 'route',
+      droneId: 'drone-2',
+      points: [{ lat: 50.0005, lng: 30 }, { lat: 50.001, lng: 30 }],
+    });
+    vi.advanceTimersByTime(20_000);
+    const last = sent.filter((m) => m.type === 'position' && m.droneId === 'drone-2').at(-1);
+    expect(last && last.type === 'position' && last.position.lat).toBeCloseTo(50.001, 4);
+    // Drone 1 has no route: it only climbs and keeps its launch point.
+    const drone1 = sent.filter((m) => m.type === 'position' && m.droneId === 'drone-1').at(-1);
+    expect(drone1 && drone1.type === 'position' && drone1.position.lat).toBeCloseTo(50, 6);
+    mission.dispose();
+  });
 });

@@ -21,6 +21,8 @@ interface DroneState {
   target: LatLng | null;
   /** Course in degrees when flying a heading instead of a target. */
   course: number | null;
+  /** Remaining control points; the drone flies them in order. */
+  route: LatLng[];
   altitudeM: number;
   batteryPct: number;
   speedMs: number;
@@ -63,7 +65,7 @@ export function createMissionController(
       broadcast({ type: 'drone_boot', droneId: entry.droneId, status: 'connecting', progress: 0 }),
     );
     later(entry.startAtMs + BOOT_MS + CONNECT_MS, () => {
-      drones.set(entry.droneId, { position: entry.start, heading: 0, target: null, course: null, altitudeM: GROUND_AMSL_M, batteryPct: 100, speedMs: 0, crabDeg: 0 });
+      drones.set(entry.droneId, { position: entry.start, heading: 0, target: null, course: null, route: [], altitudeM: GROUND_AMSL_M, batteryPct: 100, speedMs: 0, crabDeg: 0 });
       broadcast({ type: 'drone_online', telemetry: buildTelemetry(entry, now()) });
     });
   }
@@ -90,7 +92,8 @@ export function createMissionController(
         crabDeg = step.crabDeg;
         if (drone.target && distanceReached(drone.position, drone.target, step.groundSpeedMs * dtS)) {
           drone.position = drone.target;
-          drone.target = null;
+          // Reached a control point: continue to the next one of the route, if any.
+          drone.target = drone.route.shift() ?? null;
         } else {
           drone.position = step.position;
         }
@@ -120,8 +123,18 @@ export function createMissionController(
       if (drone) {
         drone.target = targets[i];
         drone.course = null;
+        drone.route = [];
       }
     });
+  }
+
+  function setRoute(droneId: string, points: LatLng[]) {
+    const drone = drones.get(droneId);
+    if (!drone) return;
+    const [first, ...rest] = points;
+    drone.route = rest;
+    drone.target = first;
+    drone.course = null;
   }
 
   function setHeading(droneIds: string[], headingDeg: number) {
@@ -130,6 +143,7 @@ export function createMissionController(
       if (drone) {
         drone.course = headingDeg;
         drone.target = null;
+        drone.route = [];
       }
     }
   }
@@ -194,6 +208,7 @@ export function createMissionController(
         broadcast({ type: 'mission_reset' });
       } else if (running && message.type === 'move') move(message.droneIds, message.target);
       else if (running && message.type === 'heading') setHeading(message.droneIds, message.headingDeg);
+      else if (running && message.type === 'route') setRoute(message.droneId, message.points);
     },
     dispose: stop,
   };

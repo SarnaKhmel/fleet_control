@@ -46,4 +46,10 @@ describe('parseClientMessage', () => {
     expect(parseClientMessage(heading)).toEqual(heading);
     expect(parseClientMessage({ ...heading, headingDeg: 360 })).toBeNull();
   });
+
+  it('accepts a route of control points for one drone', () => {
+    const route = { type: 'route', droneId: 'drone-2', points: [{ lat: 50.1, lng: 30 }, { lat: 50.2, lng: 30.1 }] };
+    expect(parseClientMessage(route)).toEqual(route);
+    expect(parseClientMessage({ ...route, points: [] })).toBeNull();
+  });
 });

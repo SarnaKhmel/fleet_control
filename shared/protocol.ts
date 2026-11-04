@@ -58,7 +58,8 @@ export type ClientMessage =
   | { type: 'mission_reset' }
   | { type: 'move'; droneIds: string[]; target: LatLng }
   | { type: 'heading'; droneIds: string[]; headingDeg: number }
-  | { type: 'wind'; speedMs: number; fromDeg: number };
+  | { type: 'wind'; speedMs: number; fromDeg: number }
+  | { type: 'route'; droneId: string; points: LatLng[] };
 
 // ---- Server → client ----
 
@@ -121,6 +122,11 @@ export function isStartLayout(value: unknown): value is StartLayout {
 }
 
 /** Returns the parsed client message, or null for anything malformed or unknown. */
+/** Control points for one drone's route: 1 to 10 valid coordinates. */
+export function isLatLngList(value: unknown): value is LatLng[] {
+  return Array.isArray(value) && value.length >= 1 && value.length <= 10 && value.every(isLatLng);
+}
+
 export function isDroneIds(value: unknown): value is string[] {
   return Array.isArray(value) && value.length >= 1 && value.length <= DRONE_COUNT && value.every((id) => typeof id === 'string' && id.length > 0 && id.length <= 64);
 }
@@ -134,6 +140,9 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
   }
   if (message.type === 'move' && isDroneIds(message.droneIds) && isLatLng(message.target)) {
     return { type: 'move', droneIds: message.droneIds, target: message.target };
+  }
+  if (message.type === 'route' && typeof message.droneId === 'string' && message.droneId.length > 0 && isLatLngList(message.points)) {
+    return { type: 'route', droneId: message.droneId, points: message.points };
   }
   if (message.type === 'wind' && isFiniteNumber(message.speedMs) && message.speedMs >= 0 && message.speedMs <= 60 && isFiniteNumber(message.fromDeg) && message.fromDeg >= 0 && message.fromDeg < 360) {
     return { type: 'wind', speedMs: message.speedMs, fromDeg: message.fromDeg };
