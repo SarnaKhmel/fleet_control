@@ -51,7 +51,12 @@ export class FakeMap {
     return { x: lngLat[0], y: lngLat[1] };
   }
   addSource(id: string, spec: object) {
-    this.sources[id] = spec;
+    // Like a GeoJSON source: its data can be replaced later.
+    const source: Record<string, unknown> = { ...spec };
+    source.setData = (data: unknown) => {
+      source.data = data;
+    };
+    this.sources[id] = source;
   }
   setTerrain(terrain: object | null) {
     this.terrain = terrain;

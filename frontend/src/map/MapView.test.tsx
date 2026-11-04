@@ -3,7 +3,7 @@ import { act, render } from '@testing-library/react';
 import { MapView } from './MapView';
 import { useThemeStore } from '../theme/themeStore';
 import { useLocationStore } from '../location/locationStore';
-import { mapInstances, markerInstances } from '../test/maplibreMock';
+import { FakeMap, mapInstances, markerInstances } from '../test/maplibreMock';
 import { useMapViewStore } from './mapStyles';
 import { useMapIssueStore } from './mapIssue';
 import { useMapScaleStore } from './mapScaleStore';
@@ -108,6 +108,18 @@ describe('MapView', () => {
     expect(marker.lngLat).toEqual([30.1, 50.1]);
     expect(renders).toBe(before);
     useMissionStore.setState({ phase: 'idle', drones: {} });
+  });
+
+  it('adds the drone path layer on style load, while the style still reports its sources as loading', () => {
+    // MapLibre fires style.load before the style's own sources have loaded, so isStyleLoaded() is false
+    // from the start until well after style.load.
+    const loaded = vi.spyOn(FakeMap.prototype, 'isStyleLoaded').mockReturnValue(false);
+    render(<MapView />);
+    const map = mapInstances[0];
+    act(() => map.emit('style.load', {} as never));
+    expect(map.getSource(WAYPOINT_SOURCE_ID)).toBeTruthy();
+    expect(map.getLayer('drone-waypoints-line')).toBeTruthy();
+    loaded.mockRestore();
   });
 
   it('updates drone paths while map tiles are still loading', () => {

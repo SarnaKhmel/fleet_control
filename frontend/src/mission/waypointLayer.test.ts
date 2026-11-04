@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FakeMap } from '../test/maplibreMock';
 import type { DroneView } from './missionStore';
-import { syncWaypoints, waypointFeatures, WAYPOINT_LINE_ID, WAYPOINT_SOURCE_ID } from './waypointLayer';
+import { addWaypointLayer, syncWaypoints, waypointFeatures, WAYPOINT_LINE_ID, WAYPOINT_SOURCE_ID } from './waypointLayer';
 
 const base: DroneView = { callsign: 'BA-01', status: 'idle', progress: 100, position: { lat: 50.1, lng: 30.1 }, heading: 0, altitudeM: 210, speedMs: 10, batteryPct: 90, crabDeg: 0, trail: [], tasks: [] };
 const flying: DroneView = { ...base, trail: [{ lat: 50, lng: 30 }], tasks: [{ lat: 50.2, lng: 30.2 }, { lat: 50.3, lng: 30.3 }] };
@@ -31,11 +31,14 @@ describe('drone paths', () => {
     expect(waypointFeatures({ 'drone-1': { ...flying, position: null } }, ['drone-1']).features).toEqual([]);
   });
 
-  it('adds the source and the line layer to the map', () => {
+  it('adds the source and the dashed line layer once, then fills it with the paths', () => {
     const map = new FakeMap({ style: 'x' });
-    syncWaypoints(map as never, { 'drone-1': flying }, ['drone-1'], 'dark');
-    expect(map.getSource(WAYPOINT_SOURCE_ID)).toBeTruthy();
+    addWaypointLayer(map as never, 'dark');
+    addWaypointLayer(map as never, 'dark');
     expect(map.getLayer(WAYPOINT_LINE_ID)).toBeTruthy();
+    syncWaypoints(map as never, { 'drone-1': flying }, ['drone-1'], 'dark');
+    const source = map.getSource(WAYPOINT_SOURCE_ID) as unknown as { data: { features: unknown[] } };
+    expect(source.data.features).toHaveLength(2);
   });
 
   it('updates the path while map tiles are still loading, once its source exists', () => {
@@ -49,10 +52,9 @@ describe('drone paths', () => {
     expect(setData).toHaveBeenCalledOnce();
   });
 
-  it('waits for the style before adding its source', () => {
+  it('does nothing before the layer is added', () => {
     const map = new FakeMap({ style: 'x' });
-    map.isStyleLoaded = () => false;
-    syncWaypoints(map as never, {}, [], 'dark');
+    syncWaypoints(map as never, { 'drone-1': flying }, ['drone-1'], 'dark');
     expect(map.getSource(WAYPOINT_SOURCE_ID)).toBeUndefined();
   });
 });

@@ -30,29 +30,33 @@ export function waypointFeatures(drones: Record<string, DroneView>, selectedIds:
 }
 
 /**
- * Adds the path layer on first use, then only replaces its data and color. Once the source exists
- * it is updated at any time: MapLibre reports the style as not loaded whenever any tiles are loading,
- * which would hold the paths back most of the time. Only adding the source waits for the style.
+ * Adds the (empty) path source and its dashed line layer. Call it on every style load, like the other
+ * custom layers: a style change drops them. Do not wait for map.isStyleLoaded() here: MapLibre fires
+ * style.load before the style's own sources have loaded, so it is still false at that point.
+ */
+export function addWaypointLayer(map: MapLibreMap, theme: Theme): void {
+  if (map.getSource(WAYPOINT_SOURCE_ID)) return;
+  map.addSource(WAYPOINT_SOURCE_ID, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: WAYPOINT_LINE_ID,
+    type: 'line',
+    source: WAYPOINT_SOURCE_ID,
+    paint: {
+      'line-color': WAYPOINT_COLORS[theme],
+      'line-width': 2,
+      'line-dasharray': [2, 2],
+      'line-opacity': ['match', ['get', 'part'], 'flown', 0.4, 1],
+    },
+  });
+}
+
+/**
+ * Puts the current paths into the source added by addWaypointLayer. It works at any time once the
+ * source exists, also while map tiles load; before the style has loaded there is nothing to update yet.
  */
 export function syncWaypoints(map: MapLibreMap, drones: Record<string, DroneView>, selectedIds: string[], theme: Theme): void {
-  const data = waypointFeatures(drones, selectedIds);
   const source = map.getSource(WAYPOINT_SOURCE_ID) as { setData?: (d: unknown) => void } | undefined;
-  if (source?.setData) {
-    source.setData(data);
-  } else {
-    if (!map.isStyleLoaded()) return; // the style.load handler adds the source
-    map.addSource(WAYPOINT_SOURCE_ID, { type: 'geojson', data: data as never });
-    map.addLayer({
-      id: WAYPOINT_LINE_ID,
-      type: 'line',
-      source: WAYPOINT_SOURCE_ID,
-      paint: {
-        'line-color': WAYPOINT_COLORS[theme],
-        'line-width': 2,
-        'line-dasharray': [2, 2],
-        'line-opacity': ['match', ['get', 'part'], 'flown', 0.4, 1],
-      },
-    });
-  }
+  if (!source?.setData) return;
+  source.setData(waypointFeatures(drones, selectedIds));
   map.setPaintProperty(WAYPOINT_LINE_ID, 'line-color', WAYPOINT_COLORS[theme]);
 }
