@@ -19,7 +19,11 @@
     "geocodeError": "Search failed, try again"
   },
   "map": {
-    "label": "Map"
+    "label": "Map",
+    "issue": {
+      "style": "Map is unavailable. Check your connection and reload.",
+      "terrain": "Terrain is unavailable: elevation is not shown."
+    }
   },
   "location": {
     "title": "Location",
