@@ -1,3 +1,4 @@
+import { Profiler } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MissionPanel } from './MissionPanel';
 import { useMissionStore } from './missionStore';
@@ -55,5 +56,24 @@ describe('MissionPanel', () => {
     render(<MissionPanel />);
     expect(screen.queryByText(/Online/)).toBeNull();
     useMissionStore.setState({ drones: {} });
+  });
+
+  it('does not re-render on drone position updates', () => {
+    useMissionStore.setState({
+      phase: 'running',
+      drones: { 'drone-1': { callsign: 'BA-01', status: 'idle', progress: 100, position: { lat: 50, lng: 30 }, heading: 0, altitudeM: 210, speedMs: 0, batteryPct: 100, crabDeg: 0, origin: null, tasks: [] } },
+    });
+    let renders = 0;
+    render(
+      <Profiler id="panel" onRender={() => renders++}>
+        <MissionPanel />
+      </Profiler>,
+    );
+    const before = renders;
+    act(() => {
+      useMissionStore.getState().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 10, speedMs: 10, altitudeM: 210, batteryPct: 99, crabDeg: 0, origin: null, tasks: [] });
+    });
+    expect(renders).toBe(before);
+    useMissionStore.setState({ phase: 'idle', drones: {} });
   });
 });

@@ -4,6 +4,12 @@ import { useSettingsPanelStore } from '../settings/settingsStore';
 import { useSelectionStore } from '../mission/selection';
 import { useMissionStore } from '../mission/missionStore';
 import { DroneDetails } from '../drones/DroneDetails';
+
+// One selected drone. It subscribes to that drone only, so other drones' updates do not re-render it.
+function SelectedDrone({ droneId, defaultOpen }: { droneId: string; defaultOpen: boolean }) {
+  const drone = useMissionStore((state) => state.drones[droneId]);
+  return <DroneDetails droneId={droneId} drone={drone} defaultOpen={defaultOpen} />;
+}
 import { SettingsSections } from './SettingsSections';
 
 // Right-side panel, laid out like the left one: drone details when drones are selected,
@@ -14,7 +20,6 @@ export function RightPanel() {
   const setSettingsOpen = useSettingsPanelStore((state) => state.setOpen);
   const selectedIds = useSelectionStore((state) => state.selectedIds);
   const clearSelection = useSelectionStore((state) => state.clear);
-  const drones = useMissionStore((state) => state.drones);
   const visible = settingsOpen || selectedIds.length > 0;
 
   useEffect(() => {
@@ -50,7 +55,7 @@ export function RightPanel() {
         </button>
       </div>
       {selectedIds.map((id) => (
-        <DroneDetails key={id} droneId={id} drone={drones[id]} defaultOpen={selectedIds.length === 1} />
+        <SelectedDrone key={id} droneId={id} defaultOpen={selectedIds.length === 1} />
       ))}
       {settingsOpen && <SettingsSections />}
     </aside>

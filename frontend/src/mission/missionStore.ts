@@ -93,7 +93,9 @@ export function layoutFrom(state: Pick<MissionState, 'layoutKind' | 'points' | '
 }
 
 /** Reason the mission cannot start yet, or null when it can. */
-export function startProblem(state: MissionState): 'incomplete' | 'outside' | null {
+export function startProblem(
+  state: Pick<MissionState, 'center' | 'widthKm' | 'heightKm' | 'layoutKind' | 'points' | 'clusterRadiusM'>,
+): 'incomplete' | 'outside' | null {
   const layout = layoutFrom(state);
   if (!layout) return 'incomplete';
   const area = { center: effectiveCenter(state), widthKm: state.widthKm, heightKm: state.heightKm };

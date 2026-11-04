@@ -1,24 +1,44 @@
 import { DRONE_COUNT, GROUND_AMSL_M } from '../../../shared/protocol';
 import { useTranslation } from 'react-i18next';
-import { useMissionStore, type DroneView, type MissionPhase } from './missionStore';
+import { useShallow } from 'zustand/react/shallow';
+import { useMissionStore } from './missionStore';
 import { sendRouteToSelected } from './missionSocket';
 import { useSelectionStore } from './selection';
 
-interface DroneStatusListProps {
-  drones: Record<string, DroneView>;
-  phase: MissionPhase;
+const DRONE_IDS = Array.from({ length: DRONE_COUNT }, (_, i) => `drone-${i + 1}`);
+
+// One drone's boot progress and state. It subscribes only to what it shows (height rounded to a meter),
+// so position updates do not re-render it.
+function DroneStatusRow({ droneId, index }: { droneId: string; index: number }) {
+  const { t } = useTranslation();
+  const status = useMissionStore((s) => s.drones[droneId]?.status ?? null);
+  const bootProgress = useMissionStore((s) => s.drones[droneId]?.progress ?? 0);
+  const heightM = useMissionStore((s) => {
+    const altitudeM = s.drones[droneId]?.altitudeM;
+    return altitudeM == null ? null : Math.round(altitudeM - GROUND_AMSL_M);
+  });
+  const progress = status === 'idle' ? 100 : status ? bootProgress : 0;
+  return (
+    <li>
+      <div className="drone-status-line">
+        {/* The callsign is fixed by the schedule (BA-01…BA-03); the drone is only a status until it is online. */}
+        <strong>{`BA-0${index + 1}`}</strong>
+        <span className={`drone-state is-${status ?? 'offline'}`}>
+          {status === 'idle' && heightM !== null ? `${heightM} m` : status ? t(`mission.status.${status}`) : t('mission.status.offline')}
+        </span>
+      </div>
+      <div className="boot-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
+        <span style={{ width: `${progress}%` }} />
+      </div>
+    </li>
+  );
 }
 
 // Boot progress and connection state of the three drones, always visible while a mission is in play.
-export function DroneStatusList({ drones, phase }: DroneStatusListProps) {
+export function DroneStatusList() {
   const { t } = useTranslation();
-  const rows = Array.from({ length: DRONE_COUNT }, (_, i) => {
-    const id = `drone-${i + 1}`;
-    // The callsign is fixed by the schedule (BA-01…BA-03); the drone is only a status until it is online.
-    const drone = drones[id];
-    return { id, callsign: `BA-0${i + 1}`, status: drone?.status ?? null, progress: drone?.progress ?? 0, altitudeM: drone?.altitudeM ?? null };
-  });
-  const online = rows.filter((r) => r.status === 'idle').length;
+  const phase = useMissionStore((s) => s.phase);
+  const online = useMissionStore((s) => Object.values(s.drones).filter((d) => d.status === 'idle').length);
   // Drones exist only while a mission runs; before the start or after a reset the list is hidden.
   if (phase !== 'running') return null;
   return (
@@ -28,26 +48,9 @@ export function DroneStatusList({ drones, phase }: DroneStatusListProps) {
         <span className="drone-status-count">{t('mission.online', { count: online, total: DRONE_COUNT })}</span>
       </div>
       <ul>
-        {rows.map((row) => {
-          const progress = row.status === 'idle' ? 100 : row.status ? row.progress : 0;
-          return (
-            <li key={row.id}>
-              <div className="drone-status-line">
-                <strong>{row.callsign}</strong>
-                <span className={`drone-state is-${row.status ?? 'offline'}`}>
-                  {row.status === 'idle' && row.altitudeM !== null
-                    ? `${Math.round(row.altitudeM - GROUND_AMSL_M)} m`
-                    : row.status
-                      ? t(`mission.status.${row.status}`)
-                      : t('mission.status.offline')}
-                </span>
-              </div>
-              <div className="boot-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
-                <span style={{ width: `${progress}%` }} />
-              </div>
-            </li>
-          );
-        })}
+        {DRONE_IDS.map((id, index) => (
+          <DroneStatusRow key={id} droneId={id} index={index} />
+        ))}
       </ul>
     </section>
   );
@@ -57,11 +60,22 @@ export function DroneStatusList({ drones, phase }: DroneStatusListProps) {
 // so they stay available while the mission runs.
 export function DroneControls() {
   const { t } = useTranslation();
-  const state = useMissionStore();
+  // Only the command fields: drone updates must not re-render the controls.
+  const state = useMissionStore(
+    useShallow((s) => ({
+      phase: s.phase,
+      moveMode: s.moveMode,
+      routeMode: s.routeMode,
+      routePoints: s.routePoints,
+      setMoveMode: s.setMoveMode,
+      setRouteMode: s.setRouteMode,
+      clearRoute: s.clearRoute,
+    })),
+  );
   const selectedIds = useSelectionStore((s) => s.selectedIds);
   return (
     <div className="drone-controls">
-      <DroneStatusList drones={state.drones} phase={state.phase} />
+      <DroneStatusList />
         <fieldset>
           <legend>{t('mission.drones')}</legend>
           <button

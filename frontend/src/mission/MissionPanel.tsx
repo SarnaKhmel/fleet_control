@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { DRONE_COUNT, type ClientMessage } from '../../../shared/protocol';
 import { useLocationStore } from '../location/locationStore';
 import { sendClientMessage } from './missionSocket';
@@ -7,7 +8,30 @@ import { effectiveCenter, layoutFrom, startProblem, useMissionStore, type Layout
 
 export function MissionPanel() {
   const { t } = useTranslation();
-  const state = useMissionStore();
+  // Only the setup fields: drone updates arrive many times a second and must not re-render the panel.
+  const state = useMissionStore(
+    useShallow((s) => ({
+      center: s.center,
+      widthKm: s.widthKm,
+      heightKm: s.heightKm,
+      layoutKind: s.layoutKind,
+      points: s.points,
+      clusterRadiusM: s.clusterRadiusM,
+      picking: s.picking,
+      drawing: s.drawing,
+      drawAnchor: s.drawAnchor,
+      phase: s.phase,
+      error: s.error,
+      setCenter: s.setCenter,
+      setSize: s.setSize,
+      setLayoutKind: s.setLayoutKind,
+      setClusterRadius: s.setClusterRadius,
+      setPicking: s.setPicking,
+      setDrawing: s.setDrawing,
+      clearPoints: s.clearPoints,
+      markStarting: s.markStarting,
+    })),
+  );
   const selected = useLocationStore((s) => s.selected);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
