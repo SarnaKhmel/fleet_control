@@ -21,6 +21,7 @@ import { moveOnlineDrones } from '../mission/missionSocket';
 import { dronesInScreenBox, useSelectionStore, type ScreenPoint } from '../mission/selection';
 import { boxesOverlap, boxOf, registerZoneFitter, zoneBoxOf } from '../mission/zoneView';
 import { registerViewReset } from './viewReset';
+import { fitMissionZone } from '../mission/zoneView';
 import { areaRing } from '../../../shared/mission/area';
 import { useSymbolStyleStore } from '../mission/symbolStyle';
 import { useFrontLineStore } from '../frontline/frontLine';
@@ -100,6 +101,8 @@ export function MapView() {
       boxEl.style.height = `${Math.abs(end.y - boxStart.y)}px`;
     };
     map.on('mousedown', (event) => {
+      // A fresh press starts a new gesture: a click suppressed after an earlier box must not leak into it.
+      suppressNextClick = false;
       if (!event.originalEvent.shiftKey || useMissionStore.getState().drawing) return;
       boxStart = { x: event.point.x, y: event.point.y };
       boxEl = document.createElement('div');
@@ -209,6 +212,10 @@ export function MapView() {
   const missionCenter = useMissionStore((state) => state.center);
   const missionPhase = useMissionStore((state) => state.phase);
   const missionDrawing = useMissionStore((state) => state.drawing);
+  // When a mission starts, bring its zone into view so the operator sees it.
+  useEffect(() => {
+    if (missionPhase === 'running') fitMissionZone();
+  }, [missionPhase]);
   const missionWidth = useMissionStore((state) => state.widthKm);
   const missionHeight = useMissionStore((state) => state.heightKm);
   const drawCursor = useMissionStore((state) => state.drawCursor);
