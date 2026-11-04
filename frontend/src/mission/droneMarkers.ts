@@ -20,24 +20,65 @@ export function droneElement(drone: DroneView, style: SymbolStyle, selected = fa
   return el;
 }
 
-/** Replaces all drone markers with the current drones. Returns the new list. */
+interface MarkerEntry {
+  map: MapLibreMap;
+  marker: MapLibreMarkerType;
+  el: HTMLElement;
+  signature: string;
+}
+
+// Markers are kept per drone and reused: a position tick only moves the marker, and the element is
+// rebuilt only when the status, selection or symbol style changes (building SVG each second is costly).
+const entries = new Map<string, MarkerEntry>();
+
+function setArrowRotation(el: HTMLElement, heading: number | null) {
+  const arrow = el.querySelector<HTMLElement>('.drone-marker-arrow');
+  if (arrow) arrow.style.transform = `rotate(${heading ?? 0}deg)`;
+}
+
+/** Keeps one marker per drone that has a position; returns the markers in use. */
 export function syncDroneMarkers(
   map: MapLibreMap,
-  previous: MapLibreMarkerType[],
+  _previous: MapLibreMarkerType[],
   drones: Record<string, DroneView>,
   style: SymbolStyle,
 ): MapLibreMarkerType[] {
-  previous.forEach((marker) => marker.remove());
   const selected = useSelectionStore.getState().selectedIds;
-  return Object.entries(drones)
-    .filter((entry): entry is [string, DroneView & { position: { lat: number; lng: number } }] => entry[1].position !== null)
-    .map(([id, drone]) => {
-      const el = droneElement(drone, style, selected.includes(id));
-      // Shift+click toggles the drone in the selection; a plain click selects only that drone.
-      el.addEventListener('click', (event) => {
-        if (event.shiftKey) useSelectionStore.getState().toggle(id);
-        else useSelectionStore.getState().select([id]);
-      });
-      return new Marker({ element: el, anchor: 'center' }).setLngLat([drone.position.lng, drone.position.lat]).addTo(map);
+  const seen = new Set<string>();
+  const markers: MapLibreMarkerType[] = [];
+
+  for (const [id, drone] of Object.entries(drones)) {
+    if (!drone.position) continue;
+    seen.add(id);
+    const isSelected = selected.includes(id);
+    const signature = `${style}|${drone.status}|${isSelected}`;
+    const lngLat: [number, number] = [drone.position.lng, drone.position.lat];
+    const entry = entries.get(id);
+
+    if (entry && entry.map === map && entry.signature === signature) {
+      entry.marker.setLngLat(lngLat);
+      if (style === 'custom') setArrowRotation(entry.el, drone.heading);
+      markers.push(entry.marker);
+      continue;
+    }
+
+    entry?.marker.remove();
+    const el = droneElement(drone, style, isSelected);
+    // Shift+click toggles the drone in the selection; a plain click selects only that drone.
+    el.addEventListener('click', (event) => {
+      if (event.shiftKey) useSelectionStore.getState().toggle(id);
+      else useSelectionStore.getState().select([id]);
     });
+    const marker = new Marker({ element: el, anchor: 'center' }).setLngLat(lngLat).addTo(map);
+    entries.set(id, { map, marker, el, signature });
+    markers.push(marker);
+  }
+
+  for (const [id, entry] of entries) {
+    if (!seen.has(id)) {
+      entry.marker.remove();
+      entries.delete(id);
+    }
+  }
+  return markers;
 }

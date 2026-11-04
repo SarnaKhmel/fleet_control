@@ -26,3 +26,14 @@ describe('drone markers', () => {
     expect(markerInstances.some((m) => m.added)).toBe(true);
   });
 });
+
+describe('drone marker reuse', () => {
+  it('moves the existing marker on a position update instead of recreating it', () => {
+    const map = new FakeMap({ style: 'x' });
+    const first = syncDroneMarkers(map as never, [], { 'drone-1': online }, 'custom');
+    const moved = { ...online, position: { lat: 50.01, lng: 30.01 } };
+    const second = syncDroneMarkers(map as never, first, { 'drone-1': moved }, 'custom');
+    expect(second[0]).toBe(first[0]);
+    expect((second[0] as unknown as { lngLat: number[] }).lngLat).toEqual([30.01, 50.01]);
+  });
+});
