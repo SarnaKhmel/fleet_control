@@ -1,0 +1,10 @@
+{
+  "app": {
+    "title": "Центр керування флотом"
+  },
+  "header": {
+    "language": "Мова",
+    "switchToLight": "Світла тема",
+    "switchToDark": "Темна тема"
+  }
+}
