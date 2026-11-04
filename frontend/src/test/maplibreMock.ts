@@ -30,6 +30,12 @@ export class FakeMap {
   getSource(id: string) {
     return this.sources[id];
   }
+  isStyleLoaded() {
+    return true;
+  }
+  getCenter() {
+    return { lat: 50, lng: 30 };
+  }
   addSource(id: string, spec: object) {
     this.sources[id] = spec;
   }
@@ -41,6 +47,12 @@ export class FakeMap {
   }
   once(event: string, handler: Handler) {
     return this.on(event, handler);
+  }
+  removeSource(id: string) {
+    delete this.sources[id];
+  }
+  removeLayer(id: string) {
+    delete this.layers[id];
   }
   getLayer(id: string) {
     return this.layers[id];
