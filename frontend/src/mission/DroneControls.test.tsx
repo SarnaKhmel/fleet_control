@@ -1,5 +1,5 @@
 import { Profiler } from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { DroneControls } from './DroneControls';
 import { useMissionStore, type DroneView } from './missionStore';
 import { useSelectionStore } from './selection';
@@ -18,6 +18,18 @@ describe('DroneControls', () => {
     render(<DroneControls />);
     expect(screen.getByText('60 m')).toBeTruthy();
     expect(screen.getByText('Online 1/3')).toBeTruthy();
+  });
+
+  it('selects a drone from its row, and Shift+click adds or removes one', () => {
+    render(<DroneControls />);
+    fireEvent.click(screen.getByRole('button', { name: /BA-01/ }));
+    expect(useSelectionStore.getState().selectedIds).toEqual(['drone-1']);
+    expect(screen.getByRole('button', { name: /BA-01/ }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: /BA-02/ }), { shiftKey: true });
+    expect(useSelectionStore.getState().selectedIds).toEqual(['drone-1', 'drone-2']);
+    fireEvent.click(screen.getByRole('button', { name: /BA-01/ }), { shiftKey: true });
+    expect(useSelectionStore.getState().selectedIds).toEqual(['drone-2']);
+    expect(screen.getByText(/Click a drone here or on the map/)).toBeTruthy();
   });
 
   it('re-renders only when what it shows changes, not on every position update', () => {

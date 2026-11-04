@@ -1139,6 +1139,33 @@ body,
   gap: 0.45rem;
 }
 
+/* Each drone row is a button: clicking it selects the drone. */
+.drone-status-select {
+  display: block;
+  width: 100%;
+  padding: 0.25rem 0.35rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.drone-status-select:hover {
+  border-color: var(--border);
+}
+
+.drone-status-select.is-selected {
+  border-color: var(--accent);
+}
+
+.drone-status-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.72rem;
+}
+
 .drone-status-line {
   display: flex;
   justify-content: space-between;

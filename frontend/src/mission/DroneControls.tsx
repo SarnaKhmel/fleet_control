@@ -8,9 +8,11 @@ import { useSelectionStore } from './selection';
 const DRONE_IDS = Array.from({ length: DRONE_COUNT }, (_, i) => `drone-${i + 1}`);
 
 // One drone's boot progress and state. It subscribes only to what it shows (height rounded to a meter),
-// so position updates do not re-render it.
+// so position updates do not re-render it. Clicking the row selects the drone, which opens its details
+// and shows its path; Shift+click adds it to the selection or takes it out.
 function DroneStatusRow({ droneId, index }: { droneId: string; index: number }) {
   const { t } = useTranslation();
+  const selected = useSelectionStore((s) => s.selectedIds.includes(droneId));
   const status = useMissionStore((s) => s.drones[droneId]?.status ?? null);
   const bootProgress = useMissionStore((s) => s.drones[droneId]?.progress ?? 0);
   const heightM = useMissionStore((s) => {
@@ -20,16 +22,26 @@ function DroneStatusRow({ droneId, index }: { droneId: string; index: number }) 
   const progress = status === 'idle' ? 100 : status ? bootProgress : 0;
   return (
     <li>
-      <div className="drone-status-line">
-        {/* The callsign is fixed by the schedule (BA-01…BA-03); the drone is only a status until it is online. */}
-        <strong>{`BA-0${index + 1}`}</strong>
-        <span className={`drone-state is-${status ?? 'offline'}`}>
-          {status === 'idle' && heightM !== null ? `${heightM} m` : status ? t(`mission.status.${status}`) : t('mission.status.offline')}
-        </span>
-      </div>
-      <div className="boot-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
-        <span style={{ width: `${progress}%` }} />
-      </div>
+      <button
+        type="button"
+        className={`drone-status-select${selected ? ' is-selected' : ''}`}
+        aria-pressed={selected}
+        onClick={(event) => {
+          if (event.shiftKey) useSelectionStore.getState().toggle(droneId);
+          else useSelectionStore.getState().select([droneId]);
+        }}
+      >
+        <div className="drone-status-line">
+          {/* The callsign is fixed by the schedule (BA-01…BA-03); the drone is only a status until it is online. */}
+          <strong>{`BA-0${index + 1}`}</strong>
+          <span className={`drone-state is-${status ?? 'offline'}`}>
+            {status === 'idle' && heightM !== null ? `${heightM} m` : status ? t(`mission.status.${status}`) : t('mission.status.offline')}
+          </span>
+        </div>
+        <div className="boot-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
+          <span style={{ width: `${progress}%` }} />
+        </div>
+      </button>
     </li>
   );
 }
@@ -52,6 +64,7 @@ export function DroneStatusList() {
           <DroneStatusRow key={id} droneId={id} index={index} />
         ))}
       </ul>
+      <p className="muted drone-status-hint">{t('mission.selectHint')}</p>
     </section>
   );
 }

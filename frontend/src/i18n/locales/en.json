@@ -125,6 +125,7 @@
     "move": "Move drones to a point",
     "moveOn": "Moving: click the map (stop)",
     "online": "Online {{count}}/{{total}}",
+    "selectHint": "Click a drone here or on the map to see its details and path. Shift+click adds more drones.",
     "resetConfirm": "Confirm reset: all drones stop",
     "locked": "Mission is running: zone and start points are fixed. Reset to change them.",
     "route": "Route of the selected drone",
