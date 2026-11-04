@@ -10,6 +10,7 @@ import { useMapScaleStore } from './mapScaleStore';
 import { turnNorthUp } from './viewReset';
 import { useMissionStore } from '../mission/missionStore';
 import { WAYPOINT_SOURCE_ID } from '../mission/waypointLayer';
+import { CAMERA_SOURCE_ID } from '../mission/cameraLayer';
 
 import { useSelectionStore } from '../mission/selection';
 import { moveOnlineDrones } from '../mission/missionSocket';
@@ -119,6 +120,7 @@ describe('MapView', () => {
     act(() => map.emit('style.load', {} as never));
     expect(map.getSource(WAYPOINT_SOURCE_ID)).toBeTruthy();
     expect(map.getLayer('drone-waypoints-line')).toBeTruthy();
+    expect(map.getSource(CAMERA_SOURCE_ID)).toBeTruthy();
     loaded.mockRestore();
   });
 

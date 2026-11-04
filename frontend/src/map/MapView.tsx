@@ -18,6 +18,7 @@ import { effectiveCenter, useMissionStore } from '../mission/missionStore';
 import { syncStartMarkers } from '../mission/startMarkers';
 import { syncDroneMarkers } from '../mission/droneMarkers';
 import { addWaypointLayer, syncWaypoints } from '../mission/waypointLayer';
+import { addCameraLayer, syncCamera } from '../mission/cameraLayer';
 import { syncTaskMarkers } from '../mission/taskMarkers';
 import { headOnlineDronesToward, moveOnlineDrones } from '../mission/missionSocket';
 import { dronesInScreenBox, useSelectionStore, type ScreenPoint } from '../mission/selection';
@@ -67,8 +68,12 @@ export function MapView() {
       addBuildingsLayer(map, current);
       addBordersLayer(map, current);
       syncMissionArea(map, useMissionStore.getState(), current);
+      const { drones } = useMissionStore.getState();
+      const { selectedIds } = useSelectionStore.getState();
+      addCameraLayer(map, current);
+      syncCamera(map, drones, selectedIds, current);
       addWaypointLayer(map, current);
-      syncWaypoints(map, useMissionStore.getState().drones, useSelectionStore.getState().selectedIds, current);
+      syncWaypoints(map, drones, selectedIds, current);
       const front = useFrontLineStore.getState();
       syncFrontLine(map, { enabled: front.enabled, zones: front.zones, theme: current });
       map.setPitch(useMapViewStore.getState().buildings3d ? TILT_3D_PITCH : 0);
@@ -221,7 +226,7 @@ export function MapView() {
   }, [missionPoints]);
 
   // Drones with a known position, drawn as NATO symbols or in our own style; the selected ones also
-  // show their path and their task points.
+  // show their path, their task points and what their camera sees.
   // Positions change many times a second, so the map follows the stores directly instead of
   // re-rendering this component on every update (tasks/tech.md, section 6).
   useEffect(() => {
@@ -231,7 +236,9 @@ export function MapView() {
       const { drones } = useMissionStore.getState();
       const { selectedIds } = useSelectionStore.getState();
       syncDroneMarkers(map, drones, useSymbolStyleStore.getState().style);
-      syncWaypoints(map, drones, selectedIds, useThemeStore.getState().theme);
+      const theme = useThemeStore.getState().theme;
+      syncCamera(map, drones, selectedIds, theme);
+      syncWaypoints(map, drones, selectedIds, theme);
       syncTaskMarkers(map, drones, selectedIds);
     };
     sync();
