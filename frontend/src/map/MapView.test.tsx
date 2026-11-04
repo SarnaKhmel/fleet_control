@@ -7,6 +7,7 @@ import { mapInstances, markerInstances } from '../test/maplibreMock';
 import { useMapViewStore } from './mapStyles';
 import { useMapIssueStore } from './mapIssue';
 import { useMapScaleStore } from './mapScaleStore';
+import { turnNorthUp } from './viewReset';
 import { useMissionStore } from '../mission/missionStore';
 import { WAYPOINT_SOURCE_ID } from '../mission/waypointLayer';
 
@@ -123,6 +124,17 @@ describe('MapView', () => {
     });
     expect(setData).toHaveBeenCalled();
     useMissionStore.setState({ phase: 'idle', drones: {} });
+  });
+
+  it('reports the bearing while the map rotates and turns north up on request', () => {
+    render(<MapView />);
+    const map = mapInstances[0];
+    map.bearing = -45;
+    act(() => map.emit('rotate', {} as never));
+    expect(useMapScaleStore.getState().bearing).toBe(-45);
+    turnNorthUp();
+    expect(map.lastEaseTo).toMatchObject({ bearing: 0 });
+    useMapScaleStore.setState({ bearing: 0 });
   });
 
   it('switches the basemap style when the theme changes', () => {

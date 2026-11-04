@@ -22,7 +22,7 @@ import { syncTaskMarkers } from '../mission/taskMarkers';
 import { headOnlineDronesToward, moveOnlineDrones } from '../mission/missionSocket';
 import { dronesInScreenBox, useSelectionStore, type ScreenPoint } from '../mission/selection';
 import { boxesOverlap, boxOf, registerZoneFitter, zoneBoxOf } from '../mission/zoneView';
-import { registerViewReset } from './viewReset';
+import { registerNorthUp, registerViewReset } from './viewReset';
 import { fitMissionZone } from '../mission/zoneView';
 import { areaRing } from '../../../shared/mission/area';
 import { useSymbolStyleStore } from '../mission/symbolStyle';
@@ -77,6 +77,9 @@ export function MapView() {
     const updateScale = () => useMapScaleStore.getState().setMetersPerPx(metersPerPixel(map.getCenter().lat, map.getZoom()));
     updateScale();
     map.on('move', updateScale);
+    // The compass follows the map's bearing; it changes only while the map is being rotated.
+    map.on('rotate', () => useMapScaleStore.getState().setBearing(map.getBearing()));
+    registerNorthUp(() => map.easeTo({ bearing: 0, duration: 500 }));
 
     // Elevation is re-read after every idle, so it follows the map once tiles arrive.
     map.on('idle', () => {

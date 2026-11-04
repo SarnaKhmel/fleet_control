@@ -89,6 +89,14 @@ export class FakeMap {
   getZoom() {
     return 10;
   }
+  bearing = 0;
+  getBearing() {
+    return this.bearing;
+  }
+  lastEaseTo: Record<string, unknown> | null = null;
+  easeTo(options: Record<string, unknown>) {
+    this.lastEaseTo = options;
+  }
   remove() {}
 }
 

@@ -29,7 +29,8 @@
       "style": "Map is unavailable. Check your connection and reload.",
       "terrain": "Terrain is unavailable: elevation is not shown."
     },
-    "resetView": "Default view"
+    "resetView": "Default view",
+    "compass": "Compass: map turned {{deg}}°. Click to face north."
   },
   "location": {
     "title": "Location",
