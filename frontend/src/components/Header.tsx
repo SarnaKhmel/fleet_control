@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { BurgerMenu } from './BurgerMenu';
 import { useTranslation } from 'react-i18next';
 import { isLanguage, setLanguage, SUPPORTED_LANGUAGES } from '../i18n';
 import { useThemeStore } from '../theme/themeStore';
@@ -51,7 +52,10 @@ export function Header() {
 
   return (
     <header className="header">
-      <h1>{t('app.title')}</h1>
+      <div className="header-start">
+        <BurgerMenu />
+        <h1>{t('app.title')}</h1>
+      </div>
       <div className="header-controls">
         <form className="coords-form" onSubmit={submitCoordinates} noValidate>
           <input
