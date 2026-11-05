@@ -255,7 +255,9 @@
       "artillery": "artillery",
       "air_defense": "air defence",
       "ew": "electronic warfare",
-      "radar": "radar"
+      "radar": "radar",
+      "depot": "depot",
+      "base": "base"
     },
     "source": {
       "intel": "known from intelligence",

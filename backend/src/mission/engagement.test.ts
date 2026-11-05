@@ -114,3 +114,12 @@ describe('strike odds from the mission', () => {
     expect(drawStrike('infantry', () => 0.99, shootsAll)).toEqual({ outcome: null, shotDown: true });
   });
 });
+
+describe('depots and bases', () => {
+  it('fight like a position: they shoot the drone down first and their strikes use the infantry odds', () => {
+    for (const kind of ['depot', 'base'] as const) {
+      expect(drawStrike(kind, () => 0.1, DEFAULT_ODDS)).toEqual({ outcome: null, shotDown: true });
+      expect(drawStrike(kind, () => 0.25, DEFAULT_ODDS)).toEqual({ outcome: 'destroyed', shotDown: false });
+    }
+  });
+});

@@ -63,6 +63,8 @@ export const ENEMY_ECHELONS: Record<UnitKind, [number, number]> = {
   air_defense: [14000, 24000],
   ew: [14000, 24000],
   radar: [14000, 24000],
+  depot: [ENEMY_MIN_DISTANCE_M, 7000],
+  base: [ENEMY_MIN_DISTANCE_M, 7000],
 };
 
 /** Allied bands: how far from the nearest start point each allied kind stands, and whether forward (toward the enemy) or behind. */

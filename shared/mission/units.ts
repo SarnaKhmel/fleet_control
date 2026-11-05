@@ -5,10 +5,16 @@ import type { LatLng } from '../protocol.js';
 
 export type UnitSide = 'enemy' | 'ally';
 
-/** Infantry, a dug-in position, vehicles, artillery, air defence, electronic warfare, radar. */
-export type UnitKind = 'infantry' | 'position' | 'vehicle' | 'artillery' | 'air_defense' | 'ew' | 'radar';
+/**
+ * Infantry, a dug-in position, vehicles, artillery, air defence, electronic warfare, radar, and the static objects:
+ * a depot and a base. Those stand still, fight like a position, and can stand in a building.
+ */
+export type UnitKind = 'infantry' | 'position' | 'vehicle' | 'artillery' | 'air_defense' | 'ew' | 'radar' | 'depot' | 'base';
 
-export const UNIT_KINDS: readonly UnitKind[] = ['infantry', 'position', 'vehicle', 'artillery', 'air_defense', 'ew', 'radar'];
+export const UNIT_KINDS: readonly UnitKind[] = ['infantry', 'position', 'vehicle', 'artillery', 'air_defense', 'ew', 'radar', 'depot', 'base'];
+
+/** Kinds that hold their ground and fight like infantry: they shoot a drone down first, and their strikes use the infantry odds. */
+export const DUG_IN_KINDS: readonly UnitKind[] = ['infantry', 'position', 'depot', 'base'];
 
 /**
  * How we know about a unit: `intel` before the mission (all allies, some of the enemy), `drone` seen by a

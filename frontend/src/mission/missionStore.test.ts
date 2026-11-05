@@ -230,7 +230,7 @@ describe('mission store', () => {
 });
 
 describe('battle settings in the store', () => {
-  beforeEach(() => useMissionStore.setState({ phase: 'idle', placed: [], placing: null, enemyCounts: { infantry: 12, position: 8, vehicle: 10, artillery: 6, air_defense: 4, ew: 4, radar: 2 } }));
+  beforeEach(() => useMissionStore.setState({ phase: 'idle', placed: [], placing: null, enemyCounts: { infantry: 12, position: 8, vehicle: 10, artillery: 6, air_defense: 4, ew: 4, radar: 2, depot: 0, base: 0 } }));
 
   it('a count is never below the units placed by hand, and a placement beyond it raises it', () => {
     const { setCount, setPlacing, addPlaced } = useMissionStore.getState();

@@ -95,7 +95,9 @@ describe('generateForces', () => {
     const start = [offsetLatLng(area.center, 0, -5000)];
     for (let seed = 1; seed <= 5; seed++) {
       const units = enemies(generateForces(small, start, seeded(seed)));
-      expect(new Set(units.map((u) => u.kind))).toEqual(new Set(UNIT_KINDS));
+      // Every kind that has a default count is placed; depots and bases have none by default.
+      const kinds = UNIT_KINDS.filter((kind) => DEFAULT_ENEMY_COUNTS[kind] > 0);
+      expect(new Set(units.map((u) => u.kind))).toEqual(new Set(kinds));
       for (const unit of units) {
         expect(nearestStartM(unit.position, start)).toBeGreaterThanOrEqual(ENEMY_MIN_DISTANCE_M);
         expect(isInsideArea(unit.position, small)).toBe(true);
@@ -235,3 +237,15 @@ describe('composition', () => {
     expect(units.find((u) => u.side === 'ally')!.position).toEqual(spot);
   });
 });
+
+describe('depots and bases', () => {
+  it('a depot or a base placed by hand stands where the operator put it, and is not moved', () => {
+    const spot = offsetLatLng(south[0], 0, 6000);
+    const units = generateForces(area, south, seeded(31), undefined, undefined, { enemy: { depot: 1 }, placed: [{ side: 'enemy', kind: 'depot', position: spot }] });
+    const depot = units.find((u) => u.kind === 'depot')!;
+    expect(depot.position).toEqual(spot);
+    expect(depot.speedMs).toBe(0);
+    expect(MOBILE_KINDS).not.toContain('depot');
+  });
+});
+

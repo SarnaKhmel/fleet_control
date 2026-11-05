@@ -7,8 +7,8 @@ const resetStore = () =>
   useMissionStore.setState({
     phase: 'idle',
     odds: DEFAULT_ODDS,
-    enemyCounts: { infantry: 12, position: 8, vehicle: 10, artillery: 6, air_defense: 4, ew: 4, radar: 2 },
-    allyCounts: { infantry: 6, vehicle: 2, artillery: 2, air_defense: 2, ew: 0, position: 0, radar: 0 },
+    enemyCounts: { infantry: 12, position: 8, vehicle: 10, artillery: 6, air_defense: 4, ew: 4, radar: 2, depot: 0, base: 0 },
+    allyCounts: { infantry: 6, vehicle: 2, artillery: 2, air_defense: 2, ew: 0, position: 0, radar: 0, depot: 0, base: 0 },
     placed: [],
     placing: null,
   });

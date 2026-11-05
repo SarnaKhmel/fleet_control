@@ -2,7 +2,7 @@ import type { LatLng } from '../../../shared/protocol.js';
 import { toMetersFrom } from '../../../shared/mission/area.js';
 import type { Buildings } from '../buildings/buildings.js';
 import { advanceAlong } from './kinematics.js';
-import type { HitOutcome, UnitKind } from '../../../shared/mission/units.js';
+import { DUG_IN_KINDS, type HitOutcome, type UnitKind } from '../../../shared/mission/units.js';
 import type { MissionOdds } from '../../../shared/mission/odds.js';
 import { buildingAhead } from './obstacles.js';
 
@@ -66,7 +66,7 @@ export function clearTrack(buildings: Buildings, from: LatLng, wantDeg: number, 
  * strike hits and its outcome is drawn. Positions are held by infantry; other armour is a vehicle.
  */
 export function drawStrike(kind: UnitKind, random: () => number, odds: MissionOdds): { outcome: HitOutcome | null; shotDown: boolean } {
-  const infantry = kind === 'infantry' || kind === 'position';
+  const infantry = DUG_IN_KINDS.includes(kind);
   if (infantry && random() < odds.infantryShootsDown) return { outcome: null, shotDown: true };
   const hit = infantry ? odds.infantry : odds.vehicle;
   const roll = random();

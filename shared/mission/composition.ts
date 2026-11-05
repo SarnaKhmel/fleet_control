@@ -6,7 +6,7 @@ import { UNIT_KINDS, type UnitKind, type UnitSide } from './units.js';
 // a random one; a placement the rules refuse stops the start.
 
 /** How many units of each kind the enemy has in a mission, unless the operator sets other counts. */
-export const DEFAULT_ENEMY_COUNTS: Record<UnitKind, number> = { infantry: 12, position: 8, vehicle: 10, artillery: 6, air_defense: 4, ew: 4, radar: 2 };
+export const DEFAULT_ENEMY_COUNTS: Record<UnitKind, number> = { infantry: 12, position: 8, vehicle: 10, artillery: 6, air_defense: 4, ew: 4, radar: 2, depot: 0, base: 0 };
 /** How many allied units of each kind a mission has, unless the operator sets other counts. */
 export const DEFAULT_ALLY_COUNTS: Partial<Record<UnitKind, number>> = { infantry: 6, vehicle: 2, artillery: 2, air_defense: 2 };
 
