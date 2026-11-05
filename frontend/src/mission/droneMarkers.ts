@@ -20,7 +20,8 @@ function stateClasses(drone: DroneView): string[] {
 // Drones that have a position: NATO symbol, or our own marker with a heading arrow and status color.
 export function droneElement(drone: DroneView, style: SymbolStyle, selected = false): HTMLElement {
   if (style === 'nato') {
-    const el = natoElement(DRONE_SIDC, 30);
+    // 15 % smaller than the first size (30).
+    const el = natoElement(DRONE_SIDC, 25.5);
     el.setAttribute('aria-label', drone.callsign);
     el.classList.add(...stateClasses(drone));
     if (selected) el.classList.add('is-selected');

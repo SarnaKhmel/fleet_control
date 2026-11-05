@@ -503,8 +503,8 @@ body,
 /* Own drone style: a round marker, colored by status, with a heading arrow and the callsign. */
 .drone-marker {
   position: relative;
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: var(--panel);
   border: 2px solid var(--muted);

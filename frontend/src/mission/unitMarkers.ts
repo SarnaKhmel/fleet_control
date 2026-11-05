@@ -8,7 +8,8 @@ import { natoElement, unitSidc } from '../symbology/nato';
 // friendly (blue rectangle) for allies. A unit on the move carries the NATO direction-of-movement arrow.
 // An enemy out of sight stays where it was last seen.
 
-const SIZE = 26;
+// 15 % smaller than the first size (26).
+const SIZE = 22;
 // The arrow is redrawn only when the course turns by this much (each redraw rebuilds the SVG).
 const HEADING_STEP_DEG = 5;
 
