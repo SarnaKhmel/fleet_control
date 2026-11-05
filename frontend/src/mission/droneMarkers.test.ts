@@ -5,8 +5,8 @@ import type { DroneView } from './missionStore';
 
 vi.mock('maplibre-gl', () => import('../test/maplibreMock'));
 
-const online: DroneView = { callsign: 'BA-01', status: 'idle', progress: 100, position: { lat: 50, lng: 30 }, heading: 45 };
-const booting: DroneView = { callsign: 'drone-2', status: 'booting', progress: 40, position: null, heading: null };
+const online: DroneView = { callsign: 'BA-01', status: 'idle', cause: null, warning: null, progress: 100, position: { lat: 50, lng: 30 }, heading: 45, altitudeM: 150, groundM: 150, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] };
+const booting: DroneView = { callsign: 'drone-2', status: 'booting', cause: null, warning: null, progress: 40, position: null, heading: null, altitudeM: null, groundM: null, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] };
 
 describe('drone markers', () => {
   it('draws NATO drones as symbols', () => {
@@ -21,8 +21,66 @@ describe('drone markers', () => {
 
   it('shows one marker per drone that has a position', () => {
     const map = new FakeMap({ style: 'x' });
-    const markers = syncDroneMarkers(map as never, [], { 'drone-1': online, 'drone-2': booting }, 'custom');
+    const markers = syncDroneMarkers(map as never, { 'drone-1': online, 'drone-2': booting }, 'custom');
     expect(markers).toHaveLength(1);
     expect(markerInstances.some((m) => m.added)).toBe(true);
+  });
+});
+
+describe('drone marker reuse', () => {
+  it('moves the existing marker on a position update instead of recreating it', () => {
+    const map = new FakeMap({ style: 'x' });
+    const first = syncDroneMarkers(map as never, { 'drone-1': online }, 'custom');
+    const moved = { ...online, position: { lat: 50.01, lng: 30.01 } };
+    const second = syncDroneMarkers(map as never, { 'drone-1': moved }, 'custom');
+    expect(second[0]).toBe(first[0]);
+    expect((second[0] as unknown as { lngLat: number[] }).lngLat).toEqual([30.01, 50.01]);
+  });
+});
+
+describe('drone marker state colors', () => {
+  const classes = (drone: DroneView, style: 'custom' | 'nato') => [...droneElement(drone, style).classList];
+
+  it('turns yellow at 30 % battery and red at 10 %', () => {
+    expect(classes({ ...online, batteryPct: 31 }, 'custom')).not.toContain('is-battery-low');
+    expect(classes({ ...online, batteryPct: 30 }, 'custom')).toContain('is-battery-low');
+    expect(classes({ ...online, batteryPct: 10 }, 'custom')).toContain('is-battery-critical');
+    expect(classes({ ...online, batteryPct: 10 }, 'nato')).toContain('is-battery-critical');
+  });
+
+  it('shows a drone that lost its link as lost, not by its battery', () => {
+    const lost = { ...online, status: 'lost_link' as const, batteryPct: 0 };
+    expect(classes(lost, 'custom')).toEqual(expect.arrayContaining(['is-lost_link']));
+    expect(classes(lost, 'custom')).not.toContain('is-battery-critical');
+    expect(classes(lost, 'nato')).toContain('is-lost_link');
+  });
+
+  it('rebuilds the marker when the battery crosses a level, and keeps it within a level', () => {
+    const map = new FakeMap({ style: 'x' });
+    const [first] = syncDroneMarkers(map as never, { 'drone-1': { ...online, batteryPct: 50 } }, 'custom');
+    const [same] = syncDroneMarkers(map as never, { 'drone-1': { ...online, batteryPct: 40 } }, 'custom');
+    expect(same).toBe(first);
+    const [low] = syncDroneMarkers(map as never, { 'drone-1': { ...online, batteryPct: 29 } }, 'custom');
+    expect(low).not.toBe(first);
+    expect((low as unknown as { element: HTMLElement }).element.classList.contains('is-battery-low')).toBe(true);
+  });
+
+  it('marks landed and destroyed drones by their status', () => {
+    expect(classes({ ...online, status: 'landed' }, 'custom')).toContain('is-landed');
+    const destroyed = { ...online, status: 'destroyed' as const, batteryPct: 0 };
+    expect(classes(destroyed, 'custom')).toContain('is-destroyed');
+    expect(classes(destroyed, 'custom')).not.toContain('is-battery-critical');
+    expect(classes(destroyed, 'nato')).toContain('is-destroyed');
+  });
+
+  it('pulses a drone with a building ahead, and rebuilds the marker when the warning comes and goes', () => {
+    expect(classes({ ...online, warning: { kind: 'building' as const, point: { lat: 50.02, lng: 30 }, distanceM: 1200, etaS: 12, heightM: 70 } }, 'custom')).toContain('is-warning');
+    expect(classes({ ...online, warning: { kind: 'building' as const, point: { lat: 50.02, lng: 30 }, distanceM: 1200, etaS: 12, heightM: 70 } }, 'nato')).toContain('is-warning');
+    const map = new FakeMap({ style: 'x' });
+    const [calm] = syncDroneMarkers(map as never, { 'drone-1': online }, 'custom');
+    const [warned] = syncDroneMarkers(map as never, { 'drone-1': { ...online, warning: { kind: 'building' as const, point: { lat: 50.02, lng: 30 }, distanceM: 1200, etaS: 12, heightM: 70 } } }, 'custom');
+    expect(warned).not.toBe(calm);
+    const [again] = syncDroneMarkers(map as never, { 'drone-1': { ...online, warning: { ...{ kind: 'building' as const, point: { lat: 50.02, lng: 30 }, distanceM: 1200, etaS: 12, heightM: 70 }, etaS: 11 } } }, 'custom');
+    expect(again).toBe(warned);
   });
 });

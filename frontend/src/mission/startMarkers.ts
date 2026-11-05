@@ -2,7 +2,7 @@ import type { Map as MapLibreMap, Marker as MapLibreMarkerType } from 'maplibre-
 import { Marker } from 'maplibre-gl';
 import type { LatLng } from '../../../shared/protocol';
 
-/** Replaces the start-point markers with one numbered marker per picked point. Returns the new list. */
+/** Replaces markers with one per start (takeoff) point: squares numbered 1, 2, 3. */
 export function syncStartMarkers(map: MapLibreMap, previous: MapLibreMarkerType[], points: LatLng[]): MapLibreMarkerType[] {
   previous.forEach((marker) => marker.remove());
   return points.map((point, index) => {

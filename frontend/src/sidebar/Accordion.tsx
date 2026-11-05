@@ -4,12 +4,20 @@ interface AccordionProps {
   title: string;
   summary?: string;
   defaultOpen?: boolean;
+  /** Controlled mode: the parent owns the open state. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   children: ReactNode;
 }
 
 // A collapsible section. The body stays mounted when closed, so its state survives toggling.
-export function Accordion({ title, summary, defaultOpen = false, children }: AccordionProps) {
-  const [open, setOpen] = useState(defaultOpen);
+export function Accordion({ title, summary, defaultOpen = false, open: controlled, onOpenChange, children }: AccordionProps) {
+  const [inner, setInner] = useState(defaultOpen);
+  const open = controlled ?? inner;
+  const setOpen = (next: boolean) => {
+    if (controlled === undefined) setInner(next);
+    onOpenChange?.(next);
+  };
   return (
     <section className={`accordion${open ? ' is-open' : ''}`}>
       <button type="button" className="accordion-head" aria-expanded={open} onClick={() => setOpen(!open)}>

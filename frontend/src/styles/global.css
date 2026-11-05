@@ -8,6 +8,7 @@
   --accent: #4ea1ff;
   --symbol-bg: #e6edf7;
   --warning: #f5a524;
+  --danger: #e5484d;
 }
 
 :root[data-theme='light'] {
@@ -19,6 +20,31 @@
   --accent: #1f6feb;
   --symbol-bg: #ffffff;
   --warning: #d97706;
+  --danger: #d93036;
+}
+
+/* Tactical: olive-black panels, off-white type, steel-blue accent (a military HUD look). Flat on purpose:
+   no images, gradients, extra fonts or shadows, so it costs nothing extra to load. */
+:root[data-theme='tactical'] {
+  --bg: #0d100e;
+  --panel: #151a16;
+  --border: #2e3a2c;
+  --fg: #dfe3d0;
+  --muted: #8f9a84;
+  --accent: #7fb2e5;
+  --symbol-bg: #dfe3d0;
+  --warning: #e3b341;
+  --danger: #e0524b;
+}
+
+:root[data-theme='tactical'] .header {
+  border-bottom: 2px solid var(--accent);
+}
+
+:root[data-theme='tactical'] .header h1,
+:root[data-theme='tactical'] .location-panel h2 {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 body {
@@ -351,11 +377,53 @@ body,
   filter: brightness(0.7) contrast(1.05);
 }
 
-.scale-bar {
+/* Compass and scale bar, side by side in the bottom-right corner of the map. */
+.map-scale-group {
   position: absolute;
   right: 0.5rem;
   bottom: 2.6rem;
   z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
+.map-compass {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.map-compass:hover {
+  border-color: var(--accent);
+}
+
+.map-compass svg {
+  transition: transform 0.1s linear;
+}
+
+.map-compass-north {
+  fill: var(--warning);
+}
+
+.map-compass-south {
+  fill: var(--muted);
+}
+
+.map-compass text {
+  fill: var(--bg);
+  font-size: 5px;
+  font-weight: 700;
+}
+
+.scale-bar {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -440,10 +508,12 @@ body,
   padding: 0;
 }
 
+/* Takeoff points: numbered squares, so they are not mistaken for the round task points. */
 .mission-start-marker {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
+  /* 10 % smaller than it was (22 px). */
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
   background: var(--accent);
   color: var(--bg);
   border: 2px solid var(--fg);
@@ -458,8 +528,8 @@ body,
 /* Own drone style: a round marker, colored by status, with a heading arrow and the callsign. */
 .drone-marker {
   position: relative;
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: var(--panel);
   border: 2px solid var(--muted);
@@ -468,12 +538,83 @@ body,
   justify-content: center;
 }
 
-.drone-marker.is-idle {
+.drone-marker.is-idle,
+.drone-marker.is-moving,
+.drone-marker.is-landing,
+.drone-marker.is-landed {
   border-color: var(--accent);
 }
 
-.drone-marker.is-connecting {
+.drone-marker.is-connecting,
+.drone-marker.is-battery-low {
   border-color: var(--warning);
+}
+
+.drone-marker.is-battery-critical {
+  border-color: var(--danger);
+}
+
+/* A building ahead at the drone's height: a pulsing red ring until the way is clear. */
+.drone-marker.is-warning,
+.maplibregl-marker .nato-symbol.is-warning {
+  animation: collision-pulse 1s ease-in-out infinite;
+}
+
+@keyframes collision-pulse {
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--danger) 55%, transparent);
+  }
+}
+
+/* Lost link (empty battery): a grey, dashed marker at the spot where the drone came down. */
+.drone-marker.is-lost_link {
+  border-color: var(--muted);
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+.drone-marker.is-lost_link .drone-marker-arrow,
+.drone-marker.is-destroyed .drone-marker-arrow,
+.drone-marker.is-landed .drone-marker-arrow {
+  display: none;
+}
+
+/* On the ground: a filled marker, so it reads apart from the drones in the air. */
+.drone-marker.is-landed,
+.drone-marker.is-landing {
+  background: color-mix(in srgb, var(--accent) 25%, var(--panel));
+}
+
+/* Destroyed (fell with an empty battery): a red dashed marker with a cross where it fell. */
+.drone-marker.is-destroyed {
+  border-color: var(--danger);
+  border-style: dashed;
+  opacity: 0.7;
+}
+
+.drone-marker.is-destroyed::after {
+  content: '✕';
+  color: var(--danger);
+  font-weight: 700;
+}
+
+/* NATO symbols keep their frame; the battery and lost-link state show as a ring around them. */
+.maplibregl-marker .nato-symbol.is-battery-low {
+  box-shadow: 0 0 0 3px var(--warning);
+}
+
+.maplibregl-marker .nato-symbol.is-battery-critical {
+  box-shadow: 0 0 0 3px var(--danger);
+}
+
+.maplibregl-marker .nato-symbol.is-lost_link,
+.maplibregl-marker .nato-symbol.is-destroyed {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+
+.maplibregl-marker .nato-symbol.is-destroyed {
+  box-shadow: 0 0 0 3px var(--danger);
 }
 
 .drone-marker-arrow {
@@ -1090,4 +1231,267 @@ body,
 .sidebar-right .settings-row button[aria-pressed='true'] {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.selection-box {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  border: 1px dashed var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.drone-marker.is-selected,
+.maplibregl-marker .nato-symbol.is-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Drone status: boot progress and connection state, shown at the top of the mission section. */
+.drone-status {
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.drone-status-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.drone-status-count {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.drone-status ul {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+/* Each drone row is a button: clicking it selects the drone. */
+.drone-status-select {
+  display: block;
+  width: 100%;
+  padding: 0.25rem 0.35rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.drone-status-select:hover {
+  border-color: var(--border);
+}
+
+.drone-status-select.is-selected {
+  border-color: var(--accent);
+}
+
+.drone-status-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.72rem;
+}
+
+.drone-status-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+}
+
+.drone-state {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.drone-state.is-idle {
+  color: var(--accent);
+}
+
+.drone-state.is-connecting {
+  color: var(--warning);
+}
+
+.drone-state.is-lost_link,
+.drone-state.is-destroyed,
+.drone-state.is-warning {
+  color: var(--danger);
+}
+
+.drone-state.is-moving,
+.drone-state.is-landing,
+.drone-state.is-landed {
+  color: var(--accent);
+}
+
+/* Lands the selected drones: a full-width action at the top of the drone details. */
+.land-selected {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+/* Highlighted warning at the top of a drone's details: low battery, critical battery, lost link. */
+.drone-alert {
+  margin: 0 0 0.5rem;
+  padding: 0.4rem 0.55rem;
+  border-left: 3px solid var(--warning);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  font-size: 0.8rem;
+}
+
+.drone-alert.is-critical,
+.drone-alert.is-collision,
+.drone-alert.is-destroyedCollision,
+.drone-alert.is-destroyed,
+.drone-alert.is-lost {
+  border-left-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+
+.boot-bar {
+  height: 4px;
+  margin-top: 0.2rem;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.boot-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}
+
+.sidebar .btn-danger {
+  border-color: var(--warning);
+  color: var(--warning);
+  font-weight: 600;
+}
+
+/* Selected-location pointer: a small teardrop in the accent color. */
+.location-pin {
+  color: var(--accent);
+  line-height: 0;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+}
+
+.drone-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 0.75rem;
+  margin: 0;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.drone-facts dt {
+  color: var(--muted);
+}
+
+.drone-facts dd {
+  margin: 0;
+  text-align: right;
+}
+
+/* A drone's task list in the right panel: numbered points, each with a remove button. */
+.drone-tasks h4 {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.drone-tasks ol {
+  margin: 0 0 0.5rem;
+  padding-left: 1.25rem;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.drone-tasks li > span {
+  display: inline-block;
+  min-width: 10.5rem;
+}
+
+.drone-tasks li button {
+  padding: 0 0.4rem;
+  line-height: 1.2;
+}
+
+/* Task points of the selected drones: numbered, draggable, right-click removes. */
+.task-marker {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--bg);
+  border: 2px solid var(--fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: grab;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+/* Tasks of a drone that lost its link: shown, but they can no longer be moved or removed. */
+.task-marker.is-locked {
+  background: var(--muted);
+  cursor: default;
+}
+
+.header button.btn-danger {
+  border-color: var(--warning);
+  color: var(--warning);
+  font-weight: 600;
+}
+
+/* Height and speed for the selected drones: two fields and Apply, at the top of the drone details. */
+.flight-settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.flight-settings label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.flight-settings button {
+  grid-column: 1 / -1;
+}
+
+.unit-marker.is-last-seen {
+  opacity: 0.45;
+}
+
+.zone-label {
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--muted);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  pointer-events: none;
 }

@@ -9,7 +9,7 @@ export const FRONT_LINE_URL = '/front-line/approximate.geojson';
 export const FRONT_SOURCE_ID = 'front-line';
 export const FRONT_FILL_ID = 'front-line-fill';
 export const FRONT_LINE_ID = 'front-line-line';
-export const FRONT_COLORS: Record<Theme, string> = { dark: '#ff9f43', light: '#c2410c' };
+export const FRONT_COLORS: Record<Theme, string> = { dark: '#ff9f43', light: '#c2410c', tactical: '#ff9f43' };
 
 interface FrontLineState {
   enabled: boolean;

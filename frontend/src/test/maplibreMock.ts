@@ -45,8 +45,18 @@ export class FakeMap {
     this.fitted = true;
   }
   fitted = false;
+  boxZoom = { disable() {}, enable() {} };
+  dragPan = { disable() {}, enable() {} };
+  project(lngLat: [number, number]) {
+    return { x: lngLat[0], y: lngLat[1] };
+  }
   addSource(id: string, spec: object) {
-    this.sources[id] = spec;
+    // Like a GeoJSON source: its data can be replaced later.
+    const source: Record<string, unknown> = { ...spec };
+    source.setData = (data: unknown) => {
+      source.data = data;
+    };
+    this.sources[id] = source;
   }
   setTerrain(terrain: object | null) {
     this.terrain = terrain;
@@ -84,6 +94,14 @@ export class FakeMap {
   getZoom() {
     return 10;
   }
+  bearing = 0;
+  getBearing() {
+    return this.bearing;
+  }
+  lastEaseTo: Record<string, unknown> | null = null;
+  easeTo(options: Record<string, unknown>) {
+    this.lastEaseTo = options;
+  }
   remove() {}
 }
 
@@ -93,9 +111,22 @@ export class Marker {
   lngLat: [number, number] | null = null;
   added = false;
   element: HTMLElement | undefined;
-  constructor(options?: { element?: HTMLElement }) {
+  draggable: boolean;
+  handlers: Record<string, (() => void)[]> = {};
+  constructor(options?: { element?: HTMLElement; draggable?: boolean }) {
     this.element = options?.element;
+    this.draggable = !!options?.draggable;
     markerInstances.push(this);
+  }
+  on(event: string, handler: () => void) {
+    (this.handlers[event] ??= []).push(handler);
+    return this;
+  }
+  fire(event: string) {
+    this.handlers[event]?.forEach((handler) => handler());
+  }
+  getLngLat() {
+    return { lng: this.lngLat![0], lat: this.lngLat![1] };
   }
   setLngLat(lngLat: [number, number]) {
     this.lngLat = lngLat;

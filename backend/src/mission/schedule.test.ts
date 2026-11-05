@@ -5,18 +5,18 @@ const area = { center: { lat: 50, lng: 30 }, widthKm: 200, heightKm: 200 };
 
 describe('resolveStarts', () => {
   it('puts all drones on one point for a single layout', () => {
-    const r = resolveStarts(area, { kind: 'single', point: { lat: 50, lng: 30 } });
+    const r = resolveStarts(area, { kind: 'single', point: { lat: 50, lng: 30 } }, 3);
     expect(r.ok && r.points).toHaveLength(3);
   });
 
   it('places clustered drones close to each other but not on one spot', () => {
-    const r = resolveStarts(area, { kind: 'cluster', center: { lat: 50, lng: 30 }, radiusM: 2000 });
+    const r = resolveStarts(area, { kind: 'cluster', center: { lat: 50, lng: 30 }, radiusM: 2000 }, 7);
     if (!r.ok) throw new Error('expected ok');
-    expect(new Set(r.points.map((p) => `${p.lat},${p.lng}`)).size).toBe(3);
+    expect(new Set(r.points.map((p) => `${p.lat},${p.lng}`)).size).toBe(7);
   });
 
   it('rejects a start point outside the mission area', () => {
-    const r = resolveStarts(area, { kind: 'separate', points: [{ lat: 50, lng: 30 }, { lat: 50, lng: 30 }, { lat: 52, lng: 30 }] });
+    const r = resolveStarts(area, { kind: 'separate', points: [{ lat: 50, lng: 30 }, { lat: 50, lng: 30 }, { lat: 52, lng: 30 }] }, 3);
     expect(r).toEqual({ ok: false, reason: 'outside_area' });
   });
 });
@@ -27,6 +27,12 @@ describe('buildSchedule and droneStateAt', () => {
   it('staggers the drones by STAGGER_MS', () => {
     expect(schedule.map((d) => d.startAtMs)).toEqual([0, STAGGER_MS, 2 * STAGGER_MS]);
     expect(schedule.map((d) => d.callsign)).toEqual(['BA-01', 'BA-02', 'BA-03']);
+  });
+
+  it('numbers callsigns with two digits for larger fleets', () => {
+    const many = buildSchedule(Array.from({ length: 12 }, () => ({ lat: 50, lng: 30 })));
+    expect(many.map((d) => d.callsign).slice(8, 12)).toEqual(['BA-09', 'BA-10', 'BA-11', 'BA-12']);
+    expect(many.at(-1)?.droneId).toBe('drone-12');
   });
 
   it('walks a drone through offline, booting, connecting and idle', () => {

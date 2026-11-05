@@ -34,15 +34,23 @@ describe('App', () => {
     expect(document.documentElement.lang).toBe('uk');
   });
 
-  it('toggles the theme, applies it to the document and saves it', () => {
+  it('chooses the theme, applies it to the document and saves it', () => {
     render(<App />);
     expect(document.documentElement.dataset.theme).toBe('dark');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Light theme' }));
+    fireEvent.change(screen.getByLabelText('Theme'), { target: { value: 'light' } });
 
     expect(document.documentElement.dataset.theme).toBe('light');
     expect(localStorage.getItem('fleet.theme')).toContain('"light"');
-    expect(screen.getByRole('button', { name: 'Dark theme' })).toBeTruthy();
+    expect(screen.getByLabelText('Theme')).toHaveProperty('value', 'light');
+  });
+
+  it('offers the tactical theme and applies it', () => {
+    render(<App />);
+    fireEvent.change(screen.getByLabelText('Theme'), { target: { value: 'tactical' } });
+
+    expect(document.documentElement.dataset.theme).toBe('tactical');
+    expect(screen.getByRole('option', { name: 'Tactical' })).toBeTruthy();
   });
 
   it('shows the selected location and clears it', () => {

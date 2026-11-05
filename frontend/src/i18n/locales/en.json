@@ -4,8 +4,9 @@
   },
   "header": {
     "language": "Language",
-    "switchToLight": "Light theme",
-    "switchToDark": "Dark theme",
+    "themeDark": "Dark",
+    "themeLight": "Light",
+    "themeTactical": "Tactical",
     "coordinates": "Coordinates",
     "coordinatesPlaceholder": "50.45, 30.52 or city name",
     "go": "Go",
@@ -13,13 +14,16 @@
     "mapView": "Map view",
     "mapAuto": "Map: by theme",
     "mapLandscape": "Map: landscape",
+    "mapSatellite": "Map: satellite",
     "buildings3dOn": "3D buildings: on",
     "buildings3dOff": "3D buildings: off",
     "cityNotFound": "City not found",
     "geocodeError": "Search failed, try again",
     "symbols": "Drone symbols",
     "symbolsNato": "Drones: NATO",
-    "symbolsCustom": "Drones: own style"
+    "symbolsCustom": "Drones: own style",
+    "resetAll": "Reset all",
+    "resetAllConfirm": "Confirm: reset all"
   },
   "map": {
     "label": "Map",
@@ -27,7 +31,8 @@
       "style": "Map is unavailable. Check your connection and reload.",
       "terrain": "Terrain is unavailable: elevation is not shown."
     },
-    "resetView": "Default view"
+    "resetView": "Default view",
+    "compass": "Compass: map turned {{deg}}°. Click to face north."
   },
   "location": {
     "title": "Location",
@@ -74,6 +79,14 @@
     "targetConfirmed": "Target confirmed — hostile",
     "targetEngaged": "Target engaged — hostile",
     "targetNeutralized": "Target neutralized — destroyed",
+    "enemyInfantry": "Enemy infantry",
+    "enemyPosition": "Enemy dug-in position",
+    "enemyVehicle": "Enemy armoured vehicles (the arrow: on the move, where to)",
+    "enemyArtillery": "Enemy artillery",
+    "enemyAirDefense": "Enemy air defence",
+    "enemyEw": "Enemy electronic warfare",
+    "enemyRadar": "Enemy radar",
+    "allyInfantry": "Allied unit (sees 2 km around)",
     "wind": "Wind compass: the arrow shows where the wind blows toward; speed in m/s"
   },
   "frontLine": {
@@ -93,6 +106,7 @@
     "layoutCluster": "Cluster around a point",
     "layoutSeparate": "Each from its own point",
     "radius": "Cluster radius, m",
+    "droneCount": "Number of drones",
     "pick": "Pick start points on map",
     "pickingOn": "Picking: click the map (stop)",
     "picked": "Points: {{count}} of {{need}}",
@@ -112,13 +126,24 @@
       "offline": "offline",
       "booting": "booting",
       "connecting": "connecting",
-      "idle": "online"
+      "idle": "hovering",
+      "lost_link": "link lost",
+      "moving": "moving",
+      "landing": "landing",
+      "landed": "landed",
+      "destroyed": "destroyed"
     },
     "draw": "Draw zone on map",
     "drawingOn": "Drawing: click the map (stop)",
     "drawFirst": "Click the first corner.",
     "drawSecond": "Click the opposite corner.",
-    "backToZone": "Back to mission zone"
+    "backToZone": "Back to mission zone",
+    "drones": "Drones",
+    "online": "Online {{count}}/{{total}}",
+    "selectHint": "Click a drone here or on the map to see its details and path. Shift+click adds more drones.",
+    "resetConfirm": "Confirm reset: all drones stop",
+    "locked": "Mission is running: zone and start points are fixed. Reset to change them.",
+    "warningBuilding": "⚠ building"
   },
   "sidebar": {
     "label": "Side panel",
@@ -126,7 +151,8 @@
     "mission": "Mission",
     "location": "Location",
     "collapse": "Collapse panel",
-    "expand": "Expand panel"
+    "expand": "Expand panel",
+    "drones": "Drones"
   },
   "settings": {
     "open": "Settings",
@@ -138,5 +164,61 @@
     "buildings": "3D buildings",
     "frontLine": "Front line",
     "drones": "Drones"
+  },
+  "drone": {
+    "panelTitle": "Drones",
+    "status": "Status",
+    "altitude": "Height above ground",
+    "heading": "Heading",
+    "speed": "Ground speed",
+    "crab": "Crab angle",
+    "battery": "Battery",
+    "position": "Position",
+    "tasks": "Tasks",
+    "tasksEmpty": "No tasks. Click the map to add points one after another; Ctrl+click starts over.",
+    "taskRemove": "Remove task {{n}}",
+    "tasksClear": "Clear all",
+    "taskMarker": "{{callsign}} task {{n}}",
+    "taskMarkerHint": "Drag to move the task, right-click to remove it",
+    "alert": {
+      "low": "Low battery: {{pct}}%. Bring the drone back or finish the task.",
+      "critical": "Critical battery: {{pct}}%. The drone will lose its link when it runs out.",
+      "lost": "Link lost: the battery ran out on the ground. The drone is intact at the position shown.",
+      "destroyed": "Destroyed: the battery ran out in the air and the drone fell at the position shown.",
+      "collision": "Building ahead, {{height}} m tall, at the flight height: impact in about {{eta}} s ({{distance}} m). Raise the drone or change its route.",
+      "destroyedCollision": "Destroyed: the drone flew into a building at the position shown."
+    },
+    "tasksUnfinished": "Route it did not finish:",
+    "land": "Land ({{count}})",
+    "landHint": "Land the selected drones where they are. A click on the map takes them up again.",
+    "settings": "Set",
+    "flight": "Flight",
+    "flightAltitude": "Height above ground, m",
+    "flightSpeed": "Speed, m/s",
+    "flightApply": "Apply ({{count}})",
+    "range": "Range",
+    "rangeHint": "How far it can still fly on its charge at its cruise speed: against the wind and with it"
+  },
+  "unit": {
+    "side": {
+      "enemy": "Enemy",
+      "ally": "Ally"
+    },
+    "kind": {
+      "infantry": "infantry",
+      "position": "dug-in position",
+      "vehicle": "armoured vehicles",
+      "artillery": "artillery",
+      "air_defense": "air defence",
+      "ew": "electronic warfare",
+      "radar": "radar"
+    },
+    "source": {
+      "intel": "known from intelligence",
+      "drone": "found by {{callsign}}",
+      "ally": "seen by allies"
+    },
+    "moving": "moving {{speed}} km/h, course {{heading}}°",
+    "lastSeen": "last seen here, not in sight now"
   }
 }

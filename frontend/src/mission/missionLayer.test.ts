@@ -13,14 +13,16 @@ describe('mission area ring', () => {
 });
 
 describe('zone visibility on the map', () => {
-  it('is hidden before the mission starts and shown while it runs', async () => {
+  it('is hidden until the operator chooses it, and shown while the mission runs', async () => {
     const { FakeMap } = await import('../test/maplibreMock');
     const { syncMissionArea, MISSION_LINE_ID } = await import('./missionLayer');
     const map = new FakeMap({ style: 'x' });
-    const state = { ...useMissionStore.getState(), phase: 'idle' as const, drawing: false };
+    const state = { ...useMissionStore.getState(), phase: 'idle' as const, drawing: false, zoneChosen: false };
     syncMissionArea(map as never, state as never, 'dark');
     expect(map.getLayer(MISSION_LINE_ID)).toBeUndefined();
-    syncMissionArea(map as never, { ...state, phase: 'running' } as never, 'dark');
+    syncMissionArea(map as never, { ...state, zoneChosen: true } as never, 'dark');
+    expect(map.getLayer(MISSION_LINE_ID)).toBeTruthy();
+    syncMissionArea(map as never, { ...state, zoneChosen: false, phase: 'running' } as never, 'dark');
     expect(map.getLayer(MISSION_LINE_ID)).toBeTruthy();
   });
 });

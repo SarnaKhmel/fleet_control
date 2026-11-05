@@ -2,13 +2,13 @@ import type { DroneTelemetry } from '../../../shared/protocol.js';
 import type { DroneSchedule } from './schedule.js';
 
 // Telemetry for a drone that has just come online. Values not simulated yet use plausible constants.
-export function buildTelemetry(entry: DroneSchedule, timestamp: string): DroneTelemetry {
+export function buildTelemetry(entry: DroneSchedule, timestamp: string, groundM: number): DroneTelemetry {
   return {
     meta: { timestamp, drone_id: entry.droneId, callsign: entry.callsign },
     connection: { signal_strength_pct: 95, uplink_loss_pct: 0, downlink_latency_ms: 40, satellites_visible: 12, link_type: 'simulated' },
     flight_status: { armed: true, flight_mode: 'HOLD', landed_state: 'ON_GROUND', mission_phase: 'IDLE' },
     position_and_kinematics: {
-      gps: { latitude: entry.start.lat, longitude: entry.start.lng, altitude_amsl_m: 150 },
+      gps: { latitude: entry.start.lat, longitude: entry.start.lng, altitude_amsl_m: groundM },
       relative_altitude_m: 0,
       ground_speed_ms: 0,
       airspeed_ms: 0,

@@ -1,20 +1,22 @@
-import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isLanguage, setLanguage, SUPPORTED_LANGUAGES } from '../i18n';
-import { useThemeStore } from '../theme/themeStore';
+import { THEMES, useThemeStore, type Theme } from '../theme/themeStore';
 import { useMapViewStore, type MapView } from '../map/mapStyles';
 import { loadFrontLine, useFrontLineStore } from '../frontline/frontLine';
 import { useSymbolStyleStore, type SymbolStyle } from '../mission/symbolStyle';
 import { Accordion } from '../sidebar/Accordion';
-import { useSettingsPanelStore } from '../settings/settingsStore';
 
-// Right-side settings panel, laid out like the left side panel: accordion sections over the map.
-export function SettingsPanel() {
+const THEME_LABEL_KEYS: Record<Theme, string> = {
+  dark: 'header.themeDark',
+  light: 'header.themeLight',
+  tactical: 'header.themeTactical',
+};
+
+// Settings sections (accordions): general, map and drone symbols.
+export function SettingsSections() {
   const { t, i18n } = useTranslation();
-  const open = useSettingsPanelStore((state) => state.open);
-  const setOpen = useSettingsPanelStore((state) => state.setOpen);
   const theme = useThemeStore((state) => state.theme);
-  const toggleTheme = useThemeStore((state) => state.toggleTheme);
+  const setTheme = useThemeStore((state) => state.setTheme);
   const mapView = useMapViewStore((state) => state.view);
   const setMapView = useMapViewStore((state) => state.setView);
   const buildings3d = useMapViewStore((state) => state.buildings3d);
@@ -24,32 +26,8 @@ export function SettingsPanel() {
   const symbolStyle = useSymbolStyleStore((state) => state.style);
   const setSymbolStyle = useSymbolStyleStore((state) => state.setStyle);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, setOpen]);
-
-  if (!open) return null;
-
   return (
-    <aside className="sidebar sidebar-right" aria-label={t('settings.title')}>
-      <div className="sidebar-top">
-        <span className="sidebar-title">{t('settings.title')}</span>
-        <button
-          type="button"
-          className="sidebar-toggle"
-          aria-label={t('settings.close')}
-          title={t('settings.close')}
-          onClick={() => setOpen(false)}
-        >
-          ×
-        </button>
-      </div>
-
+    <>
       <Accordion title={t('settings.general')} defaultOpen>
         <label className="settings-row">
           <span>{t('header.language')}</span>
@@ -67,12 +45,16 @@ export function SettingsPanel() {
             ))}
           </select>
         </label>
-        <div className="settings-row">
+        <label className="settings-row">
           <span>{t('settings.theme')}</span>
-          <button type="button" onClick={toggleTheme}>
-            {t(theme === 'dark' ? 'header.switchToLight' : 'header.switchToDark')}
-          </button>
-        </div>
+          <select aria-label={t('settings.theme')} value={theme} onChange={(event) => setTheme(event.target.value as Theme)}>
+            {THEMES.map((name) => (
+              <option key={name} value={name}>
+                {t(THEME_LABEL_KEYS[name])}
+              </option>
+            ))}
+          </select>
+        </label>
       </Accordion>
 
       <Accordion title={t('settings.map')}>
@@ -81,6 +63,7 @@ export function SettingsPanel() {
           <select aria-label={t('header.mapView')} value={mapView} onChange={(event) => setMapView(event.target.value as MapView)}>
             <option value="auto">{t('header.mapAuto')}</option>
             <option value="landscape">{t('header.mapLandscape')}</option>
+            <option value="satellite">{t('header.mapSatellite')}</option>
           </select>
         </label>
         <div className="settings-row">
@@ -113,6 +96,6 @@ export function SettingsPanel() {
           </select>
         </label>
       </Accordion>
-    </aside>
+    </>
   );
 }
