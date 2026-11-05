@@ -2,11 +2,12 @@ import type { ClientMessage, ServerMessage } from '../../../shared/protocol';
 import { useMissionStore } from './missionStore';
 import { useSelectionStore } from './selection';
 import { takesCommands, type EngageMode, type LatLng } from '../../../shared/protocol';
+import type { SimSpeed } from '../../../shared/mission/clock';
 import { toMetersFrom } from '../../../shared/mission/area';
 import { useWindStore } from '../wind/windStore';
 import { debugLog } from '../log';
 
-const SERVER_TYPES = new Set(['mission_snapshot', 'drone_boot', 'drone_online', 'position', 'drone_tasks', 'drone_status', 'drone_settings', 'drone_warning', 'recon_cells', 'units', 'unit_hit', 'mission_error', 'mission_reset']);
+const SERVER_TYPES = new Set(['mission_snapshot', 'drone_boot', 'drone_online', 'position', 'drone_tasks', 'drone_status', 'drone_settings', 'drone_warning', 'recon_cells', 'units', 'unit_hit', 'clock', 'mission_error', 'mission_reset']);
 
 /** Parses a server message, or null for anything unknown or malformed. Trust boundary for the client. */
 export function parseServerMessage(raw: unknown): ServerMessage | null {
@@ -149,4 +150,9 @@ export function headOnlineDronesToward(target: LatLng): number {
 /** Sends a drone at an enemy unit: a strike, or a pursuit. Returns false when not connected. */
 export function engageEnemy(droneId: string, targetId: string, mode: EngageMode): boolean {
   return sendClientMessage({ type: 'engage', droneId, targetId, mode });
+}
+
+/** Sets the mission clock: a speed, a pause, or both. Returns false when not connected. */
+export function setMissionClock(settings: { speed?: SimSpeed; paused?: boolean }): boolean {
+  return sendClientMessage({ type: 'set_clock', ...settings });
 }

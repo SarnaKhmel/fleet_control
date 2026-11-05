@@ -2,6 +2,7 @@ import type { ReconCell, ReconGrid } from './mission/recon.js';
 import type { HitOutcome, MissionUnit } from './mission/units.js';
 import { isMissionOdds, type MissionOdds } from './mission/odds.js';
 import { isComposition, type Composition } from './mission/composition.js';
+import { isSimSpeed, type MissionClockView, type SimSpeed } from './mission/clock.js';
 
 // WebSocket protocol shared by the simulator (backend) and the dashboard (frontend).
 // Server is the source of truth; the client sends intents only. Every incoming message is
@@ -142,6 +143,8 @@ export type ClientMessage =
   | { type: 'land'; droneIds: string[] }
   /** Sets the height above the ground and/or the cruise speed of the drones (at least one of the two). */
   | { type: 'set_flight'; droneIds: string[]; altitudeAglM?: number; cruiseSpeedMs?: number }
+  /** The mission clock: a speed (1, 2, 3, 4, 5 or 10 times real time), a pause, or both. */
+  | { type: 'set_clock'; speed?: SimSpeed; paused?: boolean }
   /** Sends a drone at an enemy unit (enemy-N). Refused unless the unit is known; pursuit also needs it within camera range. */
   | { type: 'engage'; droneId: string; targetId: string; mode: EngageMode }
   /** Drops one task (0 = the current one) from a drone's list. */
@@ -210,6 +213,8 @@ export type ServerMessage =
   | { type: 'drone_warning'; droneId: string; warning: CollisionWarning | null }
   /** The result of a drone's strike on a unit: destroyed units leave the map, damaged ones stay marked. */
   | { type: 'unit_hit'; unitId: string; droneId: string; outcome: HitOutcome }
+  /** The mission clock: wall time it started, simulated seconds since, speed, and whether it is paused. */
+  | ({ type: 'clock' } & MissionClockView)
   | { type: 'mission_error'; reason: MissionErrorReason }
   | { type: 'mission_reset' };
 
@@ -290,6 +295,13 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
   }
   if (message.type === 'move' && isDroneIds(message.droneIds) && isLatLng(message.target) && (message.append === undefined || typeof message.append === 'boolean')) {
     return message.append ? { type: 'move', droneIds: message.droneIds, target: message.target, append: true } : { type: 'move', droneIds: message.droneIds, target: message.target };
+  }
+  if (message.type === 'set_clock') {
+    const { speed, paused } = message;
+    if (speed === undefined && paused === undefined) return null;
+    if (speed !== undefined && !isSimSpeed(speed)) return null;
+    if (paused !== undefined && typeof paused !== 'boolean') return null;
+    return { type: 'set_clock', ...(speed !== undefined ? { speed: speed as SimSpeed } : {}), ...(paused !== undefined ? { paused } : {}) };
   }
   if (message.type === 'engage' && isDroneId(message.droneId) && isEnemyId(message.targetId) && (message.mode === 'strike' || message.mode === 'pursuit')) {
     return { type: 'engage', droneId: message.droneId, targetId: message.targetId, mode: message.mode };

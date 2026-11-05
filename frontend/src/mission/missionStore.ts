@@ -20,6 +20,7 @@ import type { ReconCell, ReconGrid } from '../../../shared/mission/recon';
 import type { MissionUnit, UnitKind, UnitSide } from '../../../shared/mission/units';
 import { UNIT_KINDS } from '../../../shared/mission/units';
 import { DEFAULT_ODDS, type MissionOdds } from '../../../shared/mission/odds';
+import type { MissionClockView } from '../../../shared/mission/clock';
 import { DEFAULT_ALLY_COUNTS, DEFAULT_ENEMY_COUNTS, MAX_PLACED_UNITS, MAX_UNITS_PER_KIND, type PlacedUnit } from '../../../shared/mission/composition';
 import { DEFAULT_CENTER } from '../map/mapStyles';
 import { useLocationStore } from '../location/locationStore';
@@ -83,6 +84,8 @@ export interface MissionState {
   reconCells: ReconCell[];
   /** Enemy and allied units known so far, by id; an enemy out of sight stays where it was last seen. */
   units: Record<string, MissionUnit>;
+  /** The mission clock: when it started, simulated seconds since, speed and pause, as the server sends them. */
+  clock: MissionClockView;
   error: MissionErrorReason | null;
   /** Battle settings, set before the start: the odds, how many units of each kind each side has, and the units placed by hand. */
   odds: MissionOdds;
@@ -181,6 +184,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   reconGrid: null,
   reconCells: [],
   units: {},
+  clock: { startedAt: null, simulatedS: 0, speed: 1, paused: false },
   error: null,
   odds: DEFAULT_ODDS,
   enemyCounts: { ...DEFAULT_ENEMY_COUNTS },
@@ -403,7 +407,10 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
         set({ phase: 'idle', error: message.reason });
         return;
       case 'mission_reset':
-        set({ phase: 'idle', drones: {}, reconGrid: null, reconCells: [], units: {}, error: null });
+        set({ phase: 'idle', drones: {}, reconGrid: null, reconCells: [], units: {}, error: null, clock: { ...get().clock, startedAt: null, simulatedS: 0 } });
+        return;
+      case 'clock':
+        set({ clock: { startedAt: message.startedAt, simulatedS: message.simulatedS, speed: message.speed, paused: message.paused } });
         return;
     }
   },

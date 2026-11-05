@@ -26,6 +26,7 @@ export function resetEverything(): void {
     enemyCounts: { ...DEFAULT_ENEMY_COUNTS },
     allyCounts: defaultAllyCounts(),
     placed: [],
+    clock: { startedAt: null, simulatedS: 0, speed: 1, paused: false },
     drawing: false,
     drawAnchor: null,
     drawCursor: null,

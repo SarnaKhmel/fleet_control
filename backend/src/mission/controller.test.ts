@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_TASKS, type LatLng, type ServerMessage } from '../../../shared/protocol.js';
-import { createMissionController } from './controller.js';
+import { createMissionController as createAtSpeed } from './controller.js';
+
+// Most of these tests were written for the simulation at 10 times real time (a tick is 10 simulated seconds).
+// They keep those numbers: the clock is set to 10 when the controller is made. The clock tests set their own speed.
+const createMissionController = (...args: Parameters<typeof createAtSpeed> extends [...infer P] ? P : never) =>
+  createAtSpeed(args[0], args[1], args[2], args[3], args[4], args[5], args[6], 10);
 import { NO_TERRAIN, type Terrain } from '../terrain/terrain.js';
 import type { Building, Buildings } from '../buildings/buildings.js';
 import { offsetLatLng, toMetersFrom } from '../../../shared/mission/area.js';
@@ -275,7 +280,8 @@ describe('mission controller', () => {
         mission.handle({ type: 'heading', droneIds: ['drone-1'], headingDeg: 90 });
         mission.handle({ type: 'set_flight', droneIds: ['drone-1'], altitudeAglM: 100 });
         vi.advanceTimersByTime(5000);
-        expect(sent).toEqual([]);
+        // Only the mission clock goes on each tick; the drone sends nothing.
+        expect(sent.filter((m) => m.type !== 'clock')).toEqual([]);
         mission.dispose();
       });
     });
@@ -1090,6 +1096,63 @@ describe('mission controller', () => {
       for (let i = 0; i < 10; i++) await Promise.resolve();
       expect(sent).toEqual([{ type: 'mission_error', reason: 'bad_placement' }]);
       refused.dispose();
+    });
+  });
+
+  describe('mission clock', () => {
+    const clocks = () => sent.filter((m) => m.type === 'clock') as Extract<ServerMessage, { type: 'clock' }>[];
+    const positionsOf = (droneId: string) => sent.filter((m) => m.type === 'position' && m.droneId === droneId) as Extract<ServerMessage, { type: 'position' }>[];
+    const droneAt = (mission: ReturnType<typeof createAtSpeed>) => (mission.snapshot() as Extract<ServerMessage, { type: 'mission_snapshot' }>).drones[0].position!;
+    // The clock at its default speed (×1): the clock tests set the speed and the pause themselves.
+    const atRealSpeed = (...args: Parameters<typeof createAtSpeed> extends [...infer P] ? P : never) => createAtSpeed(...args);
+
+    // A started mission with its drone online and flying east; the clock is already running (boot took real time).
+    function startAndMove(speed?: number) {
+      const mission = atRealSpeed((m) => sent.push(m), undefined, NO_TERRAIN);
+      if (speed) mission.handle({ type: 'set_clock', speed: speed as 10 });
+      mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1 });
+      vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
+      mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50, lng: 30.5 } });
+      sent = [];
+      return mission;
+    }
+
+    it('runs at real speed by default: a drone flies 10 m in one real second at 10 m/s', () => {
+      const mission = startAndMove();
+      const before = droneAt(mission);
+      vi.advanceTimersByTime(1000);
+      expect(distanceM(before, droneAt(mission))).toBeCloseTo(10, 0);
+      expect(clocks().at(-1)!.speed).toBe(1);
+      mission.dispose();
+    });
+
+    it('a pause stops the simulation and the clock, and the flight goes on from where it stopped', () => {
+      const mission = startAndMove(5);
+      vi.advanceTimersByTime(1000);
+      const stoppedAt = droneAt(mission);
+      const clockBefore = clocks().at(-1)!.simulatedS;
+      mission.handle({ type: 'set_clock', paused: true });
+      vi.advanceTimersByTime(5000);
+      expect(droneAt(mission)).toEqual(stoppedAt);
+      expect(clocks().at(-1)).toMatchObject({ paused: true });
+      expect(clocks().at(-1)!.simulatedS).toBeCloseTo(clockBefore, 5);
+      mission.handle({ type: 'set_clock', paused: false });
+      vi.advanceTimersByTime(1000);
+      expect(distanceM(stoppedAt, droneAt(mission))).toBeGreaterThan(0);
+      mission.dispose();
+    });
+
+    it('a speed-up sends the new speed at once, and one position per drone per tick, not one per simulated step', () => {
+      const mission = startAndMove();
+      mission.handle({ type: 'set_clock', speed: 10 });
+      expect(clocks().at(-1)).toMatchObject({ speed: 10 });
+      const clockBefore = clocks().at(-1)!.simulatedS;
+      sent = [];
+      vi.advanceTimersByTime(1000);
+      // Ten simulated seconds in one real second: the drone took ten steps, but reports its position once.
+      expect(positionsOf('drone-1')).toHaveLength(1);
+      expect(clocks().at(-1)!.simulatedS - clockBefore).toBeCloseTo(10, 5);
+      mission.dispose();
     });
   });
 });

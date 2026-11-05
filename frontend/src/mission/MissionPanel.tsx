@@ -6,6 +6,7 @@ import { useLocationStore } from '../location/locationStore';
 import { sendClientMessage } from './missionSocket';
 import { effectiveCenter, layoutFrom, startProblem, useMissionStore, type LayoutKind } from './missionStore';
 import { BattleSettings } from './BattleSettings';
+import { MissionClock } from './MissionClock';
 
 export function MissionPanel() {
   const { t } = useTranslation();
@@ -85,6 +86,8 @@ export function MissionPanel() {
 
   return (
     <div className="mission-panel">
+
+      <MissionClock />
 
       <fieldset>
         <legend>{t('mission.area')}</legend>

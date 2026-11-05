@@ -13,12 +13,16 @@ import { buildingAhead, hitOnStep, WARNING_REAL_S } from './obstacles.js';
 import { serverLog } from '../log.js';
 import { droneStateAt } from './schedule.js';
 import { airDrainPctPerS, groundDrainPctPerS } from '../../../shared/flight/battery.js';
-import { bearingTo, CLIMB_RATE_MS, formationTargets, GROUND_AMSL_M, SIM_TIME_SCALE, TICK_MS, windStep } from './kinematics.js';
+import { bearingTo, CLIMB_RATE_MS, formationTargets, GROUND_AMSL_M, TICK_MS, windStep } from './kinematics.js';
+import { MissionClock } from './clock.js';
+import type { SimSpeed } from '../../../shared/mission/clock.js';
 import { clearTrack, distanceM, drawStrike, pursuitPost } from './engagement.js';
 import { DEFAULT_ODDS, type MissionOdds } from '../../../shared/mission/odds.js';
 
 // Interval between "booting" progress messages, ms: several steps per boot, so the bar moves smoothly.
 export const PROGRESS_STEP_MS = 250;
+// Simulated time is stepped in pieces of at most this many seconds, so a fast clock does not skip the details.
+export const SUBSTEP_S = 1;
 
 export interface MissionController {
   handle(message: ClientMessage): void;
@@ -96,7 +100,7 @@ function withTrailPoint(trail: LatLng[], point: LatLng): LatLng[] {
  * change through `broadcast`. One mission per server: a second start is refused until mission_reset.
  */
 export function createMissionController(
-  broadcast: (message: ServerMessage) => void,
+  sink: (message: ServerMessage) => void,
   now: () => string = () => new Date().toISOString(),
   terrain: Terrain = NO_TERRAIN,
   buildings: Buildings = NO_BUILDINGS,
@@ -104,6 +108,7 @@ export function createMissionController(
     generateForces(area, starts, Math.random, isWater, odds, composition),
   water: Water = NO_WATER,
   random: () => number = Math.random,
+  clockSpeed: SimSpeed = 1,
 ): MissionController {
   let timers: ReturnType<typeof setTimeout>[] = [];
   let ticker: ReturnType<typeof setInterval> | undefined;
@@ -125,6 +130,11 @@ export function createMissionController(
   let starts: LatLng[] = [];
   let forces: ForceUnit[] = [];
   const known = new Map<string, MissionUnit>();
+  // The mission clock: simulated time passes with real time, at the operator's speed.
+  const clock = new MissionClock();
+  clock.speed = clockSpeed;
+  // While a tick simulates, its messages are gathered here and sent once it ends (see flush).
+  let batch: ServerMessage[] | null = null;
   // Buildings enemy infantry has walked into this mission: each becomes an enemy position once. The count
   // numbers the new enemy units (enemy-N), so an id is never reused.
   const occupied = new Set<Building>();
@@ -245,10 +255,66 @@ export function createMissionController(
    * slower on the ground; when it runs out the drone is out for good.
    */
   function tick() {
-    const dtS = (TICK_MS / 1000) * SIM_TIME_SCALE;
+    const passed = clock.advance(TICK_MS);
+    if (passed > 0) {
+      const steps = Math.ceil(passed / SUBSTEP_S);
+      // The ground the cameras see during the tick, and the enemy found in it: once per tick, after its steps.
+      const inView = new Map<string, string>();
+      batch = [];
+      for (let i = 0; i < steps; i++) simulate(passed / steps, inView);
+      detect(inView);
+      const messages = batch;
+      batch = null;
+      flush(messages);
+    }
+    broadcast({ type: 'clock', ...clockView() });
+  }
+
+  /**
+   * Sends the messages of one tick. A drone's position and its building warning are sent once per tick, the
+   * last of each, where that last one came; everything else goes in order.
+   */
+  function flush(messages: ServerMessage[]) {
+    const last = new Map<string, number>();
+    messages.forEach((message, index) => {
+      const key = coalesceKey(message);
+      if (key) last.set(key, index);
+    });
+    messages.forEach((message, index) => {
+      const key = coalesceKey(message);
+      if (key && last.get(key) !== index) return;
+      sink(message);
+    });
+  }
+
+  function coalesceKey(message: ServerMessage): string | null {
+    if (message.type === 'position') return `position:${message.droneId}`;
+    if (message.type === 'drone_warning') return `warning:${message.droneId}`;
+    return null;
+  }
+
+  /** Sends a message now, or with the tick's block while a tick simulates. */
+  function broadcast(message: ServerMessage) {
+    if (batch) batch.push(message);
+    else sink(message);
+  }
+
+  function clockView() {
+    return { startedAt: clock.startedAt, simulatedS: clock.simulatedS, speed: clock.speed, paused: clock.paused };
+  }
+
+  /** The operator's clock: a speed, a pause, or both. It applies at once and goes out with the change. */
+  function setClock(speed: SimSpeed | undefined, paused: boolean | undefined) {
+    if (speed !== undefined) clock.speed = speed;
+    if (paused !== undefined) clock.paused = paused;
+    serverLog('clock', { speed: clock.speed, paused: clock.paused });
+    broadcast({ type: 'clock', ...clockView() });
+  }
+
+  /** One step of simulated time (dtS seconds): the drones fly and the units move. */
+  function simulate(dtS: number, inView: Map<string, string>) {
     const fresh: ReconCell[] = [];
-    // Cells in a camera's view this tick, and the first drone that sees each.
-    const inView = new Map<string, string>();
+    // Cells in a camera's view this tick, and the first drone that sees each (see tick).
     if (area) {
       for (const unit of forces) moveUnit(unit, area, starts, dtS, Math.random, water.isWater, buildings);
       for (const unit of forces.filter((u) => u.kind === 'infantry' && u.speedMs > 0)) occupy(unit);
@@ -299,7 +365,6 @@ export function createMissionController(
       syncStatus(droneId, drone);
     }
     if (reconGrid && fresh.length > 0) broadcast({ type: 'recon_cells', grid: reconGrid, cells: fresh });
-    detect(inView);
   }
 
   /**
@@ -436,7 +501,7 @@ export function createMissionController(
    * height (minus a clearance). Sent every tick while it lasts, so the time to impact counts down; cleared once.
    */
   function updateWarning(droneId: string, drone: DroneState) {
-    const lookM = drone.cruiseSpeedMs * WARNING_REAL_S * SIM_TIME_SCALE;
+    const lookM = drone.cruiseSpeedMs * WARNING_REAL_S * clock.speed;
     const found = drone.phase === 'air' ? buildingAhead(buildings, pathAhead(drone, lookM), lookM, drone.altitudeAglM) : null;
     setWarning(
       droneId,
@@ -445,7 +510,7 @@ export function createMissionController(
         kind: 'building',
         point: found.point,
         distanceM: Math.round(found.distanceM),
-        etaS: Math.round(found.distanceM / drone.cruiseSpeedMs / SIM_TIME_SCALE),
+        etaS: Math.round(found.distanceM / drone.cruiseSpeedMs / clock.speed),
         heightM: found.building.heightM,
       },
     );
@@ -774,6 +839,7 @@ export function createMissionController(
       return;
     }
     running = true;
+    clock.start(now());
     odds = missionOdds;
     composition = missionComposition;
     const no = ++missionNo;
@@ -810,6 +876,7 @@ export function createMissionController(
     allyNo = 0;
     odds = DEFAULT_ODDS;
     composition = {};
+    clock.stop();
     running = false;
     droneCount = 0;
   }
@@ -850,6 +917,7 @@ export function createMissionController(
     handle(message) {
       serverLog('client message', message.type);
       if (message.type === 'wind') wind = { speedMs: message.speedMs, fromDeg: message.fromDeg };
+      else if (message.type === 'set_clock') setClock(message.speed, message.paused);
       else if (message.type === 'mission_start') start(message.area, message.layout, message.droneCount, message.odds ?? DEFAULT_ODDS, message.composition ?? {});
       else if (message.type === 'mission_reset') {
         stop();

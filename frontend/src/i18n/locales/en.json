@@ -168,6 +168,15 @@
       "placedNone": "No units placed by hand yet.",
       "placedCount": "placed: {{count}}",
       "remove": "Remove"
+    },
+    "clock": {
+      "title": "Mission clock",
+      "started": "Started at {{time}}",
+      "notStarted": "The mission has not started.",
+      "elapsed": "Simulated time: {{time}}",
+      "speed": "Speed",
+      "pause": "Pause",
+      "resume": "Resume"
     }
   },
   "sidebar": {

@@ -7,8 +7,6 @@ export { GROUND_AMSL_M };
 /** Default cruise speed; each drone's own can be set by the operator. */
 export const DRONE_SPEED_MS = DEFAULT_CRUISE_SPEED_MS;
 export const TICK_MS = 1000;
-// Simulated time runs this many times faster than real time, so drones visibly cross the map.
-export const SIM_TIME_SCALE = 10;
 // Takeoff: drones climb from the ground to a hover altitude, then keep it until they are given a move.
 export const HOVER_ALT_M = DEFAULT_ALTITUDE_AGL_M;
 export const CLIMB_RATE_MS = 3;
