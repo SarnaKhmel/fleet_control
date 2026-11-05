@@ -1574,3 +1574,40 @@ body,
   white-space: nowrap;
 }
 
+/* The pop-up at the cursor after a click on an enemy unit. Tokens only. */
+.target-popup {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: 16rem;
+  padding: 0.4rem 0.5rem;
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--muted);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.35);
+  font-size: 0.8rem;
+}
+
+.target-popup button {
+  padding: 0.2rem 0.5rem;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.target-popup button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.target-popup p {
+  flex-basis: 100%;
+  margin: 0;
+}
+

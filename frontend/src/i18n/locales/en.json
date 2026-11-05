@@ -32,7 +32,14 @@
       "terrain": "Terrain is unavailable: elevation is not shown."
     },
     "resetView": "Default view",
-    "compass": "Compass: map turned {{deg}}°. Click to face north."
+    "compass": "Compass: map turned {{deg}}°. Click to face north.",
+    "target": {
+      "title": "Enemy unit",
+      "strike": "Strike",
+      "pursuit": "Pursuit",
+      "noDrone": "Select a drone first (Shift-click or box select).",
+      "close": "Close"
+    }
   },
   "location": {
     "title": "Location",
@@ -233,16 +240,7 @@
     "flightSpeed": "Speed, m/s",
     "flightApply": "Apply ({{count}})",
     "range": "Range",
-    "rangeHint": "How far it can still fly on its charge at its cruise speed: against the wind and with it",
-    "attack": {
-      "title": "Attack",
-      "target": "Enemy unit",
-      "mode": "Mode",
-      "strike": "Strike (fly into it)",
-      "pursuit": "Pursuit (keep 200–400 m)",
-      "go": "Attack",
-      "none": "No enemy unit is known yet."
-    }
+    "rangeHint": "How far it can still fly on its charge at its cruise speed: against the wind and with it"
   },
   "unit": {
     "side": {

@@ -3,6 +3,7 @@ import { Marker } from 'maplibre-gl';
 import i18n from 'i18next';
 import type { MissionUnit } from '../../../shared/mission/units';
 import { natoElement, unitSidc } from '../symbology/nato';
+import { useTargetPickStore } from './targetPickStore';
 
 // Enemy and allied units the dashboard knows about, as NATO symbols: hostile (red diamond) for the enemy,
 // friendly (blue rectangle) for allies. A unit on the move carries the NATO direction-of-movement arrow.
@@ -43,6 +44,10 @@ export function unitElement(unit: MissionUnit, label: string): HTMLElement {
   el.classList.add('unit-marker', `is-${unit.side}`, ...(unit.inSight ? [] : ['is-last-seen']), ...(unit.damaged ? ['is-damaged'] : []));
   el.setAttribute('aria-label', label);
   el.title = label;
+  // A click on an enemy opens the pop-up to strike or pursue it (see TargetPopup).
+  if (unit.side === 'enemy') {
+    el.addEventListener('click', (event) => useTargetPickStore.getState().open(unit.id, event.clientX, event.clientY));
+  }
   return el;
 }
 
