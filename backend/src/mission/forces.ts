@@ -62,14 +62,14 @@ export const ENEMY_ECHELONS: Record<UnitKind, [number, number]> = {
 };
 
 /** How many of each kind of enemy unit a mission tries to place (fewer where the area is too small). */
-export const ENEMY_COUNTS: Record<UnitKind, number> = { infantry: 6, position: 4, vehicle: 5, artillery: 3, air_defense: 2, ew: 2, radar: 1 };
+export const ENEMY_COUNTS: Record<UnitKind, number> = { infantry: 12, position: 8, vehicle: 10, artillery: 6, air_defense: 4, ew: 4, radar: 2 };
 
 /** Allied units: how many, how far from the nearest start point, and whether forward (toward the enemy) or behind. */
 export const ALLY_GROUPS: { kind: UnitKind; count: number; band: [number, number]; forward: boolean }[] = [
-  { kind: 'infantry', count: 3, band: [500, 2500], forward: true },
-  { kind: 'vehicle', count: 1, band: [500, 2500], forward: true },
-  { kind: 'artillery', count: 1, band: [1000, 4000], forward: false },
-  { kind: 'air_defense', count: 1, band: [1000, 4000], forward: false },
+  { kind: 'infantry', count: 6, band: [500, 2500], forward: true },
+  { kind: 'vehicle', count: 2, band: [500, 2500], forward: true },
+  { kind: 'artillery', count: 2, band: [1000, 4000], forward: false },
+  { kind: 'air_defense', count: 2, band: [1000, 4000], forward: false },
 ];
 
 /** Kinds that can move, and the share of them that do (the rest stand where they were placed). */
@@ -82,7 +82,7 @@ export const KNOWN_SHARE = 0.3;
 /** Half-width of the sector the enemy (or our forward units) lie in, degrees either side of the front. */
 export const SECTOR_HALF_DEG = 70;
 /** Units keep at least this far apart. */
-export const MIN_SPACING_M = 400;
+export const MIN_SPACING_M = 250;
 /** A moving vehicle drives to a point at most this far away, then picks the next one. */
 export const LEG_MAX_M = 3000;
 // Random tries to find a place before a unit is left out.

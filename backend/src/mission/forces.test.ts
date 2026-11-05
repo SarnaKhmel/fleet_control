@@ -58,7 +58,7 @@ describe('generateForces', () => {
     const units = generateForces(area, south, seeded(7));
     for (const unit of enemies(units)) expect(toMetersFrom(south[0], unit.position).north).toBeGreaterThan(0);
     const rear = units.filter((u) => u.side === 'ally' && (u.kind === 'artillery' || u.kind === 'air_defense'));
-    expect(rear.length).toBe(2);
+    expect(rear.length).toBe(4);
     for (const unit of rear) expect(toMetersFrom(south[0], unit.position).north).toBeLessThan(0);
   });
 
