@@ -5,6 +5,7 @@ import { MAX_DRONES, type ClientMessage } from '../../../shared/protocol';
 import { useLocationStore } from '../location/locationStore';
 import { sendClientMessage } from './missionSocket';
 import { effectiveCenter, layoutFrom, startProblem, useMissionStore, type LayoutKind } from './missionStore';
+import { BattleSettings } from './BattleSettings';
 
 export function MissionPanel() {
   const { t } = useTranslation();
@@ -18,6 +19,10 @@ export function MissionPanel() {
       points: s.points,
       clusterRadiusM: s.clusterRadiusM,
       droneCount: s.droneCount,
+      odds: s.odds,
+      enemyCounts: s.enemyCounts,
+      allyCounts: s.allyCounts,
+      placed: s.placed,
       picking: s.picking,
       drawing: s.drawing,
       drawAnchor: s.drawAnchor,
@@ -37,6 +42,7 @@ export function MissionPanel() {
   const selected = useLocationStore((s) => s.selected);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const locked = state.phase === 'running';
 
   const need = state.layoutKind === 'separate' ? state.droneCount : 1;
@@ -72,7 +78,8 @@ export function MissionPanel() {
     const layout = layoutFrom(state);
     if (!layout) return;
     const area = { center: effectiveCenter(state), widthKm: state.widthKm, heightKm: state.heightKm };
-    if (send({ type: 'mission_start', area, layout, droneCount: state.droneCount })) state.markStarting();
+    const composition = { enemy: state.enemyCounts, ally: state.allyCounts, placed: state.placed };
+    if (send({ type: 'mission_start', area, layout, droneCount: state.droneCount, odds: state.odds, composition })) state.markStarting();
   }
 
 
@@ -129,6 +136,9 @@ export function MissionPanel() {
       </fieldset>
 
       <div className="mission-actions">
+        <button type="button" aria-label={t('mission.settings.open')} title={t('mission.settings.open')} aria-expanded={settingsOpen} onClick={() => setSettingsOpen((open) => !open)}>
+          ⚙
+        </button>
         <button type="button" className="btn-primary" onClick={start} disabled={!canStart}>
           {t('mission.start')}
         </button>
@@ -139,6 +149,7 @@ export function MissionPanel() {
 
       {problem && state.phase === 'idle' && <p className="muted">{t(`mission.problem.${problem}`)}</p>}
       {locked && <p className="muted">{t('mission.locked')}</p>}
+      {settingsOpen && <BattleSettings onClose={() => setSettingsOpen(false)} />}
       {state.error && (
         <p role="alert" className="form-error">
           {t(`mission.error.${state.error}`)}

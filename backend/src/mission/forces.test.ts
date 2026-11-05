@@ -3,10 +3,11 @@ import type { Building, Buildings } from '../buildings/buildings';
 import type { MissionArea } from '../../../shared/protocol';
 import { isInsideArea, offsetLatLng, toMetersFrom } from '../../../shared/mission/area';
 import { ENEMY_MIN_DISTANCE_M } from '../../../shared/mission/units';
-import { ENEMY_COUNTS, ENEMY_ECHELONS, frontBearing, generateForces, MIN_SPACING_M, MOBILE_KINDS, moveUnit, nearestStartM, PlacementError, type ForceUnit } from './forces';
+import { ENEMY_ECHELONS, frontBearing, generateForces, MIN_SPACING_M, MOBILE_KINDS, moveUnit, nearestStartM, PlacementError, type ForceUnit } from './forces';
 import { SPEED_RANGE_MS } from '../../../shared/mission/units';
 import { UNIT_KINDS } from '../../../shared/mission/units';
 import { bearingTo } from './kinematics';
+import { DEFAULT_ENEMY_COUNTS } from '../../../shared/mission/composition';
 
 /** A repeatable random sequence (mulberry32), so a failing case can be replayed. */
 function seeded(seed: number) {
@@ -209,7 +210,7 @@ describe('composition', () => {
     const units = generateForces(area, south, seeded(21), undefined, undefined, { enemy: { vehicle: 3 } });
     const count = (kind: string) => enemies(units).filter((u) => u.kind === kind).length;
     expect(count('vehicle')).toBe(3);
-    expect(count('infantry')).toBe(ENEMY_COUNTS.infantry);
+    expect(count('infantry')).toBe(DEFAULT_ENEMY_COUNTS.infantry);
   });
 
   it('places a unit by hand where the operator put it, and counts it toward its kind', () => {

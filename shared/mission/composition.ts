@@ -5,6 +5,11 @@ import { UNIT_KINDS, type UnitKind, type UnitSide } from './units.js';
 // the units the operator placed on the map before the start. A placed unit obeys the same placement rules as
 // a random one; a placement the rules refuse stops the start.
 
+/** How many units of each kind the enemy has in a mission, unless the operator sets other counts. */
+export const DEFAULT_ENEMY_COUNTS: Record<UnitKind, number> = { infantry: 12, position: 8, vehicle: 10, artillery: 6, air_defense: 4, ew: 4, radar: 2 };
+/** How many allied units of each kind a mission has, unless the operator sets other counts. */
+export const DEFAULT_ALLY_COUNTS: Partial<Record<UnitKind, number>> = { infantry: 6, vehicle: 2, artillery: 2, air_defense: 2 };
+
 /** Most units of one kind a side can have in a mission. */
 export const MAX_UNITS_PER_KIND = 50;
 /** Most units an operator places by hand in one mission. */

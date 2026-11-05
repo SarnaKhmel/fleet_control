@@ -145,7 +145,30 @@
     "selectHint": "Click a drone here or on the map to see its details and path. Shift+click adds more drones.",
     "resetConfirm": "Confirm reset: all drones stop",
     "locked": "Mission is running: zone and start points are fixed. Reset to change them.",
-    "warningBuilding": "⚠ building"
+    "warningBuilding": "⚠ building",
+    "settings": {
+      "open": "Battle settings",
+      "title": "Battle settings",
+      "close": "Close",
+      "locked": "The settings are fixed once the mission runs.",
+      "odds": "Odds",
+      "vehicleDestroyed": "Vehicle: destroyed, %",
+      "vehicleDamaged": "Vehicle: damaged, %",
+      "infantryDestroyed": "Infantry and positions: destroyed, %",
+      "infantryDamaged": "Infantry and positions: damaged, %",
+      "infantryShootsDown": "Infantry shoots the drone down, %",
+      "movingShare": "Units on the move at the start, %",
+      "knownShare": "Enemy known at the start, %",
+      "units": "Units by kind",
+      "kind": "Kind",
+      "place": "Place on map",
+      "stopPlacing": "Stop placing",
+      "placingHint": "Click the map to place: {{side}}, {{kind}}. Press the button again to stop.",
+      "placedTitle": "Placed by hand",
+      "placedNone": "No units placed by hand yet.",
+      "placedCount": "placed: {{count}}",
+      "remove": "Remove"
+    }
   },
   "sidebar": {
     "label": "Side panel",

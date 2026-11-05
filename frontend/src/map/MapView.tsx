@@ -24,6 +24,7 @@ import { addReconLayer, syncRecon } from '../mission/reconLayer';
 import { useWindStore } from '../wind/windStore';
 import { syncTaskMarkers } from '../mission/taskMarkers';
 import { syncUnitMarkers } from '../mission/unitMarkers';
+import { placedAsUnits } from '../mission/placement';
 import { headOnlineDronesToward, moveOnlineDrones } from '../mission/missionSocket';
 import { dronesInScreenBox, useSelectionStore, type ScreenPoint } from '../mission/selection';
 import { boxesOverlap, boxOf, registerZoneFitter, zoneBoxOf } from '../mission/zoneView';
@@ -167,6 +168,7 @@ export function MapView() {
       });
       // Mode clicks take priority: zone drawing, then start points, else the location.
       if (mission.drawing) mission.drawClick(point);
+      else if (mission.placing) mission.addPlaced(point);
       else if (mission.picking) mission.addPoint(point);
       // Shift+click with drones selected sets their course toward the clicked point.
       else if (event.originalEvent?.shiftKey && useSelectionStore.getState().selectedIds.length > 0) headOnlineDronesToward(point);
@@ -254,8 +256,10 @@ export function MapView() {
     };
     // Known enemy and allied units: they change only when one is found or one in sight moves.
     const syncUnits = () => {
-      const { units, drones } = useMissionStore.getState();
-      syncUnitMarkers(map, units, (droneId) => drones[droneId]?.callsign ?? droneId);
+      const { units, drones, placed, phase } = useMissionStore.getState();
+      // Units placed by hand show before the start; once it runs, only the server's units.
+      const shown = phase === 'idle' ? { ...placedAsUnits(placed), ...units } : units;
+      syncUnitMarkers(map, shown, (droneId) => drones[droneId]?.callsign ?? droneId);
     };
     sync();
     syncUnits();
@@ -264,7 +268,7 @@ export function MapView() {
         if (state.drones !== previous.drones) sync();
       }),
       useMissionStore.subscribe((state, previous) => {
-        if (state.units !== previous.units) syncUnits();
+        if (state.units !== previous.units || state.placed !== previous.placed || state.phase !== previous.phase) syncUnits();
       }),
       useSelectionStore.subscribe((state, previous) => {
         if (state.selectedIds !== previous.selectedIds) sync();

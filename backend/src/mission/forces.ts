@@ -1,7 +1,7 @@
 import type { LatLng, MissionArea } from '../../../shared/protocol.js';
 import { isInsideArea, offsetLatLng, toMetersFrom } from '../../../shared/mission/area.js';
 import { ENEMY_MIN_DISTANCE_M, SPEED_RANGE_MS, UNIT_KINDS, type UnitKind, type UnitSide } from '../../../shared/mission/units.js';
-import type { Composition, PlacedUnit } from '../../../shared/mission/composition.js';
+import { DEFAULT_ALLY_COUNTS, DEFAULT_ENEMY_COUNTS, type Composition, type PlacedUnit } from '../../../shared/mission/composition.js';
 import { bearingTo, stepToward } from './kinematics.js';
 import { DEFAULT_ODDS, type MissionOdds } from '../../../shared/mission/odds.js';
 import { NO_BUILDINGS, type Buildings } from '../buildings/buildings.js';
@@ -65,15 +65,12 @@ export const ENEMY_ECHELONS: Record<UnitKind, [number, number]> = {
   radar: [14000, 24000],
 };
 
-/** How many of each kind of enemy unit a mission tries to place (fewer where the area is too small). */
-export const ENEMY_COUNTS: Record<UnitKind, number> = { infantry: 12, position: 8, vehicle: 10, artillery: 6, air_defense: 4, ew: 4, radar: 2 };
-
-/** Allied units: how many, how far from the nearest start point, and whether forward (toward the enemy) or behind. */
-export const ALLY_GROUPS: { kind: UnitKind; count: number; band: [number, number]; forward: boolean }[] = [
-  { kind: 'infantry', count: 6, band: [500, 2500], forward: true },
-  { kind: 'vehicle', count: 2, band: [500, 2500], forward: true },
-  { kind: 'artillery', count: 2, band: [1000, 4000], forward: false },
-  { kind: 'air_defense', count: 2, band: [1000, 4000], forward: false },
+/** Allied bands: how far from the nearest start point each allied kind stands, and whether forward (toward the enemy) or behind. */
+export const ALLY_GROUPS: { kind: UnitKind; band: [number, number]; forward: boolean }[] = [
+  { kind: 'infantry', band: [500, 2500], forward: true },
+  { kind: 'vehicle', band: [500, 2500], forward: true },
+  { kind: 'artillery', band: [1000, 4000], forward: false },
+  { kind: 'air_defense', band: [1000, 4000], forward: false },
 ];
 
 /** Kinds that can move, and the share of them that do (the rest stand where they were placed). */
@@ -227,7 +224,7 @@ export function generateForces(
 
   for (const kind of UNIT_KINDS) {
     const band = bands[kind];
-    const count = composition.enemy?.[kind] ?? ENEMY_COUNTS[kind] ?? 0;
+    const count = composition.enemy?.[kind] ?? DEFAULT_ENEMY_COUNTS[kind];
     for (let i = placedOf('enemy', kind); i < count; i++) {
       const position = findPlace(area, starts, band, () => inSector(middle, front, SECTOR_HALF_DEG, Math.max(0, band[0] - spread), band[1] + spread, random), taken(), isWater);
       if (position) add('enemy', kind, position);
@@ -237,7 +234,7 @@ export function generateForces(
   for (const kind of UNIT_KINDS) {
     const { band, forward } = allyBandOf(kind);
     const bearing = forward ? front : front + 180;
-    const count = composition.ally?.[kind] ?? ALLY_GROUPS.find((g) => g.kind === kind)?.count ?? 0;
+    const count = composition.ally?.[kind] ?? DEFAULT_ALLY_COUNTS[kind] ?? 0;
     for (let i = placedOf('ally', kind); i < count; i++) {
       const position = findPlace(area, starts, band, () => inSector(middle, bearing, SECTOR_HALF_DEG, 0, band[1] + spread, random), taken(), isWater);
       if (position) add('ally', kind, position);
