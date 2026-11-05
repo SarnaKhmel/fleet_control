@@ -17,6 +17,14 @@ describe('parseClientMessage', () => {
     expect(parseClientMessage({ type: 'mission_start', area, layout, droneCount: 3, odds: { ...odds, vehicle: { destroyed: 0.8, damaged: 0.5 } } })).toBeNull();
   });
 
+  it('accepts mission_start with a composition, and refuses one with unknown kinds', () => {
+    const area = { center: { lat: 50, lng: 30 }, widthKm: 10, heightKm: 10 };
+    const layout = { kind: 'single' as const, point: { lat: 50, lng: 30 } };
+    const composition = { enemy: { vehicle: 5 }, placed: [{ side: 'enemy' as const, kind: 'vehicle' as const, position: { lat: 50.1, lng: 30 } }] };
+    expect(parseClientMessage({ type: 'mission_start', area, layout, droneCount: 3, composition })).toEqual({ type: 'mission_start', area, layout, droneCount: 3, composition });
+    expect(parseClientMessage({ type: 'mission_start', area, layout, droneCount: 3, composition: { enemy: { tank: 2 } } })).toBeNull();
+  });
+
   it('accepts mission_start with each start layout', () => {
     const single = { kind: 'single', point: { lat: 50, lng: 30 } };
     const cluster = { kind: 'cluster', center: { lat: 50, lng: 30 }, radiusM: 500 };

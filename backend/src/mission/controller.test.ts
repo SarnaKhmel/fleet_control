@@ -5,6 +5,7 @@ import { NO_TERRAIN, type Terrain } from '../terrain/terrain.js';
 import type { Building, Buildings } from '../buildings/buildings.js';
 import { offsetLatLng, toMetersFrom } from '../../../shared/mission/area.js';
 import { distanceM } from './engagement.js';
+import { PlacementError } from './forces.js';
 import { DEFAULT_ODDS, type MissionOdds } from '../../../shared/mission/odds.js';
 import { bearingTo } from './kinematics.js';
 import { CONNECT_MS, BOOT_MS, STAGGER_MS } from './schedule.js';
@@ -1064,6 +1065,31 @@ describe('mission controller', () => {
       const mission = await strikeWith(() => 0.99);
       expect(sent).toContainEqual({ type: 'unit_hit', unitId: 'enemy-1', droneId: 'drone-1', outcome: 'unharmed' });
       mission.dispose();
+    });
+  });
+
+  describe('mission composition', () => {
+    it('passes the composition to the placement, and refuses a start whose placed unit breaks the rules', async () => {
+      const seen: unknown[] = [];
+      const composition = { enemy: { vehicle: 2 }, placed: [{ side: 'enemy' as const, kind: 'vehicle' as const, position: offsetLatLng(area.center, 0, -15000 + 6000) }] };
+      const mission = createMissionController((m) => sent.push(m), undefined, NO_TERRAIN, undefined, (_a, _s, _w, _o, c) => {
+        seen.push(c);
+        return [];
+      });
+      mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1, composition });
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      expect(seen).toEqual([composition]);
+      mission.dispose();
+
+      // A placed unit that the rules refuse: the start is refused, and nothing runs.
+      sent = [];
+      const refused = createMissionController((m) => sent.push(m), undefined, NO_TERRAIN, undefined, () => {
+        throw new PlacementError({ side: 'enemy', kind: 'vehicle', position: area.center });
+      });
+      refused.handle({ type: 'mission_start', area, layout: single, droneCount: 1 });
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      expect(sent).toEqual([{ type: 'mission_error', reason: 'bad_placement' }]);
+      refused.dispose();
     });
   });
 });

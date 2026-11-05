@@ -4,7 +4,8 @@ import { buildTelemetry } from './telemetry.js';
 import { offsetLatLng, toMetersFrom } from '../../../shared/mission/area.js';
 import { cellOf, circleCells, CAMERA_RANGE_M, coneCells, RECON_CELL_M, type ReconCell, type ReconGrid } from '../../../shared/mission/recon.js';
 import { ALLY_RECON_RADIUS_M, type HitOutcome, type MissionUnit, type UnitSource } from '../../../shared/mission/units.js';
-import { generateForces, moveUnit, placementPoints, type ForceUnit, type IsWater } from './forces.js';
+import { generateForces, moveUnit, PlacementError, placementPoints, type ForceUnit, type IsWater } from './forces.js';
+import type { Composition } from '../../../shared/mission/composition.js';
 import { NO_TERRAIN, type Terrain } from '../terrain/terrain.js';
 import { NO_BUILDINGS, type Building, type Buildings } from '../buildings/buildings.js';
 import { NO_WATER, type Water } from '../water/water.js';
@@ -99,7 +100,8 @@ export function createMissionController(
   now: () => string = () => new Date().toISOString(),
   terrain: Terrain = NO_TERRAIN,
   buildings: Buildings = NO_BUILDINGS,
-  placeForces: (area: MissionArea, starts: LatLng[], isWater: IsWater, odds: MissionOdds) => ForceUnit[] = (area, starts, isWater, odds) => generateForces(area, starts, Math.random, isWater, odds),
+  placeForces: (area: MissionArea, starts: LatLng[], isWater: IsWater, odds: MissionOdds, composition: Composition) => ForceUnit[] = (area, starts, isWater, odds, composition) =>
+    generateForces(area, starts, Math.random, isWater, odds, composition),
   water: Water = NO_WATER,
   random: () => number = Math.random,
 ): MissionController {
@@ -130,6 +132,8 @@ export function createMissionController(
   let allyNo = 0;
   // The odds the running mission plays with: the operator's, or the defaults.
   let odds: MissionOdds = DEFAULT_ODDS;
+  // The units the operator sets up before the start: how many of each kind, and the ones placed by hand.
+  let composition: Composition = {};
 
   function later(ms: number, fn: () => void) {
     timers.push(setTimeout(fn, ms));
@@ -738,7 +742,16 @@ export function createMissionController(
   function deployForces(missionArea: MissionArea, startPoints: LatLng[]) {
     area = missionArea;
     starts = startPoints;
-    forces = placeForces(missionArea, startPoints, water.isWater, odds);
+    try {
+      forces = placeForces(missionArea, startPoints, water.isWater, odds, composition);
+    } catch (error) {
+      if (!(error instanceof PlacementError)) throw error;
+      // A hand-placed unit breaks the rules: the mission does not start.
+      serverLog('placement refused', { side: error.placed.side, kind: error.placed.kind });
+      broadcast({ type: 'mission_error', reason: 'bad_placement' });
+      stop();
+      return;
+    }
     enemyNo = forces.filter((u) => u.side === 'enemy').length;
     allyNo = forces.filter((u) => u.side === 'ally').length;
     for (const unit of forces) {
@@ -750,7 +763,7 @@ export function createMissionController(
     if (known.size > 0) broadcast({ type: 'units', units: [...known.values()] });
   }
 
-  function start(area: MissionArea, layout: StartLayout, count: number, missionOdds: MissionOdds) {
+  function start(area: MissionArea, layout: StartLayout, count: number, missionOdds: MissionOdds, missionComposition: Composition) {
     if (running) {
       broadcast({ type: 'mission_error', reason: 'already_running' });
       return;
@@ -762,6 +775,7 @@ export function createMissionController(
     }
     running = true;
     odds = missionOdds;
+    composition = missionComposition;
     const no = ++missionNo;
     droneCount = count;
     reconGrid = { origin: area.center, cellM: RECON_CELL_M };
@@ -795,6 +809,7 @@ export function createMissionController(
     enemyNo = 0;
     allyNo = 0;
     odds = DEFAULT_ODDS;
+    composition = {};
     running = false;
     droneCount = 0;
   }
@@ -835,7 +850,7 @@ export function createMissionController(
     handle(message) {
       serverLog('client message', message.type);
       if (message.type === 'wind') wind = { speedMs: message.speedMs, fromDeg: message.fromDeg };
-      else if (message.type === 'mission_start') start(message.area, message.layout, message.droneCount, message.odds ?? DEFAULT_ODDS);
+      else if (message.type === 'mission_start') start(message.area, message.layout, message.droneCount, message.odds ?? DEFAULT_ODDS, message.composition ?? {});
       else if (message.type === 'mission_reset') {
         stop();
         broadcast({ type: 'mission_reset' });

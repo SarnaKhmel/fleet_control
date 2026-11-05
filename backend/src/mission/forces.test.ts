@@ -3,7 +3,7 @@ import type { Building, Buildings } from '../buildings/buildings';
 import type { MissionArea } from '../../../shared/protocol';
 import { isInsideArea, offsetLatLng, toMetersFrom } from '../../../shared/mission/area';
 import { ENEMY_MIN_DISTANCE_M } from '../../../shared/mission/units';
-import { ENEMY_ECHELONS, frontBearing, generateForces, MIN_SPACING_M, MOBILE_KINDS, moveUnit, nearestStartM, type ForceUnit } from './forces';
+import { ENEMY_COUNTS, ENEMY_ECHELONS, frontBearing, generateForces, MIN_SPACING_M, MOBILE_KINDS, moveUnit, nearestStartM, PlacementError, type ForceUnit } from './forces';
 import { SPEED_RANGE_MS } from '../../../shared/mission/units';
 import { UNIT_KINDS } from '../../../shared/mission/units';
 import { bearingTo } from './kinematics';
@@ -201,5 +201,36 @@ describe('moveUnit', () => {
     const at = post.position;
     expect(moveUnit(post, area, south, 10)).toBe(false);
     expect(post.position).toBe(at);
+  });
+});
+
+describe('composition', () => {
+  it('places the count of each kind the composition asks for, and the defaults for the kinds it leaves out', () => {
+    const units = generateForces(area, south, seeded(21), undefined, undefined, { enemy: { vehicle: 3 } });
+    const count = (kind: string) => enemies(units).filter((u) => u.kind === kind).length;
+    expect(count('vehicle')).toBe(3);
+    expect(count('infantry')).toBe(ENEMY_COUNTS.infantry);
+  });
+
+  it('places a unit by hand where the operator put it, and counts it toward its kind', () => {
+    const spot = offsetLatLng(south[0], 0, 6000); // 6 km north of the start: a vehicle's band
+    const units = generateForces(area, south, seeded(22), undefined, undefined, {
+      enemy: { vehicle: 4 },
+      placed: [{ side: 'enemy', kind: 'vehicle', position: spot }],
+    });
+    expect(enemies(units).filter((u) => u.kind === 'vehicle')).toHaveLength(4);
+    expect(units.some((u) => u.side === 'enemy' && u.kind === 'vehicle' && u.position === spot)).toBe(true);
+  });
+
+  it('refuses a placed unit that breaks the placement rules: too close to the start for its kind', () => {
+    const tooClose = offsetLatLng(south[0], 0, 1000); // a vehicle stands 5 to 11 km from the start
+    expect(() => generateForces(area, south, seeded(23), undefined, undefined, { placed: [{ side: 'enemy', kind: 'vehicle', position: tooClose }] })).toThrow(PlacementError);
+  });
+
+  it('places an allied unit by hand inside its band', () => {
+    const spot = offsetLatLng(south[0], 0, 1500); // allied infantry band: 0.5 to 2.5 km from the start
+    const units = generateForces(area, south, seeded(24), undefined, undefined, { ally: { infantry: 1 }, placed: [{ side: 'ally', kind: 'infantry', position: spot }] });
+    expect(units.filter((u) => u.side === 'ally' && u.kind === 'infantry')).toHaveLength(1);
+    expect(units.find((u) => u.side === 'ally')!.position).toEqual(spot);
   });
 });

@@ -1,6 +1,7 @@
 import type { ReconCell, ReconGrid } from './mission/recon.js';
 import type { HitOutcome, MissionUnit } from './mission/units.js';
 import { isMissionOdds, type MissionOdds } from './mission/odds.js';
+import { isComposition, type Composition } from './mission/composition.js';
 
 // WebSocket protocol shared by the simulator (backend) and the dashboard (frontend).
 // Server is the source of truth; the client sends intents only. Every incoming message is
@@ -131,7 +132,7 @@ export interface DroneTelemetry {
 
 export type ClientMessage =
   /** `odds`: the odds of this mission (strikes, shoot-downs, placement); the defaults when left out. */
-  | { type: 'mission_start'; area: MissionArea; layout: StartLayout; droneCount: number; odds?: MissionOdds }
+  | { type: 'mission_start'; area: MissionArea; layout: StartLayout; droneCount: number; odds?: MissionOdds; composition?: Composition }
   | { type: 'mission_reset' }
   /** Without `append` the target replaces the drones' tasks; with it, the target goes to the end of them. */
   | { type: 'move'; droneIds: string[]; target: LatLng; append?: boolean }
@@ -153,7 +154,7 @@ export type ClientMessage =
 
 // ---- Server → client ----
 
-export type MissionErrorReason = 'outside_area' | 'already_running';
+export type MissionErrorReason = 'outside_area' | 'already_running' | 'bad_placement';
 
 /** One drone as seen by a client that connects in the middle of a mission. */
 export interface SnapshotDrone {
@@ -277,12 +278,14 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
     // A layout with a point per drone must have exactly one point for each.
     if (message.layout.kind === 'separate' && message.layout.points.length !== message.droneCount) return null;
     if (message.odds !== undefined && !isMissionOdds(message.odds)) return null;
+    if (message.composition !== undefined && !isComposition(message.composition)) return null;
     return {
       type: 'mission_start',
       area: message.area,
       layout: message.layout,
       droneCount: message.droneCount,
       ...(message.odds !== undefined ? { odds: message.odds as MissionOdds } : {}),
+      ...(message.composition !== undefined ? { composition: message.composition as Composition } : {}),
     };
   }
   if (message.type === 'move' && isDroneIds(message.droneIds) && isLatLng(message.target) && (message.append === undefined || typeof message.append === 'boolean')) {

@@ -120,7 +120,8 @@
     },
     "error": {
       "outside_area": "A start point is outside the mission area.",
-      "already_running": "A mission is already running. Reset first."
+      "already_running": "A mission is already running. Reset first.",
+      "bad_placement": "A unit placed by hand breaks the placement rules. Move it and start again."
     },
     "status": {
       "offline": "offline",

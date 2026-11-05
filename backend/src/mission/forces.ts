@@ -1,6 +1,7 @@
 import type { LatLng, MissionArea } from '../../../shared/protocol.js';
 import { isInsideArea, offsetLatLng, toMetersFrom } from '../../../shared/mission/area.js';
-import { ENEMY_MIN_DISTANCE_M, SPEED_RANGE_MS, type UnitKind, type UnitSide } from '../../../shared/mission/units.js';
+import { ENEMY_MIN_DISTANCE_M, SPEED_RANGE_MS, UNIT_KINDS, type UnitKind, type UnitSide } from '../../../shared/mission/units.js';
+import type { Composition, PlacedUnit } from '../../../shared/mission/composition.js';
 import { bearingTo, stepToward } from './kinematics.js';
 import { DEFAULT_ODDS, type MissionOdds } from '../../../shared/mission/odds.js';
 import { NO_BUILDINGS, type Buildings } from '../buildings/buildings.js';
@@ -137,6 +138,16 @@ export function frontBearing(area: MissionArea, starts: LatLng[], random: Random
   return distanceM(middle, area.center) < CENTERED_M ? random() * 360 : bearingTo(middle, area.center);
 }
 
+/**
+ * The placement rules, for a unit and for a placed one alike: inside the area, in the band from the nearest start
+ * point, not on water, and apart from the other units.
+ */
+export function fitsPlace(point: LatLng, area: MissionArea, starts: LatLng[], band: [number, number], taken: LatLng[], isWater: IsWater): boolean {
+  const nearest = nearestStartM(point, starts);
+  if (nearest < band[0] || nearest > band[1] || !isInsideArea(point, area) || isWater(point)) return false;
+  return !taken.some((other) => distanceM(other, point) < MIN_SPACING_M);
+}
+
 /** A place in the area, in the band from the nearest start point and away from the other units; null if none found. */
 function findPlace(
   area: MissionArea,
@@ -148,12 +159,16 @@ function findPlace(
 ): LatLng | null {
   for (let i = 0; i < ATTEMPTS; i++) {
     const point = pick();
-    const nearest = nearestStartM(point, starts);
-    if (nearest < band[0] || nearest > band[1] || !isInsideArea(point, area) || isWater(point)) continue;
-    if (taken.some((other) => distanceM(other, point) < MIN_SPACING_M)) continue;
-    return point;
+    if (fitsPlace(point, area, starts, band, taken, isWater)) return point;
   }
   return null;
+}
+
+/** A placed unit that the placement rules refuse: the mission does not start. */
+export class PlacementError extends Error {
+  constructor(readonly placed: PlacedUnit) {
+    super(`placement refused: ${placed.side} ${placed.kind}`);
+  }
 }
 
 /** A random point in a sector around `from`, between `minM` and `maxM` away. */
@@ -163,8 +178,25 @@ function inSector(from: LatLng, bearing: number, halfDeg: number, minM: number, 
   return offsetLatLng(from, d * Math.sin(rad), d * Math.cos(rad));
 }
 
-/** Places the enemy and the allies for a mission with these start points. */
-export function generateForces(area: MissionArea, starts: LatLng[], random: Random = Math.random, isWater: IsWater = NO_WATER_CHECK, odds: MissionOdds = DEFAULT_ODDS): ForceUnit[] {
+/** The band and the direction of an allied kind: its group's, or behind the start points when it has none. */
+function allyBandOf(kind: UnitKind): { band: [number, number]; forward: boolean } {
+  const group = ALLY_GROUPS.find((g) => g.kind === kind);
+  return group ? { band: group.band, forward: group.forward } : { band: [1000, 4000], forward: false };
+}
+
+/**
+ * Places the enemy and the allies for a mission with these start points. The composition sets how many of each
+ * kind a side has (the defaults where it does not), and places some units by hand; the rest are placed at random.
+ * A placed unit the rules refuse throws PlacementError.
+ */
+export function generateForces(
+  area: MissionArea,
+  starts: LatLng[],
+  random: Random = Math.random,
+  isWater: IsWater = NO_WATER_CHECK,
+  odds: MissionOdds = DEFAULT_ODDS,
+  composition: Composition = {},
+): ForceUnit[] {
   const middle = centroid(starts);
   // Start points can be spread out: the sector is sampled far enough out to reach every band from any of them.
   const spread = Math.max(...starts.map((start) => distanceM(middle, start)));
@@ -172,36 +204,43 @@ export function generateForces(area: MissionArea, starts: LatLng[], random: Rand
   const bands = echelonBandsFor(areaReachM(area, middle));
   const units: ForceUnit[] = [];
   const taken = () => units.map((unit) => unit.position);
+  const enemyNo = { n: 0 };
+  const allyNo = { n: 0 };
 
-  let enemyNo = 0;
-  for (const [kind, count] of Object.entries(ENEMY_COUNTS) as [UnitKind, number][]) {
+  const add = (side: UnitSide, kind: UnitKind, position: LatLng) => {
+    const moves = MOBILE_KINDS.includes(kind) && random() < odds.movingShare;
+    const id = side === 'enemy' ? `enemy-${++enemyNo.n}` : `ally-${++allyNo.n}`;
+    if (side === 'enemy') {
+      units.push({ id, side, kind, position, headingDeg: moves ? 0 : null, speedMs: moves ? legSpeedMs(kind as keyof typeof SPEED_RANGE_MS, random) : 0, intel: random() < odds.knownShare, band: bands[kind], waypoint: null });
+    } else {
+      units.push({ id, side, kind, position, headingDeg: moves ? 0 : null, speedMs: moves ? legSpeedMs(kind as keyof typeof SPEED_RANGE_MS, random) : 0, intel: true, band: allyBandOf(kind).band, waypoint: null });
+    }
+  };
+
+  // The units placed by hand come first: they must pass the same rules as a random one.
+  for (const placed of composition.placed ?? []) {
+    const band = placed.side === 'enemy' ? bands[placed.kind] : allyBandOf(placed.kind).band;
+    if (!fitsPlace(placed.position, area, starts, band, taken(), isWater)) throw new PlacementError(placed);
+    add(placed.side, placed.kind, placed.position);
+  }
+  const placedOf = (side: UnitSide, kind: UnitKind) => units.filter((u) => u.side === side && u.kind === kind).length;
+
+  for (const kind of UNIT_KINDS) {
     const band = bands[kind];
-    for (let i = 0; i < count; i++) {
+    const count = composition.enemy?.[kind] ?? ENEMY_COUNTS[kind] ?? 0;
+    for (let i = placedOf('enemy', kind); i < count; i++) {
       const position = findPlace(area, starts, band, () => inSector(middle, front, SECTOR_HALF_DEG, Math.max(0, band[0] - spread), band[1] + spread, random), taken(), isWater);
-      if (!position) continue;
-      const moves = MOBILE_KINDS.includes(kind) && random() < odds.movingShare;
-      units.push({
-        id: `enemy-${++enemyNo}`,
-        side: 'enemy',
-        kind,
-        position,
-        headingDeg: moves ? 0 : null,
-        speedMs: moves ? legSpeedMs(kind as keyof typeof SPEED_RANGE_MS, random) : 0,
-        intel: random() < odds.knownShare,
-        band,
-        waypoint: null,
-      });
+      if (position) add('enemy', kind, position);
     }
   }
 
-  let allyNo = 0;
-  for (const group of ALLY_GROUPS) {
-    const bearing = group.forward ? front : front + 180;
-    for (let i = 0; i < group.count; i++) {
-      const position = findPlace(area, starts, group.band, () => inSector(middle, bearing, SECTOR_HALF_DEG, 0, group.band[1] + spread, random), taken(), isWater);
-      if (!position) continue;
-      const moves = MOBILE_KINDS.includes(group.kind) && random() < odds.movingShare;
-      units.push({ id: `ally-${++allyNo}`, side: 'ally', kind: group.kind, position, headingDeg: moves ? 0 : null, speedMs: moves ? legSpeedMs(group.kind as keyof typeof SPEED_RANGE_MS, random) : 0, intel: true, band: group.band, waypoint: null });
+  for (const kind of UNIT_KINDS) {
+    const { band, forward } = allyBandOf(kind);
+    const bearing = forward ? front : front + 180;
+    const count = composition.ally?.[kind] ?? ALLY_GROUPS.find((g) => g.kind === kind)?.count ?? 0;
+    for (let i = placedOf('ally', kind); i < count; i++) {
+      const position = findPlace(area, starts, band, () => inSector(middle, bearing, SECTOR_HALF_DEG, 0, band[1] + spread, random), taken(), isWater);
+      if (position) add('ally', kind, position);
     }
   }
   return units;
