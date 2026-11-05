@@ -8,6 +8,7 @@
   --accent: #4ea1ff;
   --symbol-bg: #e6edf7;
   --warning: #f5a524;
+  --danger: #e5484d;
 }
 
 :root[data-theme='light'] {
@@ -19,6 +20,31 @@
   --accent: #1f6feb;
   --symbol-bg: #ffffff;
   --warning: #d97706;
+  --danger: #d93036;
+}
+
+/* Tactical: olive-black panels, off-white type, steel-blue accent (a military HUD look). Flat on purpose:
+   no images, gradients, extra fonts or shadows, so it costs nothing extra to load. */
+:root[data-theme='tactical'] {
+  --bg: #0d100e;
+  --panel: #151a16;
+  --border: #2e3a2c;
+  --fg: #dfe3d0;
+  --muted: #8f9a84;
+  --accent: #7fb2e5;
+  --symbol-bg: #dfe3d0;
+  --warning: #e3b341;
+  --danger: #e0524b;
+}
+
+:root[data-theme='tactical'] .header {
+  border-bottom: 2px solid var(--accent);
+}
+
+:root[data-theme='tactical'] .header h1,
+:root[data-theme='tactical'] .location-panel h2 {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 body {
@@ -232,9 +258,6 @@ body,
   gap: 0.75rem;
 }
 
-.burger {
-  position: relative;
-}
 
 .burger-button {
   display: flex;
@@ -255,29 +278,8 @@ body,
   border-radius: 1px;
 }
 
-.burger-menu {
-  position: absolute;
-  top: calc(100% + 0.5rem);
-  left: 0;
-  z-index: 2;
-  min-width: 12rem;
-  padding: 0.4rem;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
 
-.burger-menu a {
-  display: block;
-  padding: 0.4rem 0.6rem;
-  color: var(--fg);
-  text-decoration: none;
-  border-radius: 4px;
-}
 
-.burger-menu a:hover {
-  background: var(--bg);
-}
 
 .legend {
   max-width: 40rem;
@@ -350,3 +352,1262 @@ body,
   border: 1px solid var(--warning);
   border-radius: 6px;
 }
+
+.front-line-attribution {
+  position: absolute;
+  left: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 1;
+  max-width: 22rem;
+  padding: 0.3rem 0.5rem;
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.front-line-attribution a {
+  color: var(--accent);
+}
+
+/* Dark theme: the blue-grey "fiord" basemap is darkened a bit more. Markers and borders are HTML/vector
+   overlays on top of the canvas and keep their own colors. */
+:root[data-theme='dark'] .map-area .maplibregl-canvas {
+  filter: brightness(0.7) contrast(1.05);
+}
+
+/* Compass and scale bar, side by side in the bottom-right corner of the map. */
+.map-scale-group {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 2.6rem;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
+.map-compass {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.map-compass:hover {
+  border-color: var(--accent);
+}
+
+.map-compass svg {
+  transition: transform 0.1s linear;
+}
+
+.map-compass-north {
+  fill: var(--warning);
+}
+
+.map-compass-south {
+  fill: var(--muted);
+}
+
+.map-compass text {
+  fill: var(--bg);
+  font-size: 5px;
+  font-weight: 700;
+}
+
+.scale-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  padding: 0.25rem 0.4rem;
+  background: var(--panel);
+  color: var(--fg);
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.scale-bar-line {
+  height: 6px;
+  border: 2px solid var(--fg);
+  border-top: none;
+}
+
+.mission-panel {
+  position: absolute;
+  left: 1rem;
+  top: 8.5rem;
+  z-index: 1;
+  width: 15rem;
+  max-height: calc(100% - 12rem);
+  overflow: auto;
+  padding: 0.6rem 0.8rem;
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.mission-panel h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+}
+
+.mission-panel fieldset {
+  margin: 0 0 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.mission-panel legend {
+  padding: 0 0.2rem;
+  color: var(--muted);
+}
+
+.mission-panel input,
+.mission-panel select,
+.mission-panel button {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.25rem 0.4rem;
+}
+
+.mission-panel button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.mission-panel button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.mission-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.roster {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+}
+
+/* Takeoff points: numbered squares, so they are not mistaken for the round task points. */
+.mission-start-marker {
+  /* 10 % smaller than it was (22 px). */
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  background: var(--accent);
+  color: var(--bg);
+  border: 2px solid var(--fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+/* Own drone style: a round marker, colored by status, with a heading arrow and the callsign. */
+.drone-marker {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 2px solid var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drone-marker.is-idle,
+.drone-marker.is-moving,
+.drone-marker.is-landing,
+.drone-marker.is-landed {
+  border-color: var(--accent);
+}
+
+.drone-marker.is-connecting,
+.drone-marker.is-battery-low {
+  border-color: var(--warning);
+}
+
+.drone-marker.is-battery-critical {
+  border-color: var(--danger);
+}
+
+/* A building ahead at the drone's height: a pulsing red ring until the way is clear. */
+.drone-marker.is-warning,
+.maplibregl-marker .nato-symbol.is-warning {
+  animation: collision-pulse 1s ease-in-out infinite;
+}
+
+@keyframes collision-pulse {
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--danger) 55%, transparent);
+  }
+}
+
+/* Lost link (empty battery): a grey, dashed marker at the spot where the drone came down. */
+.drone-marker.is-lost_link {
+  border-color: var(--muted);
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+.drone-marker.is-lost_link .drone-marker-arrow,
+.drone-marker.is-destroyed .drone-marker-arrow,
+.drone-marker.is-landed .drone-marker-arrow {
+  display: none;
+}
+
+/* On the ground: a filled marker, so it reads apart from the drones in the air. */
+.drone-marker.is-landed,
+.drone-marker.is-landing {
+  background: color-mix(in srgb, var(--accent) 25%, var(--panel));
+}
+
+/* Destroyed (fell with an empty battery): a red dashed marker with a cross where it fell. */
+.drone-marker.is-destroyed {
+  border-color: var(--danger);
+  border-style: dashed;
+  opacity: 0.7;
+}
+
+.drone-marker.is-destroyed::after {
+  content: '✕';
+  color: var(--danger);
+  font-weight: 700;
+}
+
+/* NATO symbols keep their frame; the battery and lost-link state show as a ring around them. */
+.maplibregl-marker .nato-symbol.is-battery-low {
+  box-shadow: 0 0 0 3px var(--warning);
+}
+
+.maplibregl-marker .nato-symbol.is-battery-critical {
+  box-shadow: 0 0 0 3px var(--danger);
+}
+
+.maplibregl-marker .nato-symbol.is-lost_link,
+.maplibregl-marker .nato-symbol.is-destroyed {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+
+.maplibregl-marker .nato-symbol.is-destroyed {
+  box-shadow: 0 0 0 3px var(--danger);
+}
+
+.drone-marker-arrow {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  margin-left: -4px;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 8px solid var(--fg);
+  transform-origin: 50% 21px;
+}
+
+.drone-marker-label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 2px;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  color: var(--fg);
+  background: var(--panel);
+  padding: 0 3px;
+  border-radius: 3px;
+}
+
+.zone-return {
+  position: absolute;
+  top: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  background: var(--panel);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+
+
+/* Layout: left side panel (accordions) next to the map. */
+.workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.sidebar {
+  width: 17rem;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  overflow: auto;
+  background: var(--panel);
+  color: var(--fg);
+  border-right: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+.sidebar.is-collapsed {
+  width: auto;
+}
+
+.sidebar-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sidebar-toggle,
+.view-reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.view-reset:hover,
+.sidebar-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.accordion {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.accordion-head {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background: none;
+  color: var(--fg);
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  text-align: left;
+}
+
+.accordion-summary {
+  flex: 1;
+  color: var(--muted);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accordion-body {
+  padding: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.accordion-body[hidden] {
+  display: none;
+}
+
+/* Panels rendered inside the sidebar take the sidebar's layout instead of floating on the map. */
+.sidebar .wind-compass,
+.sidebar .mission-panel,
+.sidebar .location-content {
+  position: static;
+  width: auto;
+  max-height: none;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+}
+
+.sidebar .location-content .location-actions,
+.sidebar .mission-actions {
+  margin-top: 0.4rem;
+}
+
+/* The side panel floats over the map: expanding or collapsing it does not resize the map. */
+.workspace {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.map-area {
+  position: absolute;
+  inset: 0;
+}
+
+.sidebar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 3;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.25);
+}
+
+/* ---- Side panel: a quiet, layered look. Tokens only, no hard-coded colors. ---- */
+.sidebar {
+  width: 18rem;
+  padding: 0;
+  gap: 0;
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-right: 1px solid var(--border);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  transition: width 0.2s ease;
+}
+
+/* The left panel is wide enough for the battle settings window, which opens inside it. */
+.sidebar:not(.sidebar-right) {
+  width: 26rem;
+}
+
+.sidebar.is-collapsed {
+  width: 3rem;
+}
+
+.sidebar-top {
+  padding: 0.6rem 0.6rem 0.5rem;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--border);
+  justify-content: flex-start;
+}
+
+.sidebar-top .view-reset {
+  margin-left: auto;
+}
+
+.sidebar.is-collapsed .sidebar-top {
+  flex-direction: column;
+  padding: 0.6rem 0.4rem;
+}
+
+.sidebar-toggle,
+.view-reset {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  border-color: transparent;
+  background: transparent;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.sidebar-toggle:hover,
+.view-reset:hover {
+  background: var(--bg);
+  border-color: var(--border);
+  color: var(--accent);
+}
+
+.sidebar-toggle:focus-visible,
+.view-reset:focus-visible,
+.sidebar button:focus-visible,
+.sidebar input:focus-visible,
+.sidebar select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.accordion {
+  border: none;
+  border-radius: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.accordion-head {
+  padding: 0.75rem 0.9rem;
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.accordion-head:hover {
+  color: var(--fg);
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+}
+
+.accordion-title {
+  flex: none;
+}
+
+.accordion-summary {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.78rem;
+  color: var(--fg);
+}
+
+.accordion-chevron {
+  flex: none;
+  transition: transform 0.2s ease;
+}
+
+.accordion.is-open .accordion-chevron {
+  transform: rotate(180deg);
+}
+
+.accordion-body {
+  padding: 0.25rem 0.9rem 0.9rem;
+  border-top: none;
+}
+
+.sidebar fieldset {
+  margin: 0 0 0.75rem;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sidebar legend {
+  padding: 0;
+  margin-bottom: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.sidebar label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.sidebar input,
+.sidebar select {
+  height: 2rem;
+  padding: 0 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar button {
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.sidebar button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sidebar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sidebar button[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sidebar .btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.sidebar .btn-primary:hover:not(:disabled) {
+  background: var(--fg);
+  border-color: var(--fg);
+  color: var(--bg);
+}
+
+.sidebar .mission-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.sidebar .mission-panel .muted,
+.sidebar .location-content .muted {
+  font-size: 0.75rem;
+}
+
+.sidebar .wind-compass {
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.6rem;
+}
+
+.sidebar .wind-compass-text {
+  font-size: 0.8125rem;
+}
+
+.sidebar .roster {
+  margin-top: 0.6rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+}
+
+.sidebar .roster li {
+  padding: 0.25rem 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar .location-coords {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.sidebar .saved-list button:first-child {
+  border: none;
+  background: transparent;
+  padding: 0.3rem 0.4rem;
+  min-height: 0;
+}
+
+.sidebar .saved-list button:first-child:hover {
+  background: var(--bg);
+}
+
+.sidebar .mission-actions button {
+  white-space: nowrap;
+  padding: 0 0.5rem;
+}
+
+/* Menu drawer: full height, same surface as the side panel. */
+.nav-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.nav-drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 20;
+  width: 18rem;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--panel) 96%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--fg);
+  border-right: 1px solid var(--border);
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.3);
+}
+
+.nav-drawer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-drawer-head h2 {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem;
+}
+
+.nav-list a {
+  display: block;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  color: var(--fg);
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.nav-list a:hover {
+  background: var(--bg);
+  color: var(--accent);
+}
+
+.nav-list a:focus-visible,
+.nav-drawer button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sidebar .wind-climate {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar .wind-climate > span {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+/* Header gear and the settings drawer on the right. */
+.gear-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.gear-button:hover,
+.gear-button[aria-expanded='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+
+.settings-group {
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.settings-group h3 {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.settings-row select,
+.settings-row button {
+  min-height: 2rem;
+  padding: 0 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings-row button:hover,
+.settings-row select:hover {
+  border-color: var(--accent);
+}
+
+.settings-row button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Right-side settings panel: same surface and layout as the left side panel. */
+.sidebar.sidebar-right {
+  left: auto;
+  right: 0;
+  border-right: none;
+  border-left: 1px solid var(--border);
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.25);
+}
+
+.sidebar-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sidebar-right .sidebar-top {
+  justify-content: space-between;
+}
+
+.sidebar-right .settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.sidebar-right .settings-row span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.sidebar-right .settings-row select,
+.sidebar-right .settings-row button {
+  min-height: 2rem;
+  padding: 0 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.sidebar-right .settings-row button:hover,
+.sidebar-right .settings-row select:hover {
+  border-color: var(--accent);
+}
+
+.sidebar-right .settings-row button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.selection-box {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  border: 1px dashed var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.drone-marker.is-selected,
+.maplibregl-marker .nato-symbol.is-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Drone status: boot progress and connection state, shown at the top of the mission section. */
+.drone-status {
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.drone-status-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.drone-status-count {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.drone-status ul {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+/* Each drone row is a button: clicking it selects the drone. */
+.drone-status-select {
+  display: block;
+  width: 100%;
+  padding: 0.25rem 0.35rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.drone-status-select:hover {
+  border-color: var(--border);
+}
+
+.drone-status-select.is-selected {
+  border-color: var(--accent);
+}
+
+.drone-status-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.72rem;
+}
+
+.drone-status-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+}
+
+.drone-state {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.drone-state.is-idle {
+  color: var(--accent);
+}
+
+.drone-state.is-connecting {
+  color: var(--warning);
+}
+
+.drone-state.is-lost_link,
+.drone-state.is-destroyed,
+.drone-state.is-warning {
+  color: var(--danger);
+}
+
+.drone-state.is-moving,
+.drone-state.is-landing,
+.drone-state.is-landed {
+  color: var(--accent);
+}
+
+/* Lands the selected drones: a full-width action at the top of the drone details. */
+.land-selected {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+/* Highlighted warning at the top of a drone's details: low battery, critical battery, lost link. */
+.drone-alert {
+  margin: 0 0 0.5rem;
+  padding: 0.4rem 0.55rem;
+  border-left: 3px solid var(--warning);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  font-size: 0.8rem;
+}
+
+.drone-alert.is-critical,
+.drone-alert.is-collision,
+.drone-alert.is-destroyedCollision,
+.drone-alert.is-destroyed,
+.drone-alert.is-shotDown,
+.drone-alert.is-lost {
+  border-left-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+
+.boot-bar {
+  height: 4px;
+  margin-top: 0.2rem;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.boot-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}
+
+.sidebar .btn-danger {
+  border-color: var(--warning);
+  color: var(--warning);
+  font-weight: 600;
+}
+
+/* Selected-location pointer: a small teardrop in the accent color. */
+.location-pin {
+  color: var(--accent);
+  line-height: 0;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+}
+
+.drone-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 0.75rem;
+  margin: 0;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.drone-facts dt {
+  color: var(--muted);
+}
+
+.drone-facts dd {
+  margin: 0;
+  text-align: right;
+}
+
+/* A drone's task list in the right panel: numbered points, each with a remove button. */
+.drone-tasks h4 {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.drone-tasks ol {
+  margin: 0 0 0.5rem;
+  padding-left: 1.25rem;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.drone-tasks li > span {
+  display: inline-block;
+  min-width: 10.5rem;
+}
+
+.drone-tasks li button {
+  padding: 0 0.4rem;
+  line-height: 1.2;
+}
+
+/* Task points of the selected drones: numbered, draggable, right-click removes. */
+.task-marker {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--bg);
+  border: 2px solid var(--fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: grab;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+/* Tasks of a drone that lost its link: shown, but they can no longer be moved or removed. */
+.task-marker.is-locked {
+  background: var(--muted);
+  cursor: default;
+}
+
+.header button.btn-danger {
+  border-color: var(--warning);
+  color: var(--warning);
+  font-weight: 600;
+}
+
+/* Height and speed for the selected drones: two fields and Apply, at the top of the drone details. */
+.flight-settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.flight-settings label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.flight-settings button {
+  grid-column: 1 / -1;
+}
+
+.unit-marker.is-last-seen {
+  opacity: 0.45;
+}
+
+/* A unit a strike damaged but did not destroy: dashed ring in the warning colour. */
+.unit-marker.is-damaged {
+  outline: 2px dashed var(--warning);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.zone-label {
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--muted);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Battle settings: a modal over the map that lets clicks through, so units can be placed on the map from it. */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 3.5rem 1rem 1rem;
+  pointer-events: none;
+}
+
+.modal {
+  pointer-events: auto;
+  width: min(26rem, 100%);
+  max-height: calc(100vh - 5rem);
+  overflow: auto;
+  padding: 1rem;
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--muted);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+}
+
+.modal h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.modal label {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0.25rem 0;
+  font-size: 0.85rem;
+}
+
+.battle-units th,
+.battle-units td {
+  padding: 0.2rem 0.3rem;
+  text-align: left;
+  font-size: 0.8rem;
+}
+
+.battle-units input {
+  width: 4.5rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.75rem;
+}
+
+/* Visually hidden, still read by screen readers (labels of controls whose text is drawn elsewhere). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* The pop-up at the cursor after a click on an enemy unit. Tokens only. */
+.target-popup {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: 16rem;
+  padding: 0.4rem 0.5rem;
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--muted);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.35);
+  font-size: 0.8rem;
+}
+
+.target-popup button {
+  padding: 0.2rem 0.5rem;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.target-popup button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.target-popup p {
+  flex-basis: 100%;
+  margin: 0;
+}
+

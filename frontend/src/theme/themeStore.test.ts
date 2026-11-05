@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { applyTheme, THEME_STORAGE_KEY, useThemeStore } from './themeStore';
+import { applyTheme, THEMES, THEME_STORAGE_KEY, useThemeStore } from './themeStore';
 
 describe('themeStore', () => {
   beforeEach(() => {
@@ -10,11 +10,14 @@ describe('themeStore', () => {
     expect(useThemeStore.getState().theme).toBe('dark');
   });
 
-  it('toggles between dark and light', () => {
-    useThemeStore.getState().toggleTheme();
-    expect(useThemeStore.getState().theme).toBe('light');
-    useThemeStore.getState().toggleTheme();
-    expect(useThemeStore.getState().theme).toBe('dark');
+  it('offers dark, light and tactical themes', () => {
+    expect(THEMES).toEqual(['dark', 'light', 'tactical']);
+  });
+
+  it('switches to the tactical theme and applies it to the document', () => {
+    useThemeStore.getState().setTheme('tactical');
+    applyTheme(useThemeStore.getState().theme);
+    expect(document.documentElement.dataset.theme).toBe('tactical');
   });
 
   it('persists the choice in localStorage', () => {

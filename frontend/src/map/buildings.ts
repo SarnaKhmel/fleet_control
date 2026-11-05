@@ -4,7 +4,7 @@ import type { Theme } from '../theme/themeStore';
 // 3D buildings from the OpenFreeMap vector tiles (source "openmaptiles", layer "building").
 // Heights come from the tile properties render_height / render_min_height.
 export const BUILDINGS_LAYER_ID = '3d-buildings';
-export const BUILDING_COLORS: Record<Theme, string> = { dark: '#4a5a78', light: '#cfc9bf' };
+export const BUILDING_COLORS: Record<Theme, string> = { dark: '#4a5a78', light: '#cfc9bf', tactical: '#4a5a78' };
 export const TILT_3D_PITCH = 50;
 
 export function buildingsLayerSpec(theme: Theme): LayerSpecification {
