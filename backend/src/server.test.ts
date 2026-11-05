@@ -1,3 +1,4 @@
+import { NO_WATER } from './water/water.js';
 import { describe, it, expect, afterEach } from 'vitest';
 import WebSocket from 'ws';
 import { createServer } from './server.js';
@@ -10,7 +11,7 @@ describe('createServer', () => {
   afterEach(() => close?.());
 
   it('accepts WebSocket connections', async () => {
-    const wss = createServer(0, NO_TERRAIN, NO_BUILDINGS);
+    const wss = createServer(0, NO_TERRAIN, NO_BUILDINGS, NO_WATER);
     close = () => wss.close();
     await new Promise<void>((resolve) => wss.on('listening', () => resolve()));
     const port = (wss.address() as { port: number }).port;
@@ -27,7 +28,7 @@ describe('createServer', () => {
 
 describe('mission over WebSocket', () => {
   it('sends an error for a start outside the mission area', async () => {
-    const wss = createServer(0, NO_TERRAIN, NO_BUILDINGS);
+    const wss = createServer(0, NO_TERRAIN, NO_BUILDINGS, NO_WATER);
     await new Promise<void>((resolve) => wss.on('listening', () => resolve()));
     const port = (wss.address() as { port: number }).port;
     const socket = new WebSocket(`ws://localhost:${port}`);

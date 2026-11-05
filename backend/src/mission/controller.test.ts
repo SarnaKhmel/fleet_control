@@ -492,24 +492,49 @@ describe('mission controller', () => {
 
   });
 
+  // Lets the pending promises run (the units are placed once the water is known).
+  const settle = async () => {
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+  };
+
   describe('enemy and allies', () => {
     const unitMessages = () => sent.filter((m) => m.type === 'units') as Extract<ServerMessage, { type: 'units' }>[];
     const sentUnits = () => unitMessages().flatMap((m) => m.units);
     const force = (over: Partial<ForceUnit>): ForceUnit => ({
       id: 'enemy-1', side: 'enemy', kind: 'infantry', position: area.center, headingDeg: null, speedMs: 0, intel: false, band: [0, 100_000], waypoint: null, ...over,
     });
-    function online(forces: ForceUnit[]) {
+    // The units go out once the water around the start points is known: a few microtasks later.
+    async function online(forces: ForceUnit[]) {
       const mission = createMissionController((m) => sent.push(m), undefined, NO_TERRAIN, undefined, () => forces.map((f) => ({ ...f })));
       mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1 });
+      await settle();
       vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
       return mission;
     }
 
-    it('sends the allies and the enemy known from intelligence at the start, and hides the rest', () => {
+    it('waits for the water around the start points before it places the units, and places them on land', async () => {
+      let loaded: () => void = () => {};
+      const water = { isWater: (p: LatLng) => p.lat > 50.5, loaded: () => new Promise<void>((resolve) => (loaded = resolve)) };
+      const placed: ((p: LatLng) => boolean)[] = [];
+      const mission = createMissionController((m) => sent.push(m), undefined, NO_TERRAIN, undefined, (_area, _starts, isWater) => {
+        placed.push(isWater);
+        return [];
+      }, water);
+      mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1 });
+      await settle();
+      expect(placed).toEqual([]);
+      loaded();
+      await settle();
+      expect(placed).toHaveLength(1);
+      expect(placed[0]).toBe(water.isWater);
+      mission.dispose();
+    });
+
+    it('sends the allies and the enemy known from intelligence at the start, and hides the rest', async () => {
       const ally = force({ id: 'ally-1', side: 'ally', position: offsetLatLng(area.center, 0, -20_000), intel: true });
       const known = force({ id: 'enemy-1', kind: 'artillery', position: offsetLatLng(area.center, 0, 30_000), intel: true });
       const hidden = force({ id: 'enemy-2', position: offsetLatLng(area.center, 0, 40_000) });
-      const mission = online([known, hidden, ally]);
+      const mission = await online([known, hidden, ally]);
       expect(unitMessages()).toHaveLength(1);
       expect(sentUnits().map((u) => [u.id, u.source])).toEqual([['enemy-1', 'intel'], ['ally-1', 'intel']]);
       expect(sentUnits()[0]).toEqual({ id: 'enemy-1', side: 'enemy', kind: 'artillery', position: known.position, headingDeg: null, speedMs: 0, source: 'intel', detectedByDroneId: null });
@@ -520,8 +545,8 @@ describe('mission controller', () => {
       mission.dispose();
     });
 
-    it('reconnoitres the 2 km around each ally from the start', () => {
-      const mission = online([force({ id: 'ally-1', side: 'ally', position: offsetLatLng(area.center, 0, -20_000), intel: true })]);
+    it('reconnoitres the 2 km around each ally from the start', async () => {
+      const mission = await online([force({ id: 'ally-1', side: 'ally', position: offsetLatLng(area.center, 0, -20_000), intel: true })]);
       const recon = sent.filter((m) => m.type === 'recon_cells') as Extract<ServerMessage, { type: 'recon_cells' }>[];
       const cells = recon[0].cells;
       expect(cells.length).toBeGreaterThan(1200);
@@ -530,9 +555,9 @@ describe('mission controller', () => {
       mission.dispose();
     });
 
-    it('finds a hidden enemy once a drone camera sees it, and names the drone', () => {
+    it('finds a hidden enemy once a drone camera sees it, and names the drone', async () => {
       const enemy = force({ position: offsetLatLng(area.center, 1000, 0) }); // 1 km east; the drone looks north
-      const mission = online([enemy]);
+      const mission = await online([enemy]);
       vi.advanceTimersByTime(5000);
       expect(sentUnits()).toEqual([]);
       mission.handle({ type: 'move', droneIds: ['drone-1'], target: offsetLatLng(area.center, 5000, 0) });
@@ -544,9 +569,9 @@ describe('mission controller', () => {
       mission.dispose();
     });
 
-    it('finds an enemy within 2 km of an ally', () => {
+    it('finds an enemy within 2 km of an ally', async () => {
       const allyAt = offsetLatLng(area.center, 0, -20_000);
-      const mission = online([
+      const mission = await online([
         force({ id: 'ally-1', side: 'ally', position: allyAt, intel: true }),
         force({ id: 'enemy-1', position: offsetLatLng(allyAt, 0, 1500) }),
         force({ id: 'enemy-2', position: offsetLatLng(allyAt, 0, 2500) }),
@@ -555,9 +580,9 @@ describe('mission controller', () => {
       mission.dispose();
     });
 
-    it('follows an enemy on the move while it is in sight, and keeps it where it was last seen after', () => {
+    it('follows an enemy on the move while it is in sight, and keeps it where it was last seen after', async () => {
       const allyAt = offsetLatLng(area.center, 0, -20_000);
-      const mission = online([
+      const mission = await online([
         force({ id: 'ally-1', side: 'ally', position: allyAt, intel: true }),
         // 60 m a tick (6 m/s, 10 simulated seconds) east from 1.5 km: out of the ally's 2 km after about 9 ticks.
         force({ id: 'enemy-1', kind: 'vehicle', position: offsetLatLng(allyAt, 1500, 0), speedMs: 6, headingDeg: 90, waypoint: offsetLatLng(allyAt, 20_000, 0) }),

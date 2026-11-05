@@ -1,7 +1,10 @@
+import type { LatLng } from '../../../shared/protocol.js';
 import { VectorTile } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
-import type { LatLng } from '../../../shared/protocol.js';
-import { createTileCache, type Fetcher } from '../vectorTiles.js';
+import { createTileCache, pixelToLatLng, type Fetcher } from '../vectorTiles.js';
+import { boxOf, isInside, type Outline } from '../outline.js';
+
+export { isInside };
 
 // Buildings for the simulator, from the same OpenFreeMap vector tiles the map draws in 3D (layer
 // "building", heights in render_height). Tiles load in the background on first use, like the terrain:
@@ -12,15 +15,9 @@ export const BUILDINGS_ZOOM = 14;
 // Height given to a building whose tile does not say (rare in OpenFreeMap data).
 const DEFAULT_HEIGHT_M = 10;
 
-export interface Building {
-  /** Outline rings: the outer ones and any holes (read with the even-odd rule). */
-  rings: LatLng[][];
+export interface Building extends Outline {
   /** Height of its top above the ground, meters. */
   heightM: number;
-  south: number;
-  north: number;
-  west: number;
-  east: number;
 }
 
 export interface Buildings {
@@ -35,45 +32,15 @@ export const NO_BUILDINGS: Buildings = { at: () => null };
 export function parseBuildingTile(data: Uint8Array, x: number, y: number, zoom: number): Building[] {
   const layer = new VectorTile(new PbfReader(data)).layers.building;
   if (!layer) return [];
-  const n = 2 ** zoom;
-  const toLatLng = (px: number, py: number): LatLng => {
-    const fx = (x + px / layer.extent) / n;
-    const fy = (y + py / layer.extent) / n;
-    return { lng: fx * 360 - 180, lat: (Math.atan(Math.sinh(Math.PI * (1 - 2 * fy))) * 180) / Math.PI };
-  };
   const buildings: Building[] = [];
   for (let i = 0; i < layer.length; i++) {
     const feature = layer.feature(i);
     if (feature.type !== 3) continue; // polygons only
-    const rings = feature.loadGeometry().map((ring) => ring.map((p) => toLatLng(p.x, p.y)));
-    const points = rings.flat();
+    const rings = feature.loadGeometry().map((ring) => ring.map((p) => pixelToLatLng(x, y, zoom, layer.extent, p.x, p.y)));
     const height = feature.properties.render_height;
-    buildings.push({
-      rings,
-      heightM: typeof height === 'number' && height > 0 ? height : DEFAULT_HEIGHT_M,
-      south: Math.min(...points.map((p) => p.lat)),
-      north: Math.max(...points.map((p) => p.lat)),
-      west: Math.min(...points.map((p) => p.lng)),
-      east: Math.max(...points.map((p) => p.lng)),
-    });
+    buildings.push({ rings, ...boxOf(rings), heightM: typeof height === 'number' && height > 0 ? height : DEFAULT_HEIGHT_M });
   }
   return buildings;
-}
-
-/** Even-odd point-in-polygon over all rings (holes fall out of the count). */
-export function isInside(point: LatLng, building: Building): boolean {
-  if (point.lat < building.south || point.lat > building.north || point.lng < building.west || point.lng > building.east) return false;
-  let inside = false;
-  for (const ring of building.rings) {
-    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-      const a = ring[i];
-      const b = ring[j];
-      if (a.lat > point.lat !== b.lat > point.lat && point.lng < ((b.lng - a.lng) * (point.lat - a.lat)) / (b.lat - a.lat) + a.lng) {
-        inside = !inside;
-      }
-    }
-  }
-  return inside;
 }
 
 export function createBuildings(fetcher?: Fetcher, zoom = BUILDINGS_ZOOM): Buildings {

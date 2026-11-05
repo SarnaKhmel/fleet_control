@@ -14,6 +14,21 @@ import { bearingTo, stepToward } from './kinematics.js';
 // little forward, artillery and air defence behind the start points.
 
 export type Random = () => number;
+/** Whether a point is on water: no unit stands or drives there. */
+export type IsWater = (point: LatLng) => boolean;
+const NO_WATER_CHECK: IsWater = () => false;
+
+/** Points the placement samples around the start points: a grid over the widest band plus the spread. */
+export function placementPoints(starts: LatLng[], stepM = 2000): LatLng[] {
+  const middle = centroid(starts);
+  const spread = Math.max(...starts.map((start) => distanceM(middle, start)));
+  const reach = Math.max(...Object.values(ENEMY_ECHELONS).map((band) => band[1]), ...ALLY_GROUPS.map((group) => group.band[1])) + spread;
+  const points: LatLng[] = [];
+  for (let east = -reach; east <= reach; east += stepM) {
+    for (let north = -reach; north <= reach; north += stepM) points.push(offsetLatLng(middle, east, north));
+  }
+  return points;
+}
 
 /** Distance band from the nearest start point, meters, by kind of enemy unit. */
 export const ENEMY_ECHELONS: Record<UnitKind, [number, number]> = {
@@ -99,11 +114,12 @@ function findPlace(
   band: [number, number],
   pick: () => LatLng,
   taken: LatLng[],
+  isWater: IsWater,
 ): LatLng | null {
   for (let i = 0; i < ATTEMPTS; i++) {
     const point = pick();
     const nearest = nearestStartM(point, starts);
-    if (nearest < band[0] || nearest > band[1] || !isInsideArea(point, area)) continue;
+    if (nearest < band[0] || nearest > band[1] || !isInsideArea(point, area) || isWater(point)) continue;
     if (taken.some((other) => distanceM(other, point) < MIN_SPACING_M)) continue;
     return point;
   }
@@ -118,7 +134,7 @@ function inSector(from: LatLng, bearing: number, halfDeg: number, minM: number, 
 }
 
 /** Places the enemy and the allies for a mission with these start points. */
-export function generateForces(area: MissionArea, starts: LatLng[], random: Random = Math.random): ForceUnit[] {
+export function generateForces(area: MissionArea, starts: LatLng[], random: Random = Math.random, isWater: IsWater = NO_WATER_CHECK): ForceUnit[] {
   const middle = centroid(starts);
   // Start points can be spread out: the sector is sampled far enough out to reach every band from any of them.
   const spread = Math.max(...starts.map((start) => distanceM(middle, start)));
@@ -131,7 +147,7 @@ export function generateForces(area: MissionArea, starts: LatLng[], random: Rand
   for (const [kind, count] of Object.entries(ENEMY_COUNTS) as [UnitKind, number][]) {
     const band = ENEMY_ECHELONS[kind];
     for (let i = 0; i < count; i++) {
-      const position = findPlace(area, starts, band, () => inSector(middle, front, SECTOR_HALF_DEG, Math.max(0, band[0] - spread), band[1] + spread, random), taken());
+      const position = findPlace(area, starts, band, () => inSector(middle, front, SECTOR_HALF_DEG, Math.max(0, band[0] - spread), band[1] + spread, random), taken(), isWater);
       if (!position) continue;
       const moves = kind === 'vehicle' && moving < MOVING_VEHICLES;
       if (moves) moving++;
@@ -153,7 +169,7 @@ export function generateForces(area: MissionArea, starts: LatLng[], random: Rand
   for (const group of ALLY_GROUPS) {
     const bearing = group.forward ? front : front + 180;
     for (let i = 0; i < group.count; i++) {
-      const position = findPlace(area, starts, group.band, () => inSector(middle, bearing, SECTOR_HALF_DEG, 0, group.band[1] + spread, random), taken());
+      const position = findPlace(area, starts, group.band, () => inSector(middle, bearing, SECTOR_HALF_DEG, 0, group.band[1] + spread, random), taken(), isWater);
       if (!position) continue;
       units.push({ id: `ally-${++allyNo}`, side: 'ally', kind: group.kind, position, headingDeg: null, speedMs: 0, intel: true, band: group.band, waypoint: null });
     }
@@ -166,13 +182,18 @@ export function generateForces(area: MissionArea, starts: LatLng[], random: Rand
  * next one, a short leg away within its band (so it never drives across the band toward our start points).
  * Returns true if it moved.
  */
-export function moveUnit(unit: ForceUnit, area: MissionArea, starts: LatLng[], dtS: number, random: Random = Math.random): boolean {
+export function moveUnit(unit: ForceUnit, area: MissionArea, starts: LatLng[], dtS: number, random: Random = Math.random, isWater: IsWater = NO_WATER_CHECK): boolean {
   if (unit.speedMs === 0) return false;
   if (!unit.waypoint) {
-    unit.waypoint = findPlace(area, starts, unit.band, () => inSector(unit.position, 0, 180, 0, LEG_MAX_M, random), []);
+    unit.waypoint = findPlace(area, starts, unit.band, () => inSector(unit.position, 0, 180, 0, LEG_MAX_M, random), [], isWater);
     if (!unit.waypoint) return false;
   }
   const step = stepToward(unit.position, unit.waypoint, unit.speedMs * dtS);
+  // A step onto water is not taken: the unit waits and picks another leg next tick.
+  if (isWater(step.position)) {
+    unit.waypoint = null;
+    return false;
+  }
   unit.position = step.position;
   unit.headingDeg = step.heading;
   if (step.arrived) unit.waypoint = null;

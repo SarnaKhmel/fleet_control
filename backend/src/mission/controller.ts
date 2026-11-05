@@ -4,9 +4,10 @@ import { buildTelemetry } from './telemetry.js';
 import { offsetLatLng, toMetersFrom } from '../../../shared/mission/area.js';
 import { cellOf, circleCells, coneCells, RECON_CELL_M, type ReconCell, type ReconGrid } from '../../../shared/mission/recon.js';
 import { ALLY_RECON_RADIUS_M, type MissionUnit, type UnitSource } from '../../../shared/mission/units.js';
-import { generateForces, moveUnit, type ForceUnit } from './forces.js';
+import { generateForces, moveUnit, placementPoints, type ForceUnit, type IsWater } from './forces.js';
 import { NO_TERRAIN, type Terrain } from '../terrain/terrain.js';
 import { NO_BUILDINGS, type Buildings } from '../buildings/buildings.js';
+import { NO_WATER, type Water } from '../water/water.js';
 import { buildingAhead, hitOnStep, WARNING_REAL_S } from './obstacles.js';
 import { serverLog } from '../log.js';
 import { droneStateAt } from './schedule.js';
@@ -84,11 +85,14 @@ export function createMissionController(
   now: () => string = () => new Date().toISOString(),
   terrain: Terrain = NO_TERRAIN,
   buildings: Buildings = NO_BUILDINGS,
-  placeForces: (area: MissionArea, starts: LatLng[]) => ForceUnit[] = generateForces,
+  placeForces: (area: MissionArea, starts: LatLng[], isWater: IsWater) => ForceUnit[] = (area, starts, isWater) => generateForces(area, starts, Math.random, isWater),
+  water: Water = NO_WATER,
 ): MissionController {
   let timers: ReturnType<typeof setTimeout>[] = [];
   let ticker: ReturnType<typeof setInterval> | undefined;
   let running = false;
+  // Counts the missions started and stopped: forces placed for a mission that has since ended are dropped.
+  let missionNo = 0;
   let startedAt = 0;
   let droneCount = 0;
   // Wind at the mission location, as last reported by the dashboard (Open-Meteo, 10 m).
@@ -218,7 +222,7 @@ export function createMissionController(
     const fresh: ReconCell[] = [];
     // Cells in a camera's view this tick, and the first drone that sees each.
     const inView = new Map<string, string>();
-    if (area) for (const unit of forces) moveUnit(unit, area, starts, dtS);
+    if (area) for (const unit of forces) moveUnit(unit, area, starts, dtS, Math.random, water.isWater);
     for (const [droneId, drone] of drones) {
       if (drone.phase === 'lost_link' || drone.phase === 'destroyed') continue;
       drone.groundM = groundAt(drone, drone.position);
@@ -539,7 +543,7 @@ export function createMissionController(
   function deployForces(missionArea: MissionArea, startPoints: LatLng[]) {
     area = missionArea;
     starts = startPoints;
-    forces = placeForces(missionArea, startPoints);
+    forces = placeForces(missionArea, startPoints, water.isWater);
     const watched: ReconCell[] = [];
     for (const unit of forces) {
       if (unit.intel) known.set(unit.id, unitView(unit, 'intel', null));
@@ -566,9 +570,13 @@ export function createMissionController(
       return;
     }
     running = true;
+    const no = ++missionNo;
     droneCount = count;
     reconGrid = { origin: area.center, cellM: RECON_CELL_M };
-    deployForces(area, starts.points);
+    // The units go out once the water around the start points is known, so none is placed on water.
+    void water.loaded(placementPoints(starts.points)).then(() => {
+      if (running && no === missionNo) deployForces(area, starts.points);
+    });
     startedAt = Date.now();
     schedule = buildSchedule(starts.points);
     // Start loading the ground under the start points, so it is known when the drones come online.
@@ -578,6 +586,7 @@ export function createMissionController(
   }
 
   function stop() {
+    missionNo++;
     timers.forEach(clearTimeout);
     timers = [];
     if (ticker) clearInterval(ticker);

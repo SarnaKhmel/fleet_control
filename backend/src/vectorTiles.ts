@@ -18,10 +18,20 @@ export const fetchBytes: Fetcher = async (url) => {
   return new Uint8Array(await response.arrayBuffer());
 };
 
+/** Point on the ground of a position inside a tile (the tile's pixel grid, `extent` wide), in degrees. */
+export function pixelToLatLng(x: number, y: number, zoom: number, extent: number, px: number, py: number): LatLng {
+  const n = 2 ** zoom;
+  const fx = (x + px / extent) / n;
+  const fy = (y + py / extent) / n;
+  return { lng: fx * 360 - 180, lat: (Math.atan(Math.sinh(Math.PI * (1 - 2 * fy))) * 180) / Math.PI };
+}
+
 /** Tiles of one layer of the planet tiles, parsed into `T[]` per tile. */
 export interface TileCache<T> {
   /** The tile's parsed items over the point, or null while the tile loads (or when it failed). */
   itemsAt(point: LatLng): T[] | null;
+  /** Resolves once the point's tile is in (or has failed): asks for it if it was not asked for yet. */
+  loaded(point: LatLng): Promise<void>;
 }
 
 /**
@@ -34,7 +44,8 @@ export function createTileCache<T>(
   zoom: number,
   fetcher: Fetcher = fetchBytes,
 ): TileCache<T> {
-  const tiles = new Map<string, T[] | 'loading' | 'failed'>();
+  const tiles = new Map<string, T[] | 'failed'>();
+  const pending = new Map<string, Promise<void>>();
   let template: Promise<string> | null = null;
 
   function tileTemplate(): Promise<string> {
@@ -46,25 +57,38 @@ export function createTileCache<T>(
     return template;
   }
 
-  function load(key: string, x: number, y: number) {
-    tiles.set(key, 'loading');
+  function load(key: string, x: number, y: number): Promise<void> {
     if (tiles.size > MAX_TILES) tiles.delete(tiles.keys().next().value!);
-    tileTemplate()
+    const request = tileTemplate()
       .then((url) => fetcher(url.replace('{z}', String(zoom)).replace('{x}', String(x)).replace('{y}', String(y))))
-      .then((data) => tiles.set(key, parse(data, x, y, zoom)))
+      .then((data) => {
+        tiles.set(key, parse(data, x, y, zoom));
+      })
       .catch((error: unknown) => {
         serverLog(`${name} tile failed`, { key, error: String(error) });
         tiles.set(key, 'failed');
-      });
+      })
+      .finally(() => pending.delete(key));
+    pending.set(key, request);
+    return request;
+  }
+
+  function keyOf(point: LatLng) {
+    const { x, y } = tilePixel(point, zoom);
+    return { key: `${x}/${y}`, x, y };
   }
 
   return {
     itemsAt(point) {
-      const { x, y } = tilePixel(point, zoom);
-      const key = `${x}/${y}`;
+      const { key, x, y } = keyOf(point);
+      if (!tiles.has(key) && !pending.has(key)) load(key, x, y);
       const tile = tiles.get(key);
-      if (tile === undefined) load(key, x, y);
       return Array.isArray(tile) ? tile : null;
+    },
+    loaded(point) {
+      const { key, x, y } = keyOf(point);
+      if (!tiles.has(key) && !pending.has(key)) load(key, x, y);
+      return pending.get(key) ?? Promise.resolve();
     },
   };
 }

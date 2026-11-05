@@ -85,6 +85,28 @@ describe('generateForces', () => {
   });
 });
 
+describe('water', () => {
+  // A lake: everything 2 to 9 km north of the start points. Land elsewhere.
+  const lake = (p: { lat: number; lng: number }) => {
+    const north = toMetersFrom(south[0], p).north;
+    return north > 2000 && north < 9000;
+  };
+
+  it('places no unit on water', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      for (const unit of generateForces(area, south, seeded(seed), lake)) expect(lake(unit.position)).toBe(false);
+    }
+  });
+
+  it('does not step a moving unit onto water: it waits and takes another leg', () => {
+    const boat = { id: 'enemy-9', side: 'enemy' as const, kind: 'vehicle' as const, position: offsetLatLng(south[0], 0, 1995), headingDeg: 0, speedMs: 6, intel: true, band: [0, 100_000] as [number, number], waypoint: offsetLatLng(south[0], 0, 3000) };
+    // Heading north into the lake: the unit does not enter it.
+    expect(moveUnit(boat, area, south, 10, Math.random, lake)).toBe(false);
+    expect(boat.position).toEqual(offsetLatLng(south[0], 0, 1995));
+    expect(boat.waypoint).toBeNull();
+  });
+});
+
 describe('frontBearing', () => {
   it('faces from the start points toward the area center', () => {
     expect(frontBearing(area, south, Math.random)).toBeCloseTo(0, 5);
