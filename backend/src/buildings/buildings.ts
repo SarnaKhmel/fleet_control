@@ -1,19 +1,14 @@
 import { VectorTile } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
 import type { LatLng } from '../../../shared/protocol.js';
-import { tilePixel } from '../terrain/terrain.js';
-import { serverLog } from '../log.js';
+import { createTileCache, type Fetcher } from '../vectorTiles.js';
 
 // Buildings for the simulator, from the same OpenFreeMap vector tiles the map draws in 3D (layer
 // "building", heights in render_height). Tiles load in the background on first use, like the terrain:
 // until a tile is in, its buildings are unknown and nothing is reported there.
 
-/** TileJSON of the OpenFreeMap planet tiles: it names the current tile URL (it changes with each data release). */
-export const BUILDINGS_TILEJSON_URL = 'https://tiles.openfreemap.org/planet';
 // Zoom 14: the most detailed level, where every building is in the tiles.
 export const BUILDINGS_ZOOM = 14;
-// Tiles kept in memory; the oldest are dropped past this (a tile is a few hundred kilobytes).
-const MAX_TILES = 400;
 // Height given to a building whose tile does not say (rare in OpenFreeMap data).
 const DEFAULT_HEIGHT_M = 10;
 
@@ -35,14 +30,6 @@ export interface Buildings {
 
 /** Buildings that know nothing: no obstacles anywhere. */
 export const NO_BUILDINGS: Buildings = { at: () => null };
-
-export type Fetcher = (url: string) => Promise<Uint8Array>;
-
-const fetchBytes: Fetcher = async (url) => {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return new Uint8Array(await response.arrayBuffer());
-};
 
 /** The buildings of one vector tile, outlines in degrees. */
 export function parseBuildingTile(data: Uint8Array, x: number, y: number, zoom: number): Building[] {
@@ -89,40 +76,12 @@ export function isInside(point: LatLng, building: Building): boolean {
   return inside;
 }
 
-export function createBuildings(fetcher: Fetcher = fetchBytes, zoom = BUILDINGS_ZOOM): Buildings {
-  const tiles = new Map<string, Building[] | 'loading' | 'failed'>();
-  let template: Promise<string> | null = null;
-
-  function tileTemplate(): Promise<string> {
-    template ??= fetcher(BUILDINGS_TILEJSON_URL).then((data) => {
-      const url = (JSON.parse(new TextDecoder().decode(data)) as { tiles?: unknown }).tiles;
-      if (!Array.isArray(url) || typeof url[0] !== 'string') throw new Error('no tile URL in TileJSON');
-      return url[0];
-    });
-    return template;
-  }
-
-  function load(key: string, x: number, y: number) {
-    tiles.set(key, 'loading');
-    if (tiles.size > MAX_TILES) tiles.delete(tiles.keys().next().value!);
-    tileTemplate()
-      .then((url) => fetcher(url.replace('{z}', String(zoom)).replace('{x}', String(x)).replace('{y}', String(y))))
-      .then((data) => tiles.set(key, parseBuildingTile(data, x, y, zoom)))
-      .catch((error: unknown) => {
-        serverLog('buildings tile failed', { key, error: String(error) });
-        tiles.set(key, 'failed');
-      });
-  }
-
+export function createBuildings(fetcher?: Fetcher, zoom = BUILDINGS_ZOOM): Buildings {
+  const tiles = createTileCache('buildings', parseBuildingTile, zoom, fetcher);
   return {
     at(point) {
-      const { x, y } = tilePixel(point, zoom);
-      const key = `${x}/${y}`;
-      const tile = tiles.get(key);
-      if (tile === undefined) load(key, x, y);
-      if (!Array.isArray(tile)) return null;
       let tallest: Building | null = null;
-      for (const building of tile) {
+      for (const building of tiles.itemsAt(point) ?? []) {
         if ((!tallest || building.heightM > tallest.heightM) && isInside(point, building)) tallest = building;
       }
       return tallest;

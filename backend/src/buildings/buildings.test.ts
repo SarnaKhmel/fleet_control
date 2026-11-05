@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { BUILDINGS_TILEJSON_URL, createBuildings, isInside, parseBuildingTile, type Building } from './buildings.js';
+import { createBuildings, isInside, parseBuildingTile, type Building } from './buildings.js';
+import { OPENFREEMAP_TILEJSON_URL } from '../vectorTiles.js';
 
 // Saved from OpenFreeMap: central Kyiv, zoom 14, tile 9581/5524.
 const kyiv = readFileSync(new URL('./fixtures/kyiv-14-9581-5524.pbf', import.meta.url));
@@ -57,7 +58,7 @@ describe('buildings', () => {
     const tallest = tiles.reduce((a, b) => (b.heightM > a.heightM ? b : a));
     const point = pointIn(tallest);
     const fetcher = vi.fn(async (url: string) =>
-      url === BUILDINGS_TILEJSON_URL ? new TextEncoder().encode(JSON.stringify({ tiles: ['https://tiles.example/v1/{z}/{x}/{y}.pbf'] })) : kyiv,
+      url === OPENFREEMAP_TILEJSON_URL ? new TextEncoder().encode(JSON.stringify({ tiles: ['https://tiles.example/v1/{z}/{x}/{y}.pbf'] })) : kyiv,
     );
     const buildings = createBuildings(fetcher);
     expect(buildings.at(point)).toBeNull();
