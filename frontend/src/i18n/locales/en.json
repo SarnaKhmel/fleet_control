@@ -167,7 +167,8 @@
       "placedTitle": "Placed by hand",
       "placedNone": "No units placed by hand yet.",
       "placedCount": "placed: {{count}}",
-      "remove": "Remove"
+      "remove": "Remove",
+      "autoHint": "Units not placed by hand appear automatically, by the counts below."
     },
     "clock": {
       "title": "Mission clock",

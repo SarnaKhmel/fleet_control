@@ -12,6 +12,7 @@ import { offsetLatLng, toMetersFrom } from '../../../shared/mission/area.js';
 import { distanceM } from './engagement.js';
 import { PlacementError } from './forces.js';
 import { DEFAULT_ODDS, type MissionOdds } from '../../../shared/mission/odds.js';
+import { DEFAULT_ALLY_COUNTS, DEFAULT_ENEMY_COUNTS } from '../../../shared/mission/composition.js';
 import { bearingTo } from './kinematics.js';
 import { CONNECT_MS, BOOT_MS, STAGGER_MS } from './schedule.js';
 import type { ForceUnit } from './forces.js';
@@ -1152,6 +1153,20 @@ describe('mission controller', () => {
       // Ten simulated seconds in one real second: the drone took ten steps, but reports its position once.
       expect(positionsOf('drone-1')).toHaveLength(1);
       expect(clocks().at(-1)!.simulatedS - clockBefore).toBeCloseTo(10, 5);
+      mission.dispose();
+    });
+  });
+
+  describe('automatic units', () => {
+    it('a start with no hand placements generates the enemy and the allies by their default counts', async () => {
+      const mission = createAtSpeed((m) => sent.push(m), undefined, NO_TERRAIN);
+      mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1, composition: { enemy: DEFAULT_ENEMY_COUNTS, ally: DEFAULT_ALLY_COUNTS, placed: [] } });
+      for (let i = 0; i < 20; i++) await Promise.resolve();
+      const snap = mission.snapshot() as Extract<ServerMessage, { type: 'mission_snapshot' }>;
+      const all = snap.units ?? [];
+      // The allies are known at once, so the snapshot shows every one of them placed by default.
+      expect(all.filter((u) => u.side === 'ally').length).toBe(Object.values(DEFAULT_ALLY_COUNTS).reduce((a, b) => a + b, 0));
+      expect(sent.some((m) => m.type === 'units')).toBe(true);
       mission.dispose();
     });
   });

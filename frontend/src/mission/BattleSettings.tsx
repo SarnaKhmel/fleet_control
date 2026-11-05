@@ -97,6 +97,7 @@ export function BattleSettings({ onClose }: { onClose: () => void }) {
 
         <fieldset>
           <legend>{t('mission.settings.units')}</legend>
+          <p className="muted">{t('mission.settings.autoHint')}</p>
           <table className="battle-units">
             <thead>
               <tr>

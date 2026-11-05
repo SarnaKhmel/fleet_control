@@ -804,6 +804,11 @@ body,
   transition: width 0.2s ease;
 }
 
+/* The left panel is wide enough for the battle settings window, which opens inside it. */
+.sidebar:not(.sidebar-right) {
+  width: 26rem;
+}
+
 .sidebar.is-collapsed {
   width: 3rem;
 }
