@@ -8,7 +8,7 @@ import { offsetLatLng, toMetersFrom } from './area.js';
 /** Horizontal field of view of a drone camera, degrees. */
 export const CAMERA_FOV_DEG = 60;
 /** How far a drone camera can make out the ground, meters. */
-export const CAMERA_RANGE_M = 1500;
+export const CAMERA_RANGE_M = 600;
 /** Side of a reconnaissance cell, meters. */
 export const RECON_CELL_M = 100;
 

@@ -18,7 +18,7 @@ describe('coneCells', () => {
 
   it('covers about the area of the cone', () => {
     // A 60 degree sector of 1500 m covers 1.18 square km: about 118 cells of 100 m.
-    const cells = coneCells(grid, offsetLatLng(grid.origin, 3000, -2000), 135);
+    const cells = coneCells(grid, offsetLatLng(grid.origin, 3000, -2000), 135, 60, 1500);
     expect(cells.length).toBeGreaterThan(105);
     expect(cells.length).toBeLessThan(130);
   });

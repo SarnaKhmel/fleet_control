@@ -38,6 +38,6 @@ export interface MissionUnit {
 }
 
 /** Radius around an allied unit that it watches: the ground there counts as reconnoitred. */
-export const ALLY_RECON_RADIUS_M = 2000;
+export const ALLY_RECON_RADIUS_M = 800;
 /** No enemy stands or drives closer than this to any drone start point. */
 export const ENEMY_MIN_DISTANCE_M = 3000;

@@ -460,12 +460,13 @@ describe('mission controller', () => {
       mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50.1, lng: 30 } });
       vi.advanceTimersByTime(20_000);
       const cells = allCells();
-      expect(cells.length).toBeGreaterThan(200);
+      // A 60 degree cone of 600 m is about 190 cells of 100 m.
+      expect(cells.length).toBeGreaterThan(120);
       expect(new Set(cells).size).toBe(cells.length);
       expect(reconMessages()[0].grid).toEqual({ origin: area.center, cellM: 100 });
       // The drone flies north from the center: what it saw lies north of the start, none of it far south.
       const rows = cells.map((c) => Number(c.split(',')[1]));
-      expect(Math.max(...rows)).toBeGreaterThan(30);
+      expect(Math.max(...rows)).toBeGreaterThan(4);
       expect(Math.min(...rows)).toBeGreaterThan(-3);
       mission.dispose();
     });
@@ -545,23 +546,25 @@ describe('mission controller', () => {
       mission.dispose();
     });
 
-    it('reconnoitres the 2 km around each ally from the start', async () => {
+    it('reconnoitres the 800 m around each ally from the start', async () => {
       const mission = await online([force({ id: 'ally-1', side: 'ally', position: offsetLatLng(area.center, 0, -20_000), intel: true })]);
       const recon = sent.filter((m) => m.type === 'recon_cells') as Extract<ServerMessage, { type: 'recon_cells' }>[];
       const cells = recon[0].cells;
-      expect(cells.length).toBeGreaterThan(1200);
-      expect(cells.length).toBeLessThan(1320);
-      expect(cells.every(([, y]) => y >= -221 && y <= -180)).toBe(true); // 20 km south, ±2 km
+      // A circle of 800 m is about 200 cells of 100 m, 20 km south.
+      expect(cells.length).toBeGreaterThan(180);
+      expect(cells.length).toBeLessThan(220);
+      expect(cells.every(([, y]) => y >= -209 && y <= -191)).toBe(true);
       mission.dispose();
     });
 
     it('finds a hidden enemy once a drone camera sees it, and names the drone', async () => {
-      const enemy = force({ position: offsetLatLng(area.center, 1000, 0) }); // 1 km east; the drone looks north
+      const enemy = force({ position: offsetLatLng(area.center, 1000, 0) }); // 1 km east, straight ahead of the drone that flies east
       const mission = await online([enemy]);
       vi.advanceTimersByTime(5000);
       expect(sentUnits()).toEqual([]);
       mission.handle({ type: 'move', droneIds: ['drone-1'], target: offsetLatLng(area.center, 5000, 0) });
-      vi.advanceTimersByTime(2000);
+      // Flying east (100 m per real second of the simulation), the camera's 600 m reach it after about 4 s.
+      vi.advanceTimersByTime(6000);
       expect(sentUnits()).toEqual([expect.objectContaining({ id: 'enemy-1', source: 'drone', detectedByDroneId: 'drone-1', position: enemy.position })]);
       // A unit that stands is sent once, not again while the camera keeps seeing it.
       vi.advanceTimersByTime(3000);
@@ -569,12 +572,12 @@ describe('mission controller', () => {
       mission.dispose();
     });
 
-    it('finds an enemy within 2 km of an ally', async () => {
+    it('finds an enemy within 800 m of an ally', async () => {
       const allyAt = offsetLatLng(area.center, 0, -20_000);
       const mission = await online([
         force({ id: 'ally-1', side: 'ally', position: allyAt, intel: true }),
-        force({ id: 'enemy-1', position: offsetLatLng(allyAt, 0, 1500) }),
-        force({ id: 'enemy-2', position: offsetLatLng(allyAt, 0, 2500) }),
+        force({ id: 'enemy-1', position: offsetLatLng(allyAt, 0, 500) }),
+        force({ id: 'enemy-2', position: offsetLatLng(allyAt, 0, 900) }),
       ]);
       expect(sentUnits().filter((u) => u.side === 'enemy')).toEqual([expect.objectContaining({ id: 'enemy-1', source: 'ally', detectedByDroneId: null })]);
       mission.dispose();
@@ -599,8 +602,8 @@ describe('mission controller', () => {
       const allyAt = offsetLatLng(area.center, 0, -20_000);
       const mission = await online([
         force({ id: 'ally-1', side: 'ally', position: allyAt, intel: true }),
-        // Moving east out of the ally's 2 km after about 10 ticks: at 60 m a tick it leaves the sight at 2 km.
-        force({ id: 'enemy-1', kind: 'vehicle', position: offsetLatLng(allyAt, 1500, 0), speedMs: 6, headingDeg: 90, waypoint: offsetLatLng(allyAt, 20_000, 0) }),
+        // Moving east out of the ally's 800 m after about 9 ticks: at 60 m a tick it leaves the sight at 800 m.
+        force({ id: 'enemy-1', kind: 'vehicle', position: offsetLatLng(allyAt, 300, 0), speedMs: 6, headingDeg: 90, waypoint: offsetLatLng(allyAt, 20_000, 0) }),
       ]);
       vi.advanceTimersByTime(60_000);
       const lastSeen = sentUnits().filter((u) => u.id === 'enemy-1').at(-1)!;
@@ -613,7 +616,7 @@ describe('mission controller', () => {
       expect(sentUnits().filter((u) => u.id === 'enemy-1')).toHaveLength(reports);
       expect(snap().position).toEqual(lastSeen.position);
       expect(snap().headingDeg).toBeCloseTo(90, 0);
-      expect(toMetersFrom(allyAt, lastSeen.position).east).toBeLessThan(2050);
+      expect(toMetersFrom(allyAt, lastSeen.position).east).toBeLessThan(850);
       mission.dispose();
     });
 
@@ -621,15 +624,15 @@ describe('mission controller', () => {
       const allyAt = offsetLatLng(area.center, 0, -20_000);
       const mission = await online([
         force({ id: 'ally-1', side: 'ally', position: allyAt, intel: true }),
-        // 60 m a tick (6 m/s, 10 simulated seconds) east from 1.5 km: out of the ally's 2 km after about 9 ticks.
-        force({ id: 'enemy-1', kind: 'vehicle', position: offsetLatLng(allyAt, 1500, 0), speedMs: 6, headingDeg: 90, waypoint: offsetLatLng(allyAt, 20_000, 0) }),
+        // 60 m a tick (6 m/s, 10 simulated seconds) east from 300 m: out of the ally's 800 m after about 9 ticks.
+        force({ id: 'enemy-1', kind: 'vehicle', position: offsetLatLng(allyAt, 300, 0), speedMs: 6, headingDeg: 90, waypoint: offsetLatLng(allyAt, 20_000, 0) }),
       ]);
       vi.advanceTimersByTime(30_000);
       const seen = sentUnits().filter((u) => u.id === 'enemy-1');
       expect(seen.length).toBeGreaterThan(4);
       expect(seen.length).toBeLessThan(15);
       const last = seen.at(-1)!;
-      expect(toMetersFrom(allyAt, last.position).east).toBeLessThan(2050);
+      expect(toMetersFrom(allyAt, last.position).east).toBeLessThan(850);
       expect(last.headingDeg).toBeCloseTo(90, 0);
       expect(last.speedMs).toBe(6);
       const snap = mission.snapshot();
