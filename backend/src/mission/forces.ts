@@ -52,9 +52,11 @@ export const ALLY_GROUPS: { kind: UnitKind; count: number; band: [number, number
   { kind: 'air_defense', count: 1, band: [1000, 4000], forward: false },
 ];
 
-/** Enemy vehicles on the move (the rest stand), and their ground speed, m/s. */
-export const MOVING_VEHICLES = 3;
-export const VEHICLE_SPEED_MS = 6;
+/** Kinds that can move, and the share of them that do (the rest stand where they were placed). */
+export const MOBILE_KINDS: readonly UnitKind[] = ['infantry', 'vehicle'];
+export const MOVING_SHARE = 0.5;
+/** Ground speed of a moving unit by kind, m/s. */
+export const SPEED_MS: Partial<Record<UnitKind, number>> = { infantry: 1.5, vehicle: 6 };
 /** Share of the enemy known from intelligence before the mission; the rest must be found. */
 export const KNOWN_SHARE = 0.3;
 /** Half-width of the sector the enemy (or our forward units) lie in, degrees either side of the front. */
@@ -143,21 +145,19 @@ export function generateForces(area: MissionArea, starts: LatLng[], random: Rand
   const taken = () => units.map((unit) => unit.position);
 
   let enemyNo = 0;
-  let moving = 0;
   for (const [kind, count] of Object.entries(ENEMY_COUNTS) as [UnitKind, number][]) {
     const band = ENEMY_ECHELONS[kind];
     for (let i = 0; i < count; i++) {
       const position = findPlace(area, starts, band, () => inSector(middle, front, SECTOR_HALF_DEG, Math.max(0, band[0] - spread), band[1] + spread, random), taken(), isWater);
       if (!position) continue;
-      const moves = kind === 'vehicle' && moving < MOVING_VEHICLES;
-      if (moves) moving++;
+      const moves = MOBILE_KINDS.includes(kind) && random() < MOVING_SHARE;
       units.push({
         id: `enemy-${++enemyNo}`,
         side: 'enemy',
         kind,
         position,
         headingDeg: moves ? 0 : null,
-        speedMs: moves ? VEHICLE_SPEED_MS : 0,
+        speedMs: moves ? SPEED_MS[kind]! : 0,
         intel: random() < KNOWN_SHARE,
         band,
         waypoint: null,
@@ -171,7 +171,8 @@ export function generateForces(area: MissionArea, starts: LatLng[], random: Rand
     for (let i = 0; i < group.count; i++) {
       const position = findPlace(area, starts, group.band, () => inSector(middle, bearing, SECTOR_HALF_DEG, 0, group.band[1] + spread, random), taken(), isWater);
       if (!position) continue;
-      units.push({ id: `ally-${++allyNo}`, side: 'ally', kind: group.kind, position, headingDeg: null, speedMs: 0, intel: true, band: group.band, waypoint: null });
+      const moves = MOBILE_KINDS.includes(group.kind) && random() < MOVING_SHARE;
+      units.push({ id: `ally-${++allyNo}`, side: 'ally', kind: group.kind, position, headingDeg: moves ? 0 : null, speedMs: moves ? SPEED_MS[group.kind]! : 0, intel: true, band: group.band, waypoint: null });
     }
   }
   return units;

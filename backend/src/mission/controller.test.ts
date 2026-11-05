@@ -580,6 +580,21 @@ describe('mission controller', () => {
       mission.dispose();
     });
 
+    it('moves an allied unit on the move, and it reconnoitres the ground it reaches', async () => {
+      const start = offsetLatLng(area.center, 0, -20_000);
+      const mission = await online([force({ id: 'ally-1', side: 'ally', kind: 'infantry', position: start, intel: true, speedMs: 6, headingDeg: 90, waypoint: offsetLatLng(start, 6000, 0) })]);
+      const recon = () => sent.filter((m) => m.type === 'recon_cells').flatMap((m) => (m as Extract<ServerMessage, { type: 'recon_cells' }>).cells);
+      const before = recon().length;
+      vi.advanceTimersByTime(60_000);
+      // It went 3.6 km east in a minute: the ground at its new place is seen now, the ground far to the east too.
+      const cells = recon();
+      expect(cells.length).toBeGreaterThan(before);
+      expect(cells.some(([x]) => x > 40)).toBe(true);
+      const last = sentUnits().filter((u) => u.id === 'ally-1').at(-1)!;
+      expect(toMetersFrom(start, last.position).east).toBeGreaterThan(3000);
+      mission.dispose();
+    });
+
     it('follows an enemy on the move while it is in sight, and keeps it where it was last seen after', async () => {
       const allyAt = offsetLatLng(area.center, 0, -20_000);
       const mission = await online([

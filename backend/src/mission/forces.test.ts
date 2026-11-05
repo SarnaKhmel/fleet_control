@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { MissionArea } from '../../../shared/protocol';
 import { isInsideArea, offsetLatLng, toMetersFrom } from '../../../shared/mission/area';
 import { ENEMY_MIN_DISTANCE_M } from '../../../shared/mission/units';
-import { ENEMY_ECHELONS, frontBearing, generateForces, MIN_SPACING_M, moveUnit, MOVING_VEHICLES, nearestStartM, type ForceUnit } from './forces';
+import { ENEMY_ECHELONS, frontBearing, generateForces, MIN_SPACING_M, MOBILE_KINDS, moveUnit, nearestStartM, SPEED_MS, type ForceUnit } from './forces';
 import { bearingTo } from './kinematics';
 
 /** A repeatable random sequence (mulberry32), so a failing case can be replayed. */
@@ -67,8 +67,16 @@ describe('generateForces', () => {
     expect([...kinds].sort()).toEqual(['air_defense', 'artillery', 'ew', 'infantry', 'position', 'radar', 'vehicle']);
     expect(enemies(units).some((u) => u.intel)).toBe(true);
     expect(enemies(units).some((u) => !u.intel)).toBe(true);
-    expect(units.filter((u) => u.speedMs > 0).every((u) => u.kind === 'vehicle' && u.side === 'enemy')).toBe(true);
-    expect(units.filter((u) => u.speedMs > 0)).toHaveLength(MOVING_VEHICLES);
+    // Only infantry and vehicles move, on both sides, at their speed; the others stand.
+    for (const unit of units.filter((u) => u.speedMs > 0)) {
+      expect(MOBILE_KINDS).toContain(unit.kind);
+      expect(unit.speedMs).toBe(SPEED_MS[unit.kind]);
+    }
+    expect(units.filter((u) => !MOBILE_KINDS.includes(u.kind)).every((u) => u.speedMs === 0)).toBe(true);
+    const movers = (seed: number) => generateForces(area, separate, seeded(seed)).filter((u) => u.speedMs > 0);
+    const seeds = Array.from({ length: 10 }, (_, i) => i + 1);
+    expect(seeds.some((seed) => movers(seed).some((u) => u.side === 'enemy'))).toBe(true);
+    expect(seeds.some((seed) => movers(seed).some((u) => u.side === 'ally'))).toBe(true);
     expect(units.filter((u) => u.side === 'ally').every((u) => u.intel)).toBe(true);
     for (const a of units) for (const b of units) if (a !== b) expect(distanceM(a.position, b.position)).toBeGreaterThanOrEqual(MIN_SPACING_M);
     expect(new Set(units.map((u) => u.id)).size).toBe(units.length);

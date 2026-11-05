@@ -103,13 +103,11 @@ export function createMissionController(
   let reconGrid: ReconGrid | null = null;
   const reconSeen = new Set<string>();
   let reconCells: ReconCell[] = [];
-  // The enemy and allies on the ground (all of them, as they really are), what the dashboard knows of them,
-  // and the cells the allies watch all the time.
+  // The enemy and allies on the ground (all of them, as they really are) and what the dashboard knows of them.
   let area: MissionArea | null = null;
   let starts: LatLng[] = [];
   let forces: ForceUnit[] = [];
   const known = new Map<string, MissionUnit>();
-  const allyWatch = new Set<string>();
 
   function later(ms: number, fn: () => void) {
     timers.push(setTimeout(fn, ms));
@@ -223,6 +221,9 @@ export function createMissionController(
     // Cells in a camera's view this tick, and the first drone that sees each.
     const inView = new Map<string, string>();
     if (area) for (const unit of forces) moveUnit(unit, area, starts, dtS, Math.random, water.isWater);
+    // Allies that moved watch the ground around where they are now.
+    const movedAllies = forces.filter((unit) => unit.side === 'ally' && unit.speedMs > 0);
+    fresh.push(...watchByAllies(movedAllies));
     for (const [droneId, drone] of drones) {
       if (drone.phase === 'lost_link' || drone.phase === 'destroyed') continue;
       drone.groundM = groundAt(drone, drone.position);
@@ -264,6 +265,23 @@ export function createMissionController(
     detect(inView);
   }
 
+  /** The ground within 2 km of each of these allies, marked as seen; returns the cells seen for the first time. */
+  function watchByAllies(allies: ForceUnit[]): ReconCell[] {
+    if (!reconGrid) return [];
+    const fresh: ReconCell[] = [];
+    for (const ally of allies) fresh.push(...markSeen(circleCells(reconGrid, ally.position, ALLY_RECON_RADIUS_M)));
+    return fresh;
+  }
+
+  /** True when an ally is near enough to the point to watch it (its 2 km around its place now). */
+  function allyCovers(point: LatLng): boolean {
+    return forces.some((unit) => {
+      if (unit.side !== 'ally') return false;
+      const { east, north } = toMetersFrom(unit.position, point);
+      return Math.hypot(east, north) <= ALLY_RECON_RADIUS_M;
+    });
+  }
+
   /**
    * Enemies in sight: in a drone camera's view this tick, or in the ground an ally watches. One seen for the
    * first time becomes known; a known one on the move is reported where it is now. Out of sight, the
@@ -273,10 +291,18 @@ export function createMissionController(
     if (!reconGrid) return;
     const changed: MissionUnit[] = [];
     for (const unit of forces) {
-      if (unit.side !== 'enemy') continue;
+      if (unit.side === 'ally') {
+        // Our own units on the move: the dashboard follows them.
+        if (unit.speedMs > 0) {
+          const view = unitView(unit, 'intel', null);
+          known.set(unit.id, view);
+          changed.push(view);
+        }
+        continue;
+      }
       const key = cellKey(cellOf(reconGrid, unit.position));
       const droneId = inView.get(key) ?? null;
-      if (!droneId && !allyWatch.has(key)) continue;
+      if (!droneId && !allyCovers(unit.position)) continue;
       const was = known.get(unit.id);
       if (was && unit.speedMs === 0) continue;
       if (!was) serverLog('enemy found', { id: unit.id, kind: unit.kind, by: droneId ?? 'ally' });
@@ -544,17 +570,11 @@ export function createMissionController(
     area = missionArea;
     starts = startPoints;
     forces = placeForces(missionArea, startPoints, water.isWater);
-    const watched: ReconCell[] = [];
     for (const unit of forces) {
       if (unit.intel) known.set(unit.id, unitView(unit, 'intel', null));
-      if (unit.side !== 'ally') continue;
-      for (const cell of circleCells(reconGrid!, unit.position, ALLY_RECON_RADIUS_M)) {
-        allyWatch.add(cellKey(cell));
-        watched.push(cell);
-      }
     }
     serverLog('forces', { enemies: forces.filter((u) => u.side === 'enemy').length, allies: forces.filter((u) => u.side === 'ally').length, known: known.size });
-    const fresh = markSeen(watched);
+    const fresh = watchByAllies(forces.filter((unit) => unit.side === 'ally'));
     if (fresh.length > 0) broadcast({ type: 'recon_cells', grid: reconGrid!, cells: fresh });
     if (known.size > 0) broadcast({ type: 'units', units: [...known.values()] });
   }
@@ -599,7 +619,6 @@ export function createMissionController(
     starts = [];
     forces = [];
     known.clear();
-    allyWatch.clear();
     running = false;
     droneCount = 0;
   }
