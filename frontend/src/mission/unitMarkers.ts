@@ -33,13 +33,14 @@ export function unitLabel(unit: MissionUnit, callsignOf: (droneId: string) => st
   const how = i18n.t(`unit.source.${unit.source}`, { callsign: unit.detectedByDroneId ? callsignOf(unit.detectedByDroneId) : '' });
   const heading = shownHeading(unit);
   const moving = heading === null ? '' : ` · ${i18n.t('unit.moving', { speed: Math.round(unit.speedMs * 3.6), heading })}`;
+  const damage = unit.damaged ? ` · ${i18n.t('unit.damaged')}` : '';
   const seen = unit.inSight ? '' : ` · ${i18n.t('unit.lastSeen')}`;
-  return `${what} · ${how}${moving}${seen}`;
+  return `${what} · ${how}${moving}${damage}${seen}`;
 }
 
 export function unitElement(unit: MissionUnit, label: string): HTMLElement {
   const el = natoElement(unitSidc(unit.side, unit.kind), SIZE, shownHeading(unit) ?? undefined);
-  el.classList.add('unit-marker', `is-${unit.side}`, ...(unit.inSight ? [] : ['is-last-seen']));
+  el.classList.add('unit-marker', `is-${unit.side}`, ...(unit.inSight ? [] : ['is-last-seen']), ...(unit.damaged ? ['is-damaged'] : []));
   el.setAttribute('aria-label', label);
   el.title = label;
   return el;

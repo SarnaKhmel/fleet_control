@@ -100,6 +100,11 @@ describe('DroneDetails', () => {
     expect(screen.getByRole('alert').textContent).toBe('Destroyed: the drone flew into a building at the position shown.');
   });
 
+  it('says a drone shot down by infantry was destroyed where it was hit', () => {
+    render(<DroneDetails droneId="drone-1" drone={{ ...drone, status: 'destroyed', cause: 'shot_down', batteryPct: 40 }} defaultOpen />);
+    expect(screen.getByRole('alert').textContent).toBe('Shot down by infantry: the drone was destroyed at the position shown.');
+  });
+
   it('shows how far the drone can still fly, against the wind and with it', () => {
     useWindStore.setState({ wind: { speedMs: 0, fromDeg: 0 } });
     const { rerender } = render(<DroneDetails droneId="drone-1" drone={{ ...drone, batteryPct: 50 }} defaultOpen />);

@@ -1358,6 +1358,7 @@ body,
 .drone-alert.is-collision,
 .drone-alert.is-destroyedCollision,
 .drone-alert.is-destroyed,
+.drone-alert.is-shotDown,
 .drone-alert.is-lost {
   border-left-color: var(--danger);
   background: color-mix(in srgb, var(--danger) 14%, transparent);
@@ -1483,6 +1484,13 @@ body,
 
 .unit-marker.is-last-seen {
   opacity: 0.45;
+}
+
+/* A unit a strike damaged but did not destroy: dashed ring in the warning colour. */
+.unit-marker.is-damaged {
+  outline: 2px dashed var(--warning);
+  outline-offset: 2px;
+  border-radius: 3px;
 }
 
 .zone-label {

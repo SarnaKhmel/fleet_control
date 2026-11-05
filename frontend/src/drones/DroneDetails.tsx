@@ -19,8 +19,11 @@ interface DroneDetailsProps {
  * The warning to highlight for the drone: destroyed or lost link, else a low or critical battery;
  * null when all is well.
  */
-function droneAlert(drone: DroneView | undefined): 'destroyed' | 'destroyedCollision' | 'lost' | 'low' | 'critical' | null {
-  if (drone?.status === 'destroyed') return drone.cause === 'collision' ? 'destroyedCollision' : 'destroyed';
+function droneAlert(drone: DroneView | undefined): 'destroyed' | 'destroyedCollision' | 'shotDown' | 'lost' | 'low' | 'critical' | null {
+  if (drone?.status === 'destroyed') {
+    if (drone.cause === 'shot_down') return 'shotDown';
+    return drone.cause === 'collision' ? 'destroyedCollision' : 'destroyed';
+  }
   if (drone?.status === 'lost_link') return 'lost';
   if (!drone || !takesCommands(drone.status)) return null;
   const level = batteryLevel(drone.batteryPct);
