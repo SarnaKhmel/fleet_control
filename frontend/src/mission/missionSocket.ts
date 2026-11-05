@@ -1,7 +1,7 @@
 import type { ClientMessage, ServerMessage } from '../../../shared/protocol';
 import { useMissionStore } from './missionStore';
 import { useSelectionStore } from './selection';
-import { takesCommands, type LatLng } from '../../../shared/protocol';
+import { takesCommands, type EngageMode, type LatLng } from '../../../shared/protocol';
 import { toMetersFrom } from '../../../shared/mission/area';
 import { useWindStore } from '../wind/windStore';
 import { debugLog } from '../log';
@@ -144,4 +144,9 @@ export function headOnlineDronesToward(target: LatLng): number {
   const { east, north } = toMetersFrom(from, target);
   const headingDeg = ((Math.atan2(east, north) * 180) / Math.PI + 360) % 360;
   return sendClientMessage({ type: 'heading', droneIds: ids, headingDeg }) ? ids.length : 0;
+}
+
+/** Sends a drone at an enemy unit: a strike, or a pursuit. Returns false when not connected. */
+export function engageEnemy(droneId: string, targetId: string, mode: EngageMode): boolean {
+  return sendClientMessage({ type: 'engage', droneId, targetId, mode });
 }

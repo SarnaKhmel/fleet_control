@@ -131,7 +131,8 @@
       "moving": "moving",
       "landing": "landing",
       "landed": "landed",
-      "destroyed": "destroyed"
+      "destroyed": "destroyed",
+      "engaging": "attacking"
     },
     "draw": "Draw zone on map",
     "drawingOn": "Drawing: click the map (stop)",
@@ -197,7 +198,16 @@
     "flightSpeed": "Speed, m/s",
     "flightApply": "Apply ({{count}})",
     "range": "Range",
-    "rangeHint": "How far it can still fly on its charge at its cruise speed: against the wind and with it"
+    "rangeHint": "How far it can still fly on its charge at its cruise speed: against the wind and with it",
+    "attack": {
+      "title": "Attack",
+      "target": "Enemy unit",
+      "mode": "Mode",
+      "strike": "Strike (fly into it)",
+      "pursuit": "Pursuit (keep 200–400 m)",
+      "go": "Attack",
+      "none": "No enemy unit is known yet."
+    }
   },
   "unit": {
     "side": {

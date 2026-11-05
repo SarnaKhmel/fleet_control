@@ -7,6 +7,7 @@ import { Accordion } from '../sidebar/Accordion';
 import { batteryLevel } from '../mission/battery';
 import type { DroneView } from '../mission/missionStore';
 import { clearDroneTasks, removeDroneTask } from '../mission/missionSocket';
+import { AttackControls } from './AttackControls';
 
 interface DroneDetailsProps {
   droneId: string;
@@ -85,6 +86,7 @@ export function DroneDetails({ droneId, drone, defaultOpen }: DroneDetailsProps)
           {(online || lost) && drone?.position ? `${drone.position.lat.toFixed(5)}, ${drone.position.lng.toFixed(5)}` : '—'}
         </dd>
       </dl>
+      {online && <AttackControls droneId={droneId} />}
       {(online || lost) && (
         <section className="drone-tasks" aria-label={t('drone.tasks')}>
           <h4>{t('drone.tasks')}</h4>
