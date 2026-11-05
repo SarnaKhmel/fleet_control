@@ -302,6 +302,15 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
         set({ units });
         return;
       }
+      case 'unit_hit': {
+        const units = { ...get().units };
+        const unit = units[message.unitId];
+        if (message.outcome === 'destroyed') delete units[message.unitId];
+        else if (message.outcome === 'damaged' && unit) units[message.unitId] = { ...unit, damaged: true };
+        else return;
+        set({ units });
+        return;
+      }
       case 'recon_cells':
         set({ reconGrid: message.grid, reconCells: [...get().reconCells, ...message.cells] });
         return;

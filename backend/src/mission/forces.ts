@@ -1,7 +1,10 @@
 import type { LatLng, MissionArea } from '../../../shared/protocol.js';
 import { isInsideArea, offsetLatLng, toMetersFrom } from '../../../shared/mission/area.js';
-import { ENEMY_MIN_DISTANCE_M, type UnitKind, type UnitSide } from '../../../shared/mission/units.js';
+import { ENEMY_MIN_DISTANCE_M, SPEED_RANGE_MS, type UnitKind, type UnitSide } from '../../../shared/mission/units.js';
 import { bearingTo, stepToward } from './kinematics.js';
+import { DEFAULT_ODDS, type MissionOdds } from '../../../shared/mission/odds.js';
+import { NO_BUILDINGS, type Buildings } from '../buildings/buildings.js';
+import { hitOnStep } from './obstacles.js';
 
 // The enemy and our own forces on the ground for one mission, placed when it starts.
 //
@@ -74,11 +77,14 @@ export const ALLY_GROUPS: { kind: UnitKind; count: number; band: [number, number
 
 /** Kinds that can move, and the share of them that do (the rest stand where they were placed). */
 export const MOBILE_KINDS: readonly UnitKind[] = ['infantry', 'vehicle'];
-export const MOVING_SHARE = 0.5;
-/** Ground speed of a moving unit by kind, m/s. */
-export const SPEED_MS: Partial<Record<UnitKind, number>> = { infantry: 1.5, vehicle: 6 };
-/** Share of the enemy known from intelligence before the mission; the rest must be found. */
-export const KNOWN_SHARE = 0.3;
+/**
+ * A speed for a unit's next leg, m/s: drawn within its range. Vehicles off road for now; on a road they draw
+ * from the road range once roads are routed.
+ */
+export function legSpeedMs(kind: keyof typeof SPEED_RANGE_MS, random: Random): number {
+  const [lo, hi] = SPEED_RANGE_MS[kind].offRoad;
+  return lo + (hi - lo) * random();
+}
 /** Half-width of the sector the enemy (or our forward units) lie in, degrees either side of the front. */
 export const SECTOR_HALF_DEG = 70;
 /** Units keep at least this far apart. */
@@ -104,6 +110,8 @@ export interface ForceUnit {
   band: [number, number];
   /** Where a moving unit drives to next. */
   waypoint: LatLng | null;
+  /** Hit by a strike and not destroyed. */
+  damaged?: boolean;
 }
 
 function distanceM(a: LatLng, b: LatLng): number {
@@ -156,7 +164,7 @@ function inSector(from: LatLng, bearing: number, halfDeg: number, minM: number, 
 }
 
 /** Places the enemy and the allies for a mission with these start points. */
-export function generateForces(area: MissionArea, starts: LatLng[], random: Random = Math.random, isWater: IsWater = NO_WATER_CHECK): ForceUnit[] {
+export function generateForces(area: MissionArea, starts: LatLng[], random: Random = Math.random, isWater: IsWater = NO_WATER_CHECK, odds: MissionOdds = DEFAULT_ODDS): ForceUnit[] {
   const middle = centroid(starts);
   // Start points can be spread out: the sector is sampled far enough out to reach every band from any of them.
   const spread = Math.max(...starts.map((start) => distanceM(middle, start)));
@@ -171,15 +179,15 @@ export function generateForces(area: MissionArea, starts: LatLng[], random: Rand
     for (let i = 0; i < count; i++) {
       const position = findPlace(area, starts, band, () => inSector(middle, front, SECTOR_HALF_DEG, Math.max(0, band[0] - spread), band[1] + spread, random), taken(), isWater);
       if (!position) continue;
-      const moves = MOBILE_KINDS.includes(kind) && random() < MOVING_SHARE;
+      const moves = MOBILE_KINDS.includes(kind) && random() < odds.movingShare;
       units.push({
         id: `enemy-${++enemyNo}`,
         side: 'enemy',
         kind,
         position,
         headingDeg: moves ? 0 : null,
-        speedMs: moves ? SPEED_MS[kind]! : 0,
-        intel: random() < KNOWN_SHARE,
+        speedMs: moves ? legSpeedMs(kind as keyof typeof SPEED_RANGE_MS, random) : 0,
+        intel: random() < odds.knownShare,
         band,
         waypoint: null,
       });
@@ -192,8 +200,8 @@ export function generateForces(area: MissionArea, starts: LatLng[], random: Rand
     for (let i = 0; i < group.count; i++) {
       const position = findPlace(area, starts, group.band, () => inSector(middle, bearing, SECTOR_HALF_DEG, 0, group.band[1] + spread, random), taken(), isWater);
       if (!position) continue;
-      const moves = MOBILE_KINDS.includes(group.kind) && random() < MOVING_SHARE;
-      units.push({ id: `ally-${++allyNo}`, side: 'ally', kind: group.kind, position, headingDeg: moves ? 0 : null, speedMs: moves ? SPEED_MS[group.kind]! : 0, intel: true, band: group.band, waypoint: null });
+      const moves = MOBILE_KINDS.includes(group.kind) && random() < odds.movingShare;
+      units.push({ id: `ally-${++allyNo}`, side: 'ally', kind: group.kind, position, headingDeg: moves ? 0 : null, speedMs: moves ? legSpeedMs(group.kind as keyof typeof SPEED_RANGE_MS, random) : 0, intel: true, band: group.band, waypoint: null });
     }
   }
   return units;
@@ -204,15 +212,26 @@ export function generateForces(area: MissionArea, starts: LatLng[], random: Rand
  * next one, a short leg away within its band (so it never drives across the band toward our start points).
  * Returns true if it moved.
  */
-export function moveUnit(unit: ForceUnit, area: MissionArea, starts: LatLng[], dtS: number, random: Random = Math.random, isWater: IsWater = NO_WATER_CHECK): boolean {
+export function moveUnit(
+  unit: ForceUnit,
+  area: MissionArea,
+  starts: LatLng[],
+  dtS: number,
+  random: Random = Math.random,
+  isWater: IsWater = NO_WATER_CHECK,
+  buildings: Buildings = NO_BUILDINGS,
+): boolean {
   if (unit.speedMs === 0) return false;
   if (!unit.waypoint) {
     unit.waypoint = findPlace(area, starts, unit.band, () => inSector(unit.position, 0, 180, 0, LEG_MAX_M, random), [], isWater);
     if (!unit.waypoint) return false;
+    unit.speedMs = legSpeedMs(unit.kind as keyof typeof SPEED_RANGE_MS, random);
   }
   const step = stepToward(unit.position, unit.waypoint, unit.speedMs * dtS);
-  // A step onto water is not taken: the unit waits and picks another leg next tick.
-  if (isWater(step.position)) {
+  // A step onto water, or a vehicle's step into a building, is not taken: the unit waits and picks another leg
+  // next tick. Infantry walks into buildings (and holds them: see the controller).
+  const blocked = unit.kind === 'vehicle' && hitOnStep(buildings, unit.position, step.position, 0) !== null;
+  if (isWater(step.position) || blocked) {
     unit.waypoint = null;
     return false;
   }

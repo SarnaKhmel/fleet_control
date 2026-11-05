@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import type { Building, Buildings } from '../buildings/buildings';
 import type { MissionArea } from '../../../shared/protocol';
 import { isInsideArea, offsetLatLng, toMetersFrom } from '../../../shared/mission/area';
 import { ENEMY_MIN_DISTANCE_M } from '../../../shared/mission/units';
-import { ENEMY_ECHELONS, frontBearing, generateForces, MIN_SPACING_M, MOBILE_KINDS, moveUnit, nearestStartM, SPEED_MS, type ForceUnit } from './forces';
+import { ENEMY_ECHELONS, frontBearing, generateForces, MIN_SPACING_M, MOBILE_KINDS, moveUnit, nearestStartM, type ForceUnit } from './forces';
+import { SPEED_RANGE_MS } from '../../../shared/mission/units';
 import { UNIT_KINDS } from '../../../shared/mission/units';
 import { bearingTo } from './kinematics';
 
@@ -71,7 +73,9 @@ describe('generateForces', () => {
     // Only infantry and vehicles move, on both sides, at their speed; the others stand.
     for (const unit of units.filter((u) => u.speedMs > 0)) {
       expect(MOBILE_KINDS).toContain(unit.kind);
-      expect(unit.speedMs).toBe(SPEED_MS[unit.kind]);
+      const [lo, hi] = SPEED_RANGE_MS[unit.kind as 'infantry' | 'vehicle'].offRoad;
+      expect(unit.speedMs).toBeGreaterThanOrEqual(lo);
+      expect(unit.speedMs).toBeLessThanOrEqual(hi);
     }
     expect(units.filter((u) => !MOBILE_KINDS.includes(u.kind)).every((u) => u.speedMs === 0)).toBe(true);
     const movers = (seed: number) => generateForces(area, separate, seeded(seed)).filter((u) => u.speedMs > 0);
@@ -143,6 +147,42 @@ describe('frontBearing', () => {
 });
 
 describe('moveUnit', () => {
+  it('draws a new speed within the range of the kind for each new leg', () => {
+    const [lo, hi] = SPEED_RANGE_MS.vehicle.offRoad;
+    const truck = { id: 'enemy-9', side: 'enemy' as const, kind: 'vehicle' as const, position: offsetLatLng(south[0], 0, 0), headingDeg: 0, speedMs: lo, intel: true, band: [0, 100_000] as [number, number], waypoint: null };
+    const speeds = new Set<number>();
+    for (let i = 0; i < 20; i++) {
+      moveUnit(truck, area, south, 10, seeded(i + 1));
+      expect(truck.speedMs).toBeGreaterThanOrEqual(lo);
+      expect(truck.speedMs).toBeLessThanOrEqual(hi);
+      speeds.add(truck.speedMs);
+      truck.waypoint = null;
+    }
+    expect(speeds.size).toBeGreaterThan(1);
+  });
+
+  // A block of houses 150–250 m east of the start: 40 m tall, nothing else.
+  const houses: Buildings = {
+    at: (p) => {
+      const { east } = toMetersFrom(south[0], p);
+      return east > 150 && east < 250 ? ({ rings: [], heightM: 40, south: 0, north: 0, west: 0, east: 0 } as Building) : null;
+    },
+  };
+
+  it('does not drive a vehicle into a building: it waits and takes another leg', () => {
+    // Heading east at 6 m/s: a 60 m step from 100 m reaches the houses at 150 m.
+    const truck = { id: 'enemy-9', side: 'enemy' as const, kind: 'vehicle' as const, position: offsetLatLng(south[0], 100, 0), headingDeg: 90, speedMs: 6, intel: true, band: [0, 100_000] as [number, number], waypoint: offsetLatLng(south[0], 400, 0) };
+    expect(moveUnit(truck, area, south, 10, Math.random, () => false, houses)).toBe(false);
+    expect(truck.position).toEqual(offsetLatLng(south[0], 100, 0));
+    expect(truck.waypoint).toBeNull();
+  });
+
+  it('lets infantry walk into a building', () => {
+    const foot = { id: 'enemy-9', side: 'enemy' as const, kind: 'infantry' as const, position: offsetLatLng(south[0], 145, 0), headingDeg: 90, speedMs: 1.5, intel: true, band: [0, 100_000] as [number, number], waypoint: offsetLatLng(south[0], 400, 0) };
+    expect(moveUnit(foot, area, south, 10, Math.random, () => false, houses)).toBe(true);
+    expect(houses.at(foot.position)).not.toBeNull();
+  });
+
   it('drives a moving vehicle at its speed and points its heading the way it goes, never into the 3 km ring', () => {
     const vehicle = generateForces(area, south, seeded(11)).find((u) => u.speedMs > 0)!;
     const random = seeded(12);

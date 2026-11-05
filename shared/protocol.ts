@@ -1,5 +1,6 @@
 import type { ReconCell, ReconGrid } from './mission/recon.js';
-import type { MissionUnit } from './mission/units.js';
+import type { HitOutcome, MissionUnit } from './mission/units.js';
+import { isMissionOdds, type MissionOdds } from './mission/odds.js';
 
 // WebSocket protocol shared by the simulator (backend) and the dashboard (frontend).
 // Server is the source of truth; the client sends intents only. Every incoming message is
@@ -65,10 +66,21 @@ export type DroneStatus = 'offline' | 'booting' | 'connecting' | 'idle' | 'movin
  * - `destroyed`: its battery ran out in the air and it fell.
  * The last two are final: such a drone keeps its spot, path and tasks on the map and takes no commands.
  */
-export type FlightStatus = 'idle' | 'moving' | 'landing' | 'landed' | 'lost_link' | 'destroyed';
+export type FlightStatus = 'idle' | 'moving' | 'engaging' | 'landing' | 'landed' | 'lost_link' | 'destroyed';
 
-/** Why a drone went down for good: its battery ran out, or it flew into a building. */
-export type DownCause = 'battery' | 'collision';
+/**
+ * How a drone engages an enemy unit: `strike` flies at it until the drone hits it (a kamikaze, destroyed in
+ * the hit); `pursuit` keeps 200–400 m from it: behind it while it moves, circling it while it stands.
+ */
+export type EngageMode = 'strike' | 'pursuit';
+
+/** Id of an enemy unit: enemy-1, enemy-2, … */
+export function isEnemyId(value: unknown): value is string {
+  return typeof value === 'string' && /^enemy-\d{1,4}$/.test(value);
+}
+
+/** Why a drone went down for good: its battery ran out, it flew into a building, or it was shot down by infantry. */
+export type DownCause = 'battery' | 'collision' | 'shot_down';
 
 /** A building ahead of a drone that it will hit at its present height. */
 export interface CollisionWarning {
@@ -85,12 +97,12 @@ export interface CollisionWarning {
 
 /** True for an online drone that still takes commands (everything but lost link and destroyed). */
 export function takesCommands(status: string | null | undefined): boolean {
-  return status === 'idle' || status === 'moving' || status === 'landing' || status === 'landed';
+  return status === 'idle' || status === 'moving' || status === 'engaging' || status === 'landing' || status === 'landed';
 }
 
 /** True for an online drone that is off the ground. */
 export function isAirborne(status: string | null | undefined): boolean {
-  return status === 'idle' || status === 'moving' || status === 'landing';
+  return status === 'idle' || status === 'moving' || status === 'engaging' || status === 'landing';
 }
 
 /** Full telemetry snapshot (tasks/tech.md section 3). Units are in field names. */
@@ -118,7 +130,8 @@ export interface DroneTelemetry {
 // ---- Client → server ----
 
 export type ClientMessage =
-  | { type: 'mission_start'; area: MissionArea; layout: StartLayout; droneCount: number }
+  /** `odds`: the odds of this mission (strikes, shoot-downs, placement); the defaults when left out. */
+  | { type: 'mission_start'; area: MissionArea; layout: StartLayout; droneCount: number; odds?: MissionOdds }
   | { type: 'mission_reset' }
   /** Without `append` the target replaces the drones' tasks; with it, the target goes to the end of them. */
   | { type: 'move'; droneIds: string[]; target: LatLng; append?: boolean }
@@ -128,6 +141,8 @@ export type ClientMessage =
   | { type: 'land'; droneIds: string[] }
   /** Sets the height above the ground and/or the cruise speed of the drones (at least one of the two). */
   | { type: 'set_flight'; droneIds: string[]; altitudeAglM?: number; cruiseSpeedMs?: number }
+  /** Sends a drone at an enemy unit (enemy-N). Refused unless the unit is known; pursuit also needs it within camera range. */
+  | { type: 'engage'; droneId: string; targetId: string; mode: EngageMode }
   /** Drops one task (0 = the current one) from a drone's list. */
   | { type: 'remove_task'; droneId: string; index: number }
   /** Moves one task of a drone's list to another point. */
@@ -192,6 +207,8 @@ export type ServerMessage =
    * once with `warning: null` when the path is clear again.
    */
   | { type: 'drone_warning'; droneId: string; warning: CollisionWarning | null }
+  /** The result of a drone's strike on a unit: destroyed units leave the map, damaged ones stay marked. */
+  | { type: 'unit_hit'; unitId: string; droneId: string; outcome: HitOutcome }
   | { type: 'mission_error'; reason: MissionErrorReason }
   | { type: 'mission_reset' };
 
@@ -259,10 +276,20 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
   if (message.type === 'mission_start' && isMissionArea(message.area) && isStartLayout(message.layout) && isDroneCount(message.droneCount)) {
     // A layout with a point per drone must have exactly one point for each.
     if (message.layout.kind === 'separate' && message.layout.points.length !== message.droneCount) return null;
-    return { type: 'mission_start', area: message.area, layout: message.layout, droneCount: message.droneCount };
+    if (message.odds !== undefined && !isMissionOdds(message.odds)) return null;
+    return {
+      type: 'mission_start',
+      area: message.area,
+      layout: message.layout,
+      droneCount: message.droneCount,
+      ...(message.odds !== undefined ? { odds: message.odds as MissionOdds } : {}),
+    };
   }
   if (message.type === 'move' && isDroneIds(message.droneIds) && isLatLng(message.target) && (message.append === undefined || typeof message.append === 'boolean')) {
     return message.append ? { type: 'move', droneIds: message.droneIds, target: message.target, append: true } : { type: 'move', droneIds: message.droneIds, target: message.target };
+  }
+  if (message.type === 'engage' && isDroneId(message.droneId) && isEnemyId(message.targetId) && (message.mode === 'strike' || message.mode === 'pursuit')) {
+    return { type: 'engage', droneId: message.droneId, targetId: message.targetId, mode: message.mode };
   }
   if (message.type === 'hold' && isDroneIds(message.droneIds)) {
     return { type: 'hold', droneIds: message.droneIds };

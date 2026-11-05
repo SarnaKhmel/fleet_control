@@ -178,6 +178,16 @@ describe('mission store', () => {
     expect(store().units).toEqual({});
   });
 
+
+  it('removes a unit a strike destroyed, and marks one it damaged', () => {
+    const enemy = { id: 'enemy-1', side: 'enemy' as const, kind: 'vehicle' as const, position: { lat: 50.1, lng: 30 }, headingDeg: null, speedMs: 0, source: 'drone' as const, detectedByDroneId: 'drone-1', inSight: true };
+    const other = { ...enemy, id: 'enemy-2' };
+    store().apply({ type: 'units', units: [enemy, other] });
+    store().apply({ type: 'unit_hit', unitId: 'enemy-1', droneId: 'drone-1', outcome: 'destroyed' });
+    store().apply({ type: 'unit_hit', unitId: 'enemy-2', droneId: 'drone-1', outcome: 'damaged' });
+    expect(Object.keys(store().units)).toEqual(['enemy-2']);
+    expect(store().units['enemy-2'].damaged).toBe(true);
+  });
   it('treats missing or malformed task lists from the server as empty', () => {
     store().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
     store().apply({ type: 'drone_tasks', droneId: 'drone-1', trail: 'x', tasks: [{ lat: 'a' }] } as never);
