@@ -5,7 +5,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import './mapWorker';
 import { useThemeStore } from '../theme/themeStore';
 import { useLocationStore } from '../location/locationStore';
-import { DEFAULT_CENTER, DEFAULT_ZOOM, mapStyleFor, useMapViewStore } from './mapStyles';
+import { DEFAULT_CENTER, DEFAULT_ZOOM, mapStyleFor, mapStyleKey, useMapViewStore } from './mapStyles';
 import { addBuildingsLayer, BUILDINGS_LAYER_ID, BUILDING_COLORS, TILT_3D_PITCH } from './buildings';
 import { addTerrain, groundElevationAt, TERRAIN_SOURCE_ID } from './terrain';
 import { addBordersLayer, BORDERS_LAYER_ID, BORDER_COLORS } from './borders';
@@ -57,10 +57,11 @@ export function MapView() {
 
   // Create the map once; clicking it selects a location.
   useEffect(() => {
-    const style = mapStyleFor(useThemeStore.getState().theme, useMapViewStore.getState().view);
+    const { theme: startTheme } = useThemeStore.getState();
+    const { view: startView } = useMapViewStore.getState();
     const map = new MapLibreMap({
       container: containerRef.current!,
-      style,
+      style: mapStyleFor(startTheme, startView),
       center: [DEFAULT_CENTER.lng, DEFAULT_CENTER.lat],
       zoom: DEFAULT_ZOOM,
     });
@@ -210,7 +211,7 @@ export function MapView() {
       if (mission.drawing && mission.drawAnchor) mission.setDrawCursor({ lat: event.lngLat.lat, lng: event.lngLat.lng });
     });
     mapRef.current = map;
-    styleRef.current = style;
+    styleRef.current = mapStyleKey(startTheme, startView);
     return () => {
       map.remove();
       mapRef.current = null;
@@ -220,11 +221,11 @@ export function MapView() {
 
   // Switch the basemap when the theme or the map view changes; skip if the style is already loaded.
   useEffect(() => {
-    const style = mapStyleFor(theme, view);
+    const key = mapStyleKey(theme, view);
     const map = mapRef.current;
-    if (!map || styleRef.current === style) return;
-    map.setStyle(style);
-    styleRef.current = style;
+    if (!map || styleRef.current === key) return;
+    map.setStyle(mapStyleFor(theme, view));
+    styleRef.current = key;
   }, [theme, view]);
 
   // Numbered markers for the picked start points.

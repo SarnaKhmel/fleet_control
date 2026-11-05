@@ -13,6 +13,7 @@
     "mapView": "Map view",
     "mapAuto": "Map: by theme",
     "mapLandscape": "Map: landscape",
+    "mapSatellite": "Map: satellite",
     "buildings3dOn": "3D buildings: on",
     "buildings3dOff": "3D buildings: off",
     "cityNotFound": "City not found",

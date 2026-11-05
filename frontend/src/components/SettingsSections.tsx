@@ -53,6 +53,7 @@ export function SettingsSections() {
           <select aria-label={t('header.mapView')} value={mapView} onChange={(event) => setMapView(event.target.value as MapView)}>
             <option value="auto">{t('header.mapAuto')}</option>
             <option value="landscape">{t('header.mapLandscape')}</option>
+            <option value="satellite">{t('header.mapSatellite')}</option>
           </select>
         </label>
         <div className="settings-row">

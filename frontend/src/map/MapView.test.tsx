@@ -4,7 +4,7 @@ import { MapView } from './MapView';
 import { useThemeStore } from '../theme/themeStore';
 import { useLocationStore } from '../location/locationStore';
 import { FakeMap, mapInstances, markerInstances } from '../test/maplibreMock';
-import { useMapViewStore } from './mapStyles';
+import { SATELLITE_STYLE, useMapViewStore } from './mapStyles';
 import { useMapIssueStore } from './mapIssue';
 import { useMapScaleStore } from './mapScaleStore';
 import { turnNorthUp } from './viewReset';
@@ -210,6 +210,16 @@ describe('3D buildings', () => {
     act(() => mapInstances[0].emit('style.load', {} as never));
     expect(mapInstances[0].getLayer('3d-buildings')).toBeTruthy();
     expect(mapInstances[0].pitch).toBe(50);
+  });
+
+  it('keeps the 3D buildings and the tilt over the satellite imagery', () => {
+    useMapViewStore.setState({ view: 'satellite', buildings3d: true });
+    render(<MapView />);
+    act(() => mapInstances[0].emit('style.load', {} as never));
+    expect(mapInstances[0].style).toBe(SATELLITE_STYLE);
+    expect(mapInstances[0].getLayer('3d-buildings')).toBeTruthy();
+    expect(mapInstances[0].pitch).toBe(50);
+    useMapViewStore.setState({ view: 'auto', buildings3d: false });
   });
 
   it('hides the layer and flattens the camera when turned off', () => {
