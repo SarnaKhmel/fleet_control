@@ -7,7 +7,7 @@ import type { Theme } from '../theme/themeStore';
 export const RECON_SOURCE_ID = 'recon-area';
 export const RECON_FILL_ID = 'recon-area-fill';
 // Same values as the --muted token of each theme (map layers cannot read CSS variables).
-export const RECON_COLORS: Record<Theme, string> = { dark: '#8a99b3', light: '#5b6b85' };
+export const RECON_COLORS: Record<Theme, string> = { dark: '#8a99b3', light: '#5b6b85', tactical: '#8a99b3' };
 
 /** GeoJSON with one rectangle per run of seen cells in a row. */
 export function reconFeatures(grid: ReconGrid | null, cells: ReconCell[]) {

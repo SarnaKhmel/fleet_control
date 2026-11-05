@@ -9,7 +9,7 @@ import { removeZoneLabels, syncZoneLabels } from './zoneLabels';
 export const MISSION_SOURCE_ID = 'mission-area';
 export const MISSION_LINE_ID = 'mission-area-line';
 export const MISSION_FILL_ID = 'mission-area-fill';
-export const MISSION_COLORS: Record<Theme, string> = { dark: '#7ee787', light: '#1a7f37' };
+export const MISSION_COLORS: Record<Theme, string> = { dark: '#7ee787', light: '#1a7f37', tactical: '#7ee787' };
 
 /** Rectangle to draw: the live preview while drawing, else the committed zone. */
 export function missionRing(state: MissionState) {

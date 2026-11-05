@@ -7,6 +7,10 @@ describe('mapStyleFor', () => {
     expect(mapStyleFor('light')).toBe(MAP_STYLE_URLS.light);
   });
 
+  it('gives the tactical theme the dark basemap', () => {
+    expect(mapStyleFor('tactical')).toBe(MAP_STYLE_URLS.dark);
+  });
+
   it('uses the landscape style regardless of theme', () => {
     expect(mapStyleFor('dark', 'landscape')).toBe(MAP_STYLE_URLS.landscape);
     expect(mapStyleFor('light', 'landscape')).toBe(MAP_STYLE_URLS.landscape);
@@ -26,5 +30,9 @@ describe('mapStyleKey', () => {
     expect(mapStyleKey('light', 'auto')).toBe('light');
     expect(mapStyleKey('dark', 'landscape')).toBe('landscape');
     expect(mapStyleKey('light', 'satellite')).toBe('satellite');
+  });
+
+  it('keeps the same key for dark and tactical, since they share a basemap', () => {
+    expect(mapStyleKey('tactical')).toBe(mapStyleKey('dark'));
   });
 });

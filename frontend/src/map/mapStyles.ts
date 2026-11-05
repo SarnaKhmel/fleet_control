@@ -49,16 +49,19 @@ export const useMapViewStore = create<MapViewState>()(
   ),
 );
 
+// Which basemap each UI theme uses; "tactical" reuses the dark one, so switching between them costs no reload.
+const BASEMAP_OF: Record<Theme, keyof typeof MAP_STYLE_URLS> = { dark: 'dark', light: 'light', tactical: 'dark' };
+
 /** Auto follows the UI theme; "landscape" always shows the terrain style; "satellite" the imagery. */
 export function mapStyleFor(theme: Theme, view: MapView = 'auto'): string | StyleSpecification {
   if (view === 'satellite') return SATELLITE_STYLE;
   if (view === 'landscape') return MAP_STYLE_URLS.landscape;
-  return MAP_STYLE_URLS[theme];
+  return MAP_STYLE_URLS[BASEMAP_OF[theme]];
 }
 
 /** Which style is shown: a change of this key is a change of the basemap. */
 export function mapStyleKey(theme: Theme, view: MapView = 'auto'): string {
-  return view === 'auto' ? theme : view;
+  return view === 'auto' ? BASEMAP_OF[theme] : view;
 }
 
 

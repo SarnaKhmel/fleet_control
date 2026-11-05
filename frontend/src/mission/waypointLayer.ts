@@ -9,7 +9,7 @@ import type { DroneView } from './missionStore';
 export const WAYPOINT_SOURCE_ID = 'drone-waypoints';
 export const WAYPOINT_LINE_ID = 'drone-waypoints-line';
 // Same values as the --accent token of each theme (map layers cannot read CSS variables).
-export const WAYPOINT_COLORS: Record<Theme, string> = { dark: '#4ea1ff', light: '#1f6feb' };
+export const WAYPOINT_COLORS: Record<Theme, string> = { dark: '#4ea1ff', light: '#1f6feb', tactical: '#4ea1ff' };
 
 const line = (points: LatLng[]) => ({ type: 'LineString', coordinates: points.map((p) => [p.lng, p.lat]) });
 

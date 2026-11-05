@@ -4,8 +4,9 @@
   },
   "header": {
     "language": "Language",
-    "switchToLight": "Light theme",
-    "switchToDark": "Dark theme",
+    "themeDark": "Dark",
+    "themeLight": "Light",
+    "themeTactical": "Tactical",
     "coordinates": "Coordinates",
     "coordinatesPlaceholder": "50.45, 30.52 or city name",
     "go": "Go",

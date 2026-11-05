@@ -23,6 +23,30 @@
   --danger: #d93036;
 }
 
+/* Tactical: olive-black panels, off-white type, steel-blue accent (a military HUD look). Flat on purpose:
+   no images, gradients, extra fonts or shadows, so it costs nothing extra to load. */
+:root[data-theme='tactical'] {
+  --bg: #0d100e;
+  --panel: #151a16;
+  --border: #2e3a2c;
+  --fg: #dfe3d0;
+  --muted: #8f9a84;
+  --accent: #7fb2e5;
+  --symbol-bg: #dfe3d0;
+  --warning: #e3b341;
+  --danger: #e0524b;
+}
+
+:root[data-theme='tactical'] .header {
+  border-bottom: 2px solid var(--accent);
+}
+
+:root[data-theme='tactical'] .header h1,
+:root[data-theme='tactical'] .location-panel h2 {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 body {
   margin: 0;
   background: var(--bg);

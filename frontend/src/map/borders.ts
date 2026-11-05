@@ -5,7 +5,7 @@ import type { Theme } from '../theme/themeStore';
 // admin level 2, land borders only; maritime boundaries are skipped).
 export const BORDERS_LAYER_ID = 'country-borders';
 // Bright on the dark basemap and dark on the light one, so the border stands out from the fills.
-export const BORDER_COLORS: Record<Theme, string> = { dark: '#ffd166', light: '#b45309' };
+export const BORDER_COLORS: Record<Theme, string> = { dark: '#ffd166', light: '#b45309', tactical: '#ffd166' };
 
 export function bordersLayerSpec(theme: Theme): LayerSpecification {
   return {

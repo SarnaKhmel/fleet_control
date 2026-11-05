@@ -1,16 +1,22 @@
 import { useTranslation } from 'react-i18next';
 import { isLanguage, setLanguage, SUPPORTED_LANGUAGES } from '../i18n';
-import { useThemeStore } from '../theme/themeStore';
+import { THEMES, useThemeStore, type Theme } from '../theme/themeStore';
 import { useMapViewStore, type MapView } from '../map/mapStyles';
 import { loadFrontLine, useFrontLineStore } from '../frontline/frontLine';
 import { useSymbolStyleStore, type SymbolStyle } from '../mission/symbolStyle';
 import { Accordion } from '../sidebar/Accordion';
 
+const THEME_LABEL_KEYS: Record<Theme, string> = {
+  dark: 'header.themeDark',
+  light: 'header.themeLight',
+  tactical: 'header.themeTactical',
+};
+
 // Settings sections (accordions): general, map and drone symbols.
 export function SettingsSections() {
   const { t, i18n } = useTranslation();
   const theme = useThemeStore((state) => state.theme);
-  const toggleTheme = useThemeStore((state) => state.toggleTheme);
+  const setTheme = useThemeStore((state) => state.setTheme);
   const mapView = useMapViewStore((state) => state.view);
   const setMapView = useMapViewStore((state) => state.setView);
   const buildings3d = useMapViewStore((state) => state.buildings3d);
@@ -39,12 +45,16 @@ export function SettingsSections() {
             ))}
           </select>
         </label>
-        <div className="settings-row">
+        <label className="settings-row">
           <span>{t('settings.theme')}</span>
-          <button type="button" onClick={toggleTheme}>
-            {t(theme === 'dark' ? 'header.switchToLight' : 'header.switchToDark')}
-          </button>
-        </div>
+          <select aria-label={t('settings.theme')} value={theme} onChange={(event) => setTheme(event.target.value as Theme)}>
+            {THEMES.map((name) => (
+              <option key={name} value={name}>
+                {t(THEME_LABEL_KEYS[name])}
+              </option>
+            ))}
+          </select>
+        </label>
       </Accordion>
 
       <Accordion title={t('settings.map')}>
