@@ -3,6 +3,7 @@ import type { Theme } from '../theme/themeStore';
 import { areaRingFor, type MissionState } from './missionStore';
 import { areaFromCorners, areaRing } from '../../../shared/mission/area';
 import { MISSION_MAX_AREA_KM } from '../../../shared/protocol';
+import { removeZoneLabels, syncZoneLabels } from './zoneLabels';
 
 // Mission zone drawn as a dashed rectangle in our own style.
 export const MISSION_SOURCE_ID = 'mission-area';
@@ -25,6 +26,7 @@ export function removeMissionArea(map: MapLibreMap): void {
   if (map.getLayer(MISSION_LINE_ID)) map.removeLayer(MISSION_LINE_ID);
   if (map.getLayer(MISSION_FILL_ID)) map.removeLayer(MISSION_FILL_ID);
   if (map.getSource(MISSION_SOURCE_ID)) map.removeSource(MISSION_SOURCE_ID);
+  removeZoneLabels();
 }
 
 /**
@@ -36,10 +38,12 @@ export function syncMissionArea(map: MapLibreMap, state: MissionState, theme: Th
     removeMissionArea(map);
     return;
   }
+  const ring = missionRing(state);
   const data = {
     type: 'FeatureCollection',
-    features: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [missionRing(state).map((p) => [p.lng, p.lat])] } }],
+    features: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ring.map((p) => [p.lng, p.lat])] } }],
   };
+  syncZoneLabels(map, ring);
   const source = map.getSource(MISSION_SOURCE_ID) as { setData?: (d: unknown) => void } | undefined;
   if (source?.setData) {
     source.setData(data);

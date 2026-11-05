@@ -1460,3 +1460,14 @@ body,
 .unit-marker.is-last-seen {
   opacity: 0.45;
 }
+
+.zone-label {
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--muted);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
