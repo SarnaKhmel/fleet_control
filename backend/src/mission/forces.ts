@@ -18,6 +18,23 @@ export type Random = () => number;
 export type IsWater = (point: LatLng) => boolean;
 const NO_WATER_CHECK: IsWater = () => false;
 
+/** How far the mission area reaches from the point: its farthest corner, meters. */
+export function areaReachM(area: MissionArea, from: LatLng): number {
+  const halfW = (area.widthKm * 1000) / 2;
+  const halfH = (area.heightKm * 1000) / 2;
+  return Math.max(...[-1, 1].flatMap((e) => [-1, 1].map((n) => distanceM(from, offsetLatLng(area.center, e * halfW, n * halfH)))));
+}
+
+/**
+ * The echelon bands squeezed into a smaller zone: every band keeps its order, and the deepest one reaches
+ * as far as the zone does. A zone big enough for every band keeps them as they are.
+ */
+export function echelonBandsFor(reachM: number): Record<UnitKind, [number, number]> {
+  const share = Math.max(0, Math.min(1, (reachM - ENEMY_MIN_DISTANCE_M) / (ECHELON_REACH_M - ENEMY_MIN_DISTANCE_M)));
+  const scale = (m: number) => ENEMY_MIN_DISTANCE_M + (m - ENEMY_MIN_DISTANCE_M) * share;
+  return Object.fromEntries(Object.entries(ENEMY_ECHELONS).map(([kind, [lo, hi]]) => [kind, [scale(lo), scale(hi)]])) as Record<UnitKind, [number, number]>;
+}
+
 /** Points the placement samples around the start points: a grid over the widest band plus the spread. */
 export function placementPoints(starts: LatLng[], stepM = 2000): LatLng[] {
   const middle = centroid(starts);
@@ -29,6 +46,9 @@ export function placementPoints(starts: LatLng[], stepM = 2000): LatLng[] {
   }
   return points;
 }
+
+/** Deepest echelon band of the enemy, meters: the reach a mission needs for every kind. */
+export const ECHELON_REACH_M = 24000;
 
 /** Distance band from the nearest start point, meters, by kind of enemy unit. */
 export const ENEMY_ECHELONS: Record<UnitKind, [number, number]> = {
@@ -66,7 +86,7 @@ export const MIN_SPACING_M = 400;
 /** A moving vehicle drives to a point at most this far away, then picks the next one. */
 export const LEG_MAX_M = 3000;
 // Random tries to find a place before a unit is left out.
-const ATTEMPTS = 300;
+const ATTEMPTS = 2000;
 // Starts closer than this to the area center give no front direction: the enemy can be on any side.
 const CENTERED_M = 1000;
 
@@ -141,12 +161,13 @@ export function generateForces(area: MissionArea, starts: LatLng[], random: Rand
   // Start points can be spread out: the sector is sampled far enough out to reach every band from any of them.
   const spread = Math.max(...starts.map((start) => distanceM(middle, start)));
   const front = frontBearing(area, starts, random);
+  const bands = echelonBandsFor(areaReachM(area, middle));
   const units: ForceUnit[] = [];
   const taken = () => units.map((unit) => unit.position);
 
   let enemyNo = 0;
   for (const [kind, count] of Object.entries(ENEMY_COUNTS) as [UnitKind, number][]) {
-    const band = ENEMY_ECHELONS[kind];
+    const band = bands[kind];
     for (let i = 0; i < count; i++) {
       const position = findPlace(area, starts, band, () => inSector(middle, front, SECTOR_HALF_DEG, Math.max(0, band[0] - spread), band[1] + spread, random), taken(), isWater);
       if (!position) continue;

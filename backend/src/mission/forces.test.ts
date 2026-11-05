@@ -3,6 +3,7 @@ import type { MissionArea } from '../../../shared/protocol';
 import { isInsideArea, offsetLatLng, toMetersFrom } from '../../../shared/mission/area';
 import { ENEMY_MIN_DISTANCE_M } from '../../../shared/mission/units';
 import { ENEMY_ECHELONS, frontBearing, generateForces, MIN_SPACING_M, MOBILE_KINDS, moveUnit, nearestStartM, SPEED_MS, type ForceUnit } from './forces';
+import { UNIT_KINDS } from '../../../shared/mission/units';
 import { bearingTo } from './kinematics';
 
 /** A repeatable random sequence (mulberry32), so a failing case can be replayed. */
@@ -84,12 +85,27 @@ describe('generateForces', () => {
     expect(units.find((u) => u.side === 'ally')!.id).toBe('ally-1');
   });
 
-  it('leaves out what does not fit in a small area rather than break the rules', () => {
+  it('still places every kind in a small zone, squeezed toward the start, and keeps the 3 km rule', () => {
     const small: MissionArea = { center: area.center, widthKm: 12, heightKm: 12 };
     const start = [offsetLatLng(area.center, 0, -5000)];
-    const units = enemies(generateForces(small, start, seeded(5)));
-    expect(units.some((u) => u.kind === 'radar')).toBe(false); // 14 km back is outside the area
-    for (const unit of units) expect(nearestStartM(unit.position, start)).toBeGreaterThanOrEqual(ENEMY_MIN_DISTANCE_M);
+    for (let seed = 1; seed <= 5; seed++) {
+      const units = enemies(generateForces(small, start, seeded(seed)));
+      expect(new Set(units.map((u) => u.kind))).toEqual(new Set(UNIT_KINDS));
+      for (const unit of units) {
+        expect(nearestStartM(unit.position, start)).toBeGreaterThanOrEqual(ENEMY_MIN_DISTANCE_M);
+        expect(isInsideArea(unit.position, small)).toBe(true);
+      }
+    }
+  });
+
+  it('keeps the echelon order in a small zone too', () => {
+    const small: MissionArea = { center: area.center, widthKm: 12, heightKm: 12 };
+    const start = [offsetLatLng(area.center, 0, -5000)];
+    const units = enemies(generateForces(small, start, seeded(9)));
+    const far = (kinds: string[]) => Math.min(...units.filter((u) => kinds.includes(u.kind)).map((u) => nearestStartM(u.position, start)));
+    const near = Math.max(...units.filter((u) => ['infantry', 'position'].includes(u.kind)).map((u) => nearestStartM(u.position, start)));
+    expect(far(['artillery'])).toBeGreaterThan(near - 1);
+    expect(far(['air_defense', 'ew', 'radar'])).toBeGreaterThan(near - 1);
   });
 });
 
