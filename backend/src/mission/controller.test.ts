@@ -1,9 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_TASKS, type LatLng, type ServerMessage } from '../../../shared/protocol.js';
-import { createMissionController } from './controller.js';
+import { createMissionController as createAtSpeed } from './controller.js';
+
+// Most of these tests were written for the simulation at 10 times real time (a tick is 10 simulated seconds).
+// They keep those numbers: the clock is set to 10 when the controller is made. The clock tests set their own speed.
+const createMissionController = (...args: Parameters<typeof createAtSpeed> extends [...infer P] ? P : never) =>
+  createAtSpeed(args[0], args[1], args[2], args[3], args[4], args[5], args[6], 10);
 import { NO_TERRAIN, type Terrain } from '../terrain/terrain.js';
 import type { Building, Buildings } from '../buildings/buildings.js';
 import { offsetLatLng, toMetersFrom } from '../../../shared/mission/area.js';
+import { distanceM } from './engagement.js';
+import { PlacementError } from './forces.js';
+import { DEFAULT_ODDS, type MissionOdds } from '../../../shared/mission/odds.js';
+import { DEFAULT_ALLY_COUNTS, DEFAULT_ENEMY_COUNTS } from '../../../shared/mission/composition.js';
+import { bearingTo } from './kinematics.js';
 import { CONNECT_MS, BOOT_MS, STAGGER_MS } from './schedule.js';
 import type { ForceUnit } from './forces.js';
 
@@ -271,7 +281,8 @@ describe('mission controller', () => {
         mission.handle({ type: 'heading', droneIds: ['drone-1'], headingDeg: 90 });
         mission.handle({ type: 'set_flight', droneIds: ['drone-1'], altitudeAglM: 100 });
         vi.advanceTimersByTime(5000);
-        expect(sent).toEqual([]);
+        // Only the mission clock goes on each tick; the drone sends nothing.
+        expect(sent.filter((m) => m.type !== 'clock')).toEqual([]);
         mission.dispose();
       });
     });
@@ -833,6 +844,329 @@ describe('mission controller', () => {
       mission.handle({ type: 'update_task', droneId: 'drone-1', index: 4, point: a });
       mission.handle({ type: 'update_task', droneId: 'drone-9', index: 0, point: a });
       expect(sent.length).toBe(before);
+      mission.dispose();
+    });
+  });
+
+  describe('engagement', () => {
+    const force = (over: Partial<ForceUnit>): ForceUnit => ({
+      id: 'enemy-1', side: 'enemy', kind: 'vehicle', position: area.center, headingDeg: null, speedMs: 0, intel: true, band: [0, 100_000], waypoint: null, ...over,
+    });
+    const statuses = () => sent.filter((m) => m.type === 'drone_status').map((m) => (m.type === 'drone_status' ? m.status : ''));
+    const drone1 = () => sent.filter((m) => m.type === 'position' && m.droneId === 'drone-1') as Extract<ServerMessage, { type: 'position' }>[];
+    // Lets the pending promises run (the units are placed once the water is known).
+    async function online(forces: ForceUnit[], random: () => number = () => 0.99) {
+      const mission = createMissionController((m) => sent.push(m), undefined, NO_TERRAIN, undefined, () => forces.map((f) => ({ ...f })), undefined, random);
+      mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1 });
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
+      sent = [];
+      return mission;
+    }
+
+    it('refuses a unit nobody has seen yet, and an ally', async () => {
+      const mission = await online([force({ intel: false, position: offsetLatLng(area.center, 500, 0) }), force({ id: 'ally-1', side: 'ally', kind: 'infantry', position: offsetLatLng(area.center, -20_000, 0), intel: true })]);
+      mission.handle({ type: 'engage', droneId: 'drone-1', targetId: 'enemy-1', mode: 'strike' });
+      mission.handle({ type: 'engage', droneId: 'drone-1', targetId: 'ally-1', mode: 'strike' });
+      vi.advanceTimersByTime(3000);
+      expect(statuses()).not.toContain('engaging');
+      mission.dispose();
+    });
+
+    it('a pursuit starts only within the camera range; a strike may start from further away', async () => {
+      const mission = await online([force({ position: offsetLatLng(area.center, 2000, 0) })]);
+      mission.handle({ type: 'engage', droneId: 'drone-1', targetId: 'enemy-1', mode: 'pursuit' });
+      vi.advanceTimersByTime(1000);
+      expect(statuses()).not.toContain('engaging');
+      mission.handle({ type: 'engage', droneId: 'drone-1', targetId: 'enemy-1', mode: 'strike' });
+      vi.advanceTimersByTime(1000);
+      expect(statuses()).toEqual(['engaging']);
+      mission.dispose();
+    });
+
+    it('a strike on a vehicle that is destroyed takes the unit off the map, and the drone is spent', async () => {
+      const mission = await online([force({ position: offsetLatLng(area.center, 1000, 0) })], () => 0.1);
+      mission.handle({ type: 'engage', droneId: 'drone-1', targetId: 'enemy-1', mode: 'strike' });
+      vi.advanceTimersByTime(30_000);
+      expect(statuses()).toEqual(['engaging', 'destroyed']);
+      expect(sent.filter((m) => m.type === 'drone_status').at(-1)).toEqual({ type: 'drone_status', droneId: 'drone-1', status: 'destroyed', cause: 'collision' });
+      expect(sent).toContainEqual({ type: 'unit_hit', unitId: 'enemy-1', droneId: 'drone-1', outcome: 'destroyed' });
+      const snap = mission.snapshot();
+      expect(snap.type === 'mission_snapshot' && snap.units?.map((u) => u.id)).toEqual([]);
+      mission.dispose();
+    });
+
+    it('a pursuit keeps 200–400 m from a standing unit, and circles it', async () => {
+      const enemy = offsetLatLng(area.center, 500, 0);
+      const mission = await online([force({ position: enemy })]);
+      mission.handle({ type: 'engage', droneId: 'drone-1', targetId: 'enemy-1', mode: 'pursuit' });
+      vi.advanceTimersByTime(30_000); // catches up with the post first
+      sent = [];
+      vi.advanceTimersByTime(120_000);
+      const distances = drone1().map((p) => distanceM(enemy, p.position));
+      const bearings = drone1().map((p) => bearingTo(enemy, p.position));
+      expect(statuses()).not.toContain('destroyed');
+      expect(distances.length).toBeGreaterThan(100);
+      expect(Math.min(...distances)).toBeGreaterThan(190);
+      expect(Math.max(...distances)).toBeLessThan(410);
+      // Around the unit, not just on one side: the bearings cover the four quarters.
+      expect(new Set(bearings.map((b) => Math.floor(b / 90))).size).toBe(4);
+      mission.dispose();
+    });
+
+    it('a pursuit settles behind a moving unit and follows it', async () => {
+      const mission = await online([force({ kind: 'vehicle', position: offsetLatLng(area.center, 200, 0), headingDeg: 0, speedMs: 6, waypoint: offsetLatLng(area.center, 200, 20_000) })]);
+      mission.handle({ type: 'engage', droneId: 'drone-1', targetId: 'enemy-1', mode: 'pursuit' });
+      vi.advanceTimersByTime(90_000);
+      const snap = mission.snapshot() as Extract<ServerMessage, { type: 'mission_snapshot' }>;
+      const unit = snap.units!.find((u) => u.id === 'enemy-1')!;
+      const drone = snap.drones[0];
+      expect(drone.status).toBe('engaging');
+      const d = distanceM(unit.position, drone.position!);
+      expect(d).toBeGreaterThan(190);
+      expect(d).toBeLessThan(410);
+      // Its course is north: the drone is south of it, behind.
+      expect(Math.abs(bearingTo(unit.position, drone.position!) - 180)).toBeLessThan(30);
+      mission.dispose();
+    });
+
+    it('a move order ends the engagement: the drone flies its new tasks', async () => {
+      const mission = await online([force({ position: offsetLatLng(area.center, 1000, 0) })]);
+      mission.handle({ type: 'engage', droneId: 'drone-1', targetId: 'enemy-1', mode: 'strike' });
+      vi.advanceTimersByTime(2000);
+      mission.handle({ type: 'move', droneIds: ['drone-1'], target: offsetLatLng(area.center, 0, -3000) });
+      vi.advanceTimersByTime(1000);
+      expect(statuses()).toEqual(['engaging', 'moving']);
+      mission.dispose();
+    });
+  });
+
+  describe('occupied buildings', () => {
+    // Houses 150–250 m east of the start.
+    // One house object, as the tiles hand out the same building each time.
+    const house = { rings: [], heightM: 40, south: 0, north: 0, west: 0, east: 0 } as Building;
+    const houses: Buildings = {
+      at: (p) => {
+        const { east } = toMetersFrom(area.center, p);
+        return east > 150 && east < 250 ? house : null;
+      },
+    };
+    const force = (over: Partial<ForceUnit>): ForceUnit => ({ id: 'enemy-1', side: 'enemy', kind: 'infantry', position: area.center, headingDeg: null, speedMs: 0, intel: true, band: [0, 100_000], waypoint: null, ...over });
+    const newEnemies = () => sent.filter((m) => m.type === 'units').flatMap((m) => (m as Extract<ServerMessage, { type: 'units' }>).units).filter((u) => u.id !== 'enemy-1' && u.side === 'enemy');
+
+    it('an enemy infantry walking into a building makes it an enemy position, once', async () => {
+      const forces = [
+        force({ position: offsetLatLng(area.center, 145, 0), speedMs: 1.5, waypoint: offsetLatLng(area.center, 400, 0) }),
+        force({ id: 'ally-1', side: 'ally', kind: 'infantry', position: area.center, intel: true }),
+      ];
+      const mission = createMissionController((m) => sent.push(m), undefined, NO_TERRAIN, houses, () => forces.map((f) => ({ ...f })));
+      mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1 });
+      await Promise.resolve();
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      vi.advanceTimersByTime(60_000);
+      // The ally watches 800 m around it, so the new position is seen at once.
+      expect(newEnemies()).toEqual([expect.objectContaining({ id: 'enemy-2', kind: 'position', source: 'ally' })]);
+      mission.dispose();
+    });
+
+    it('allied infantry walking into a building makes it an allied position, known at once', async () => {
+      const forces = [force({ id: 'ally-1', side: 'ally', position: offsetLatLng(area.center, 145, 0), speedMs: 1.5, waypoint: offsetLatLng(area.center, 400, 0) })];
+      const mission = createMissionController((m) => sent.push(m), undefined, NO_TERRAIN, houses, () => forces.map((f) => ({ ...f })));
+      mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1 });
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      vi.advanceTimersByTime(60_000);
+      const snap = mission.snapshot() as Extract<ServerMessage, { type: 'mission_snapshot' }>;
+      expect(snap.units?.find((u) => u.id === 'ally-2')).toEqual(expect.objectContaining({ side: 'ally', kind: 'position', inSight: true }));
+      expect(newEnemies()).toEqual([]);
+      mission.dispose();
+    });
+
+    it('a vehicle does not enter the houses, so no building is taken', async () => {
+      const forces = [force({ kind: 'vehicle', position: offsetLatLng(area.center, 100, 0), speedMs: 6, headingDeg: 90, waypoint: offsetLatLng(area.center, 400, 0) })];
+      const mission = createMissionController((m) => sent.push(m), undefined, NO_TERRAIN, houses, () => forces.map((f) => ({ ...f })));
+      mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1 });
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      vi.advanceTimersByTime(20_000);
+      expect(newEnemies()).toEqual([]);
+      mission.dispose();
+    });
+  });
+
+  describe('strike results', () => {
+    const force = (over: Partial<ForceUnit>): ForceUnit => ({
+      id: 'enemy-1', side: 'enemy', kind: 'vehicle', position: area.center, headingDeg: null, speedMs: 0, intel: true, band: [0, 100_000], waypoint: null, ...over,
+    });
+    const hits = () => sent.filter((m) => m.type === 'unit_hit');
+    const lastDroneStatus = () => sent.filter((m) => m.type === 'drone_status').at(-1);
+    async function strike(kind: ForceUnit['kind'], random: () => number) {
+      const forces = [force({ kind, position: offsetLatLng(area.center, 1000, 0) })];
+      const mission = createMissionController((m) => sent.push(m), undefined, NO_TERRAIN, undefined, () => forces.map((f) => ({ ...f })), undefined, random);
+      mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1 });
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
+      sent = [];
+      mission.handle({ type: 'engage', droneId: 'drone-1', targetId: 'enemy-1', mode: 'strike' });
+      vi.advanceTimersByTime(30_000);
+      return mission;
+    }
+    const enemyInSnapshot = (mission: ReturnType<typeof createMissionController>) => {
+      const snap = mission.snapshot() as Extract<ServerMessage, { type: 'mission_snapshot' }>;
+      return snap.units?.find((u) => u.id === 'enemy-1');
+    };
+
+    it('a damaged vehicle stays on the map, marked damaged; the drone is spent in the strike', async () => {
+      const mission = await strike('vehicle', () => 0.45);
+      expect(hits()).toEqual([{ type: 'unit_hit', unitId: 'enemy-1', droneId: 'drone-1', outcome: 'damaged' }]);
+      expect(enemyInSnapshot(mission)).toEqual(expect.objectContaining({ id: 'enemy-1', damaged: true }));
+      expect(lastDroneStatus()).toEqual({ type: 'drone_status', droneId: 'drone-1', status: 'destroyed', cause: 'collision' });
+      mission.dispose();
+    });
+
+    it('a vehicle the strike does not hurt stays whole, and the drone is still spent', async () => {
+      const mission = await strike('vehicle', () => 0.95);
+      expect(hits()).toEqual([{ type: 'unit_hit', unitId: 'enemy-1', droneId: 'drone-1', outcome: 'unharmed' }]);
+      expect(enemyInSnapshot(mission)).toEqual(expect.not.objectContaining({ damaged: true }));
+      expect(lastDroneStatus()).toEqual(expect.objectContaining({ status: 'destroyed', cause: 'collision' }));
+      mission.dispose();
+    });
+
+    it('infantry shoots the drone down first: no hit on the unit, the drone is destroyed as shot down', async () => {
+      const mission = await strike('infantry', () => 0.1);
+      expect(hits()).toEqual([]);
+      expect(enemyInSnapshot(mission)).toBeDefined();
+      expect(lastDroneStatus()).toEqual({ type: 'drone_status', droneId: 'drone-1', status: 'destroyed', cause: 'shot_down' });
+      mission.dispose();
+    });
+
+    it('infantry that does not shoot the drone down can be destroyed', async () => {
+      const mission = await strike('infantry', () => 0.25);
+      expect(hits()).toEqual([{ type: 'unit_hit', unitId: 'enemy-1', droneId: 'drone-1', outcome: 'destroyed' }]);
+      expect(enemyInSnapshot(mission)).toBeUndefined();
+      mission.dispose();
+    });
+  });
+
+  describe('mission odds', () => {
+    const force = (over: Partial<ForceUnit>): ForceUnit => ({
+      id: 'enemy-1', side: 'enemy', kind: 'vehicle', position: area.center, headingDeg: null, speedMs: 0, intel: true, band: [0, 100_000], waypoint: null, ...over,
+    });
+    async function strikeWith(random: () => number, odds?: MissionOdds) {
+      const forces = [force({ position: offsetLatLng(area.center, 1000, 0) })];
+      const mission = createMissionController((m) => sent.push(m), undefined, NO_TERRAIN, undefined, () => forces.map((f) => ({ ...f })), undefined, random);
+      mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1, ...(odds ? { odds } : {}) });
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
+      mission.handle({ type: 'engage', droneId: 'drone-1', targetId: 'enemy-1', mode: 'strike' });
+      vi.advanceTimersByTime(30_000);
+      return mission;
+    }
+
+    it('a mission plays with the odds the operator started it with', async () => {
+      const allDestroyed: MissionOdds = { ...DEFAULT_ODDS, vehicle: { destroyed: 1, damaged: 0 } };
+      const mission = await strikeWith(() => 0.99, allDestroyed);
+      expect(sent).toContainEqual({ type: 'unit_hit', unitId: 'enemy-1', droneId: 'drone-1', outcome: 'destroyed' });
+      mission.dispose();
+    });
+
+    it('without odds of its own, a mission uses the defaults', async () => {
+      const mission = await strikeWith(() => 0.99);
+      expect(sent).toContainEqual({ type: 'unit_hit', unitId: 'enemy-1', droneId: 'drone-1', outcome: 'unharmed' });
+      mission.dispose();
+    });
+  });
+
+  describe('mission composition', () => {
+    it('passes the composition to the placement, and refuses a start whose placed unit breaks the rules', async () => {
+      const seen: unknown[] = [];
+      const composition = { enemy: { vehicle: 2 }, placed: [{ side: 'enemy' as const, kind: 'vehicle' as const, position: offsetLatLng(area.center, 0, -15000 + 6000) }] };
+      const mission = createMissionController((m) => sent.push(m), undefined, NO_TERRAIN, undefined, (_a, _s, _w, _o, c) => {
+        seen.push(c);
+        return [];
+      });
+      mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1, composition });
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      expect(seen).toEqual([composition]);
+      mission.dispose();
+
+      // A placed unit that the rules refuse: the start is refused, and nothing runs.
+      sent = [];
+      const refused = createMissionController((m) => sent.push(m), undefined, NO_TERRAIN, undefined, () => {
+        throw new PlacementError({ side: 'enemy', kind: 'vehicle', position: area.center });
+      });
+      refused.handle({ type: 'mission_start', area, layout: single, droneCount: 1 });
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      expect(sent).toEqual([{ type: 'mission_error', reason: 'bad_placement' }]);
+      refused.dispose();
+    });
+  });
+
+  describe('mission clock', () => {
+    const clocks = () => sent.filter((m) => m.type === 'clock') as Extract<ServerMessage, { type: 'clock' }>[];
+    const positionsOf = (droneId: string) => sent.filter((m) => m.type === 'position' && m.droneId === droneId) as Extract<ServerMessage, { type: 'position' }>[];
+    const droneAt = (mission: ReturnType<typeof createAtSpeed>) => (mission.snapshot() as Extract<ServerMessage, { type: 'mission_snapshot' }>).drones[0].position!;
+    // The clock at its default speed (×1): the clock tests set the speed and the pause themselves.
+    const atRealSpeed = (...args: Parameters<typeof createAtSpeed> extends [...infer P] ? P : never) => createAtSpeed(...args);
+
+    // A started mission with its drone online and flying east; the clock is already running (boot took real time).
+    function startAndMove(speed?: number) {
+      const mission = atRealSpeed((m) => sent.push(m), undefined, NO_TERRAIN);
+      if (speed) mission.handle({ type: 'set_clock', speed: speed as 10 });
+      mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1 });
+      vi.advanceTimersByTime(BOOT_MS + CONNECT_MS);
+      mission.handle({ type: 'move', droneIds: ['drone-1'], target: { lat: 50, lng: 30.5 } });
+      sent = [];
+      return mission;
+    }
+
+    it('runs at real speed by default: a drone flies 10 m in one real second at 10 m/s', () => {
+      const mission = startAndMove();
+      const before = droneAt(mission);
+      vi.advanceTimersByTime(1000);
+      expect(distanceM(before, droneAt(mission))).toBeCloseTo(10, 0);
+      expect(clocks().at(-1)!.speed).toBe(1);
+      mission.dispose();
+    });
+
+    it('a pause stops the simulation and the clock, and the flight goes on from where it stopped', () => {
+      const mission = startAndMove(5);
+      vi.advanceTimersByTime(1000);
+      const stoppedAt = droneAt(mission);
+      const clockBefore = clocks().at(-1)!.simulatedS;
+      mission.handle({ type: 'set_clock', paused: true });
+      vi.advanceTimersByTime(5000);
+      expect(droneAt(mission)).toEqual(stoppedAt);
+      expect(clocks().at(-1)).toMatchObject({ paused: true });
+      expect(clocks().at(-1)!.simulatedS).toBeCloseTo(clockBefore, 5);
+      mission.handle({ type: 'set_clock', paused: false });
+      vi.advanceTimersByTime(1000);
+      expect(distanceM(stoppedAt, droneAt(mission))).toBeGreaterThan(0);
+      mission.dispose();
+    });
+
+    it('a speed-up sends the new speed at once, and one position per drone per tick, not one per simulated step', () => {
+      const mission = startAndMove();
+      mission.handle({ type: 'set_clock', speed: 10 });
+      expect(clocks().at(-1)).toMatchObject({ speed: 10 });
+      const clockBefore = clocks().at(-1)!.simulatedS;
+      sent = [];
+      vi.advanceTimersByTime(1000);
+      // Ten simulated seconds in one real second: the drone took ten steps, but reports its position once.
+      expect(positionsOf('drone-1')).toHaveLength(1);
+      expect(clocks().at(-1)!.simulatedS - clockBefore).toBeCloseTo(10, 5);
+      mission.dispose();
+    });
+  });
+
+  describe('automatic units', () => {
+    it('a start with no hand placements generates the enemy and the allies by their default counts', async () => {
+      const mission = createAtSpeed((m) => sent.push(m), undefined, NO_TERRAIN);
+      mission.handle({ type: 'mission_start', area, layout: single, droneCount: 1, composition: { enemy: DEFAULT_ENEMY_COUNTS, ally: DEFAULT_ALLY_COUNTS, placed: [] } });
+      for (let i = 0; i < 20; i++) await Promise.resolve();
+      const snap = mission.snapshot() as Extract<ServerMessage, { type: 'mission_snapshot' }>;
+      const all = snap.units ?? [];
+      // The allies are known at once, so the snapshot shows every one of them placed by default.
+      expect(all.filter((u) => u.side === 'ally').length).toBe(Object.values(DEFAULT_ALLY_COUNTS).reduce((a, b) => a + b, 0));
+      expect(sent.some((m) => m.type === 'units')).toBe(true);
       mission.dispose();
     });
   });

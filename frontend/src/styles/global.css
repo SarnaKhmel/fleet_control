@@ -804,6 +804,11 @@ body,
   transition: width 0.2s ease;
 }
 
+/* The left panel is wide enough for the battle settings window, which opens inside it. */
+.sidebar:not(.sidebar-right) {
+  width: 26rem;
+}
+
 .sidebar.is-collapsed {
   width: 3rem;
 }
@@ -1358,6 +1363,7 @@ body,
 .drone-alert.is-collision,
 .drone-alert.is-destroyedCollision,
 .drone-alert.is-destroyed,
+.drone-alert.is-shotDown,
 .drone-alert.is-lost {
   border-left-color: var(--danger);
   background: color-mix(in srgb, var(--danger) 14%, transparent);
@@ -1485,6 +1491,13 @@ body,
   opacity: 0.45;
 }
 
+/* A unit a strike damaged but did not destroy: dashed ring in the warning colour. */
+.unit-marker.is-damaged {
+  outline: 2px dashed var(--warning);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
 .zone-label {
   background: var(--panel);
   color: var(--fg);
@@ -1495,3 +1508,106 @@ body,
   white-space: nowrap;
   pointer-events: none;
 }
+
+/* Battle settings: a modal over the map that lets clicks through, so units can be placed on the map from it. */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 3.5rem 1rem 1rem;
+  pointer-events: none;
+}
+
+.modal {
+  pointer-events: auto;
+  width: min(26rem, 100%);
+  max-height: calc(100vh - 5rem);
+  overflow: auto;
+  padding: 1rem;
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--muted);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+}
+
+.modal h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.modal label {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0.25rem 0;
+  font-size: 0.85rem;
+}
+
+.battle-units th,
+.battle-units td {
+  padding: 0.2rem 0.3rem;
+  text-align: left;
+  font-size: 0.8rem;
+}
+
+.battle-units input {
+  width: 4.5rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.75rem;
+}
+
+/* Visually hidden, still read by screen readers (labels of controls whose text is drawn elsewhere). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* The pop-up at the cursor after a click on an enemy unit. Tokens only. */
+.target-popup {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: 16rem;
+  padding: 0.4rem 0.5rem;
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--muted);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.35);
+  font-size: 0.8rem;
+}
+
+.target-popup button {
+  padding: 0.2rem 0.5rem;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.target-popup button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.target-popup p {
+  flex-basis: 100%;
+  margin: 0;
+}
+

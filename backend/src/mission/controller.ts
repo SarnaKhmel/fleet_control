@@ -1,21 +1,28 @@
-import { DEFAULT_ALTITUDE_AGL_M, DEFAULT_CRUISE_SPEED_MS, MAX_TASKS, type ClientMessage, type CollisionWarning, type DownCause, type FlightStatus, type LatLng, type MissionArea, type ServerMessage, type SnapshotDrone, type StartLayout } from '../../../shared/protocol.js';
+import { DEFAULT_ALTITUDE_AGL_M, DEFAULT_CRUISE_SPEED_MS, MAX_TASKS, type ClientMessage, type EngageMode, type CollisionWarning, type DownCause, type FlightStatus, type LatLng, type MissionArea, type ServerMessage, type SnapshotDrone, type StartLayout } from '../../../shared/protocol.js';
 import { BOOT_MS, buildSchedule, CONNECT_MS, DroneSchedule, resolveStarts } from './schedule.js';
 import { buildTelemetry } from './telemetry.js';
 import { offsetLatLng, toMetersFrom } from '../../../shared/mission/area.js';
-import { cellOf, circleCells, coneCells, RECON_CELL_M, type ReconCell, type ReconGrid } from '../../../shared/mission/recon.js';
-import { ALLY_RECON_RADIUS_M, type MissionUnit, type UnitSource } from '../../../shared/mission/units.js';
-import { generateForces, moveUnit, placementPoints, type ForceUnit, type IsWater } from './forces.js';
+import { cellOf, circleCells, CAMERA_RANGE_M, coneCells, RECON_CELL_M, type ReconCell, type ReconGrid } from '../../../shared/mission/recon.js';
+import { ALLY_RECON_RADIUS_M, type HitOutcome, type MissionUnit, type UnitSource } from '../../../shared/mission/units.js';
+import { generateForces, moveUnit, PlacementError, placementPoints, type ForceUnit, type IsWater } from './forces.js';
+import type { Composition } from '../../../shared/mission/composition.js';
 import { NO_TERRAIN, type Terrain } from '../terrain/terrain.js';
-import { NO_BUILDINGS, type Buildings } from '../buildings/buildings.js';
+import { NO_BUILDINGS, type Building, type Buildings } from '../buildings/buildings.js';
 import { NO_WATER, type Water } from '../water/water.js';
 import { buildingAhead, hitOnStep, WARNING_REAL_S } from './obstacles.js';
 import { serverLog } from '../log.js';
 import { droneStateAt } from './schedule.js';
 import { airDrainPctPerS, groundDrainPctPerS } from '../../../shared/flight/battery.js';
-import { bearingTo, CLIMB_RATE_MS, formationTargets, GROUND_AMSL_M, SIM_TIME_SCALE, TICK_MS, windStep } from './kinematics.js';
+import { bearingTo, CLIMB_RATE_MS, formationTargets, GROUND_AMSL_M, TICK_MS, windStep } from './kinematics.js';
+import { MissionClock } from './clock.js';
+import type { SimSpeed } from '../../../shared/mission/clock.js';
+import { clearTrack, distanceM, drawStrike, pursuitPost } from './engagement.js';
+import { DEFAULT_ODDS, type MissionOdds } from '../../../shared/mission/odds.js';
 
 // Interval between "booting" progress messages, ms: several steps per boot, so the bar moves smoothly.
 export const PROGRESS_STEP_MS = 250;
+// Simulated time is stepped in pieces of at most this many seconds, so a fast clock does not skip the details.
+export const SUBSTEP_S = 1;
 
 export interface MissionController {
   handle(message: ClientMessage): void;
@@ -55,11 +62,23 @@ interface DroneState {
   cause: DownCause | null;
   /** The building ahead it will hit, while there is one. */
   warning: CollisionWarning | null;
+  /** The enemy unit it is attacking, while it is. */
+  engagement: Engagement | null;
+}
+
+interface Engagement {
+  targetId: string;
+  mode: EngageMode;
+  /** Pursuit: the bearing from the unit the drone came in on; a standing unit is circled from it. */
+  sideDeg: number;
+  /** Simulated seconds since the engagement began: drives the orbit and the distance swing. */
+  clockS: number;
 }
 
 /** The drone's status: its phase, and in the air whether it has somewhere to go. */
 function statusOf(drone: DroneState): FlightStatus {
   if (drone.phase !== 'air') return drone.phase;
+  if (drone.engagement) return 'engaging';
   return drone.target || drone.course !== null ? 'moving' : 'idle';
 }
 
@@ -81,12 +100,15 @@ function withTrailPoint(trail: LatLng[], point: LatLng): LatLng[] {
  * change through `broadcast`. One mission per server: a second start is refused until mission_reset.
  */
 export function createMissionController(
-  broadcast: (message: ServerMessage) => void,
+  sink: (message: ServerMessage) => void,
   now: () => string = () => new Date().toISOString(),
   terrain: Terrain = NO_TERRAIN,
   buildings: Buildings = NO_BUILDINGS,
-  placeForces: (area: MissionArea, starts: LatLng[], isWater: IsWater) => ForceUnit[] = (area, starts, isWater) => generateForces(area, starts, Math.random, isWater),
+  placeForces: (area: MissionArea, starts: LatLng[], isWater: IsWater, odds: MissionOdds, composition: Composition) => ForceUnit[] = (area, starts, isWater, odds, composition) =>
+    generateForces(area, starts, Math.random, isWater, odds, composition),
   water: Water = NO_WATER,
+  random: () => number = Math.random,
+  clockSpeed: SimSpeed = 1,
 ): MissionController {
   let timers: ReturnType<typeof setTimeout>[] = [];
   let ticker: ReturnType<typeof setInterval> | undefined;
@@ -108,6 +130,20 @@ export function createMissionController(
   let starts: LatLng[] = [];
   let forces: ForceUnit[] = [];
   const known = new Map<string, MissionUnit>();
+  // The mission clock: simulated time passes with real time, at the operator's speed.
+  const clock = new MissionClock();
+  clock.speed = clockSpeed;
+  // While a tick simulates, its messages are gathered here and sent once it ends (see flush).
+  let batch: ServerMessage[] | null = null;
+  // Buildings enemy infantry has walked into this mission: each becomes an enemy position once. The count
+  // numbers the new enemy units (enemy-N), so an id is never reused.
+  const occupied = new Set<Building>();
+  let enemyNo = 0;
+  let allyNo = 0;
+  // The odds the running mission plays with: the operator's, or the defaults.
+  let odds: MissionOdds = DEFAULT_ODDS;
+  // The units the operator sets up before the start: how many of each kind, and the ones placed by hand.
+  let composition: Composition = {};
 
   function later(ms: number, fn: () => void) {
     timers.push(setTimeout(fn, ms));
@@ -147,6 +183,7 @@ export function createMissionController(
         status: 'idle',
         cause: null,
         warning: null,
+        engagement: null,
       };
       drones.set(entry.droneId, drone);
       broadcast({ type: 'drone_online', telemetry: buildTelemetry(entry, now(), groundM) });
@@ -180,6 +217,7 @@ export function createMissionController(
     for (const id of droneIds) {
       const drone = commandable(id);
       if (!drone || drone.phase !== 'air') continue;
+      drone.engagement = null;
       drone.phase = 'landing';
       setTasks(id, drone, [], true);
     }
@@ -194,6 +232,7 @@ export function createMissionController(
     serverLog(phase === 'destroyed' ? 'drone destroyed' : 'drone lost link', { droneId, cause, position: drone.position });
     drone.phase = phase;
     drone.cause = cause;
+    drone.engagement = null;
     setWarning(droneId, drone, null);
     drone.speedMs = 0;
     drone.crabDeg = 0;
@@ -216,11 +255,70 @@ export function createMissionController(
    * slower on the ground; when it runs out the drone is out for good.
    */
   function tick() {
-    const dtS = (TICK_MS / 1000) * SIM_TIME_SCALE;
+    const passed = clock.advance(TICK_MS);
+    if (passed > 0) {
+      const steps = Math.ceil(passed / SUBSTEP_S);
+      // The ground the cameras see during the tick, and the enemy found in it: once per tick, after its steps.
+      const inView = new Map<string, string>();
+      batch = [];
+      for (let i = 0; i < steps; i++) simulate(passed / steps, inView);
+      detect(inView);
+      const messages = batch;
+      batch = null;
+      flush(messages);
+    }
+    broadcast({ type: 'clock', ...clockView() });
+  }
+
+  /**
+   * Sends the messages of one tick. A drone's position and its building warning are sent once per tick, the
+   * last of each, where that last one came; everything else goes in order.
+   */
+  function flush(messages: ServerMessage[]) {
+    const last = new Map<string, number>();
+    messages.forEach((message, index) => {
+      const key = coalesceKey(message);
+      if (key) last.set(key, index);
+    });
+    messages.forEach((message, index) => {
+      const key = coalesceKey(message);
+      if (key && last.get(key) !== index) return;
+      sink(message);
+    });
+  }
+
+  function coalesceKey(message: ServerMessage): string | null {
+    if (message.type === 'position') return `position:${message.droneId}`;
+    if (message.type === 'drone_warning') return `warning:${message.droneId}`;
+    return null;
+  }
+
+  /** Sends a message now, or with the tick's block while a tick simulates. */
+  function broadcast(message: ServerMessage) {
+    if (batch) batch.push(message);
+    else sink(message);
+  }
+
+  function clockView() {
+    return { startedAt: clock.startedAt, simulatedS: clock.simulatedS, speed: clock.speed, paused: clock.paused };
+  }
+
+  /** The operator's clock: a speed, a pause, or both. It applies at once and goes out with the change. */
+  function setClock(speed: SimSpeed | undefined, paused: boolean | undefined) {
+    if (speed !== undefined) clock.speed = speed;
+    if (paused !== undefined) clock.paused = paused;
+    serverLog('clock', { speed: clock.speed, paused: clock.paused });
+    broadcast({ type: 'clock', ...clockView() });
+  }
+
+  /** One step of simulated time (dtS seconds): the drones fly and the units move. */
+  function simulate(dtS: number, inView: Map<string, string>) {
     const fresh: ReconCell[] = [];
-    // Cells in a camera's view this tick, and the first drone that sees each.
-    const inView = new Map<string, string>();
-    if (area) for (const unit of forces) moveUnit(unit, area, starts, dtS, Math.random, water.isWater);
+    // Cells in a camera's view this tick, and the first drone that sees each (see tick).
+    if (area) {
+      for (const unit of forces) moveUnit(unit, area, starts, dtS, Math.random, water.isWater, buildings);
+      for (const unit of forces.filter((u) => u.kind === 'infantry' && u.speedMs > 0)) occupy(unit);
+    }
     // Allies that moved watch the ground around where they are now.
     const movedAllies = forces.filter((unit) => unit.side === 'ally' && unit.speedMs > 0);
     fresh.push(...watchByAllies(movedAllies));
@@ -235,23 +333,28 @@ export function createMissionController(
       } else if (drone.phase === 'landed') {
         drone.altitudeM = drone.groundM;
       } else if (drone.phase === 'air') {
-        const hit = flyStep(droneId, drone, dtS);
-        if (hit) {
-          // Flew into a building below its top: it is destroyed where it hit.
-          drone.position = hit;
-          goDown(droneId, drone, 'destroyed', 'collision');
-          continue;
+        if (drone.engagement) {
+          if (engageStep(droneId, drone, dtS) === 'down') continue;
+        } else {
+          const hit = flyStep(droneId, drone, dtS);
+          if (hit) {
+            // Flew into a building below its top: it is destroyed where it hit.
+            drone.position = hit;
+            goDown(droneId, drone, 'destroyed', 'collision');
+            continue;
+          }
         }
       }
       updateWarning(droneId, drone);
       if ((drone.phase === 'air' || drone.phase === 'landing') && reconGrid) {
-        const cone = coneCells(reconGrid, drone.position, drone.heading - drone.crabDeg);
+        // The camera looks along the way it flies, or along the nose while it attacks (the nose is on the unit).
+        const cone = coneCells(reconGrid, drone.position, drone.engagement ? drone.heading : drone.heading - drone.crabDeg);
         fresh.push(...markSeen(cone));
         for (const cell of cone) if (!inView.has(cellKey(cell))) inView.set(cellKey(cell), droneId);
       }
       // In the air the drain grows with the airspeed: the cruise speed when flying somewhere, the wind
       // speed when hovering or coming down (it holds its spot against the wind). On the ground: the link only.
-      const airspeedMs = drone.target || drone.course !== null ? drone.cruiseSpeedMs : wind.speedMs;
+      const airspeedMs = drone.target || drone.course !== null || drone.engagement ? drone.cruiseSpeedMs : wind.speedMs;
       const drain = drone.phase === 'landed' ? groundDrainPctPerS() : airDrainPctPerS(airspeedMs);
       drone.batteryPct = Math.max(0, drone.batteryPct - drain * dtS);
       if (drone.batteryPct === 0) {
@@ -262,7 +365,26 @@ export function createMissionController(
       syncStatus(droneId, drone);
     }
     if (reconGrid && fresh.length > 0) broadcast({ type: 'recon_cells', grid: reconGrid, cells: fresh });
-    detect(inView);
+  }
+
+  /**
+   * Infantry inside a building takes it: the building becomes a position of the infantry's side where it is,
+   * enemy (red) or allied (blue). The first side to take a building holds it for the mission. Ours is known at once.
+   */
+  function occupy(unit: ForceUnit) {
+    const building = buildings.at(unit.position);
+    if (!building || occupied.has(building)) return;
+    occupied.add(building);
+    const ours = unit.side === 'ally';
+    const id = ours ? `ally-${++allyNo}` : `enemy-${++enemyNo}`;
+    serverLog('building taken', { id, by: unit.id });
+    const position: ForceUnit = { id, side: unit.side, kind: 'position', position: unit.position, headingDeg: null, speedMs: 0, intel: ours, band: [0, 0], waypoint: null };
+    forces.push(position);
+    if (ours) {
+      const view = unitView(position, 'intel', null, true);
+      known.set(id, view);
+      broadcast({ type: 'units', units: [view] });
+    }
   }
 
   /** The ground within 2 km of each of these allies, marked as seen; returns the cells seen for the first time. */
@@ -321,7 +443,7 @@ export function createMissionController(
 
   function unitView(unit: ForceUnit, source: UnitSource, detectedByDroneId: string | null, inSight: boolean): MissionUnit {
     const { id, side, kind, position, headingDeg, speedMs } = unit;
-    return { id, side, kind, position, headingDeg, speedMs, source, detectedByDroneId, inSight };
+    return { id, side, kind, position, headingDeg, speedMs, source, detectedByDroneId, inSight, ...(unit.damaged ? { damaged: true } : {}) };
   }
 
   function cellKey(cell: ReconCell): string {
@@ -379,7 +501,7 @@ export function createMissionController(
    * height (minus a clearance). Sent every tick while it lasts, so the time to impact counts down; cleared once.
    */
   function updateWarning(droneId: string, drone: DroneState) {
-    const lookM = drone.cruiseSpeedMs * WARNING_REAL_S * SIM_TIME_SCALE;
+    const lookM = drone.cruiseSpeedMs * WARNING_REAL_S * clock.speed;
     const found = drone.phase === 'air' ? buildingAhead(buildings, pathAhead(drone, lookM), lookM, drone.altitudeAglM) : null;
     setWarning(
       droneId,
@@ -388,7 +510,7 @@ export function createMissionController(
         kind: 'building',
         point: found.point,
         distanceM: Math.round(found.distanceM),
-        etaS: Math.round(found.distanceM / drone.cruiseSpeedMs / SIM_TIME_SCALE),
+        etaS: Math.round(found.distanceM / drone.cruiseSpeedMs / clock.speed),
         heightM: found.building.heightM,
       },
     );
@@ -399,6 +521,110 @@ export function createMissionController(
     if (warning && !drone.warning) serverLog('collision warning', { droneId, warning });
     drone.warning = warning;
     broadcast({ type: 'drone_warning', droneId, warning });
+  }
+
+  /** Starts an engagement: the drone drops its tasks and flies at the unit. Refused unless the unit is known. */
+  function engage(droneId: string, targetId: string, mode: EngageMode) {
+    const drone = commandable(droneId);
+    const unit = forces.find((u) => u.id === targetId && u.side === 'enemy');
+    const inRange = !!drone && !!unit && (mode === 'strike' || distanceM(drone.position, unit.position) <= CAMERA_RANGE_M);
+    if (!drone || !unit || !known.has(targetId) || !inRange) {
+      serverLog('engage refused', { droneId, targetId, mode });
+      return;
+    }
+    serverLog('engage', { droneId, targetId, mode });
+    takeOff(drone);
+    setTasks(droneId, drone, [], true);
+    drone.engagement = { targetId, mode, sideDeg: bearingTo(unit.position, drone.position), clockS: 0 };
+  }
+
+  /**
+   * One step of an engagement: strike flies at the unit, pursuit keeps its post around it. The engagement ends
+   * when the unit is gone (or, for a pursuit, out of camera range). Returns 'down' if the drone went down.
+   */
+  function engageStep(droneId: string, drone: DroneState, dtS: number): 'down' | 'flying' {
+    const engagement = drone.engagement!;
+    const unit = forces.find((u) => u.id === engagement.targetId);
+    if (!unit || (engagement.mode === 'pursuit' && distanceM(drone.position, unit.position) > CAMERA_RANGE_M)) {
+      serverLog('engagement over', { droneId, targetId: engagement.targetId });
+      drone.engagement = null;
+      return 'flying';
+    }
+    engagement.clockS += dtS;
+    return engagement.mode === 'strike' ? strikeStep(droneId, drone, unit, dtS) : pursuitStep(droneId, drone, unit, dtS);
+  }
+
+  /** Flies straight at the unit. It is hit when the drone reaches it; if it reaches the place it was last seen and the unit is not there, the strike ends. */
+  function strikeStep(droneId: string, drone: DroneState, unit: ForceUnit, dtS: number): 'down' | 'flying' {
+    const aim = known.get(unit.id)?.position ?? unit.position;
+    const track = bearingTo(drone.position, aim);
+    const step = windStep(drone.position, track, wind, drone.cruiseSpeedMs, dtS);
+    if (distanceM(drone.position, unit.position) <= step.groundSpeedMs * dtS) {
+      // The drone reaches the unit: infantry may shoot it down first; otherwise it strikes and is spent.
+      drone.position = unit.position;
+      const { outcome, shotDown } = drawStrike(unit.kind, random, odds);
+      if (shotDown) {
+        goDown(droneId, drone, 'destroyed', 'shot_down');
+        return 'down';
+      }
+      hitUnit(unit, droneId, outcome!);
+      goDown(droneId, drone, 'destroyed', 'collision');
+      return 'down';
+    }
+    if (distanceM(drone.position, aim) <= step.groundSpeedMs * dtS && !known.get(unit.id)?.inSight) {
+      serverLog('strike lost its target', { droneId, targetId: unit.id });
+      drone.position = aim;
+      drone.engagement = null;
+      return 'flying';
+    }
+    return flyEngaged(droneId, drone, step.position, step.heading, step.crabDeg, track, dtS);
+  }
+
+  /** Keeps its post around the unit (behind it when it moves, circling it when it stands); the nose stays on the unit. */
+  function pursuitStep(droneId: string, drone: DroneState, unit: ForceUnit, dtS: number): 'down' | 'flying' {
+    const { sideDeg, clockS } = drone.engagement!;
+    const post = pursuitPost(unit, sideDeg, clockS);
+    const lookM = drone.cruiseSpeedMs * dtS * 2;
+    const track = clearTrack(buildings, drone.position, bearingTo(drone.position, post), lookM, drone.altitudeAglM);
+    const step = windStep(drone.position, track, wind, drone.cruiseSpeedMs, dtS);
+    // Arrives at the post rather than flying past it: a step is far longer than the margin to the range limits.
+    const position = distanceM(drone.position, post) <= step.groundSpeedMs * dtS ? post : step.position;
+    const nose = bearingTo(drone.position, unit.position);
+    // The nose is on the unit, so the way it flies is the crab off it (the camera looks along the nose).
+    return flyEngaged(droneId, drone, position, nose, ((nose - track + 540) % 360) - 180, track, dtS);
+  }
+
+  /** Moves an engaged drone one step at its cruise speed; a building on the way takes it down. */
+  function flyEngaged(droneId: string, drone: DroneState, position: LatLng, heading: number, crabDeg: number, track: number, dtS: number): 'down' | 'flying' {
+    const from = drone.position;
+    drone.position = position;
+    drone.heading = heading;
+    drone.crabDeg = crabDeg;
+    drone.speedMs = drone.cruiseSpeedMs;
+    drone.groundM = groundAt(drone, position);
+    holdHeight(drone, track, dtS);
+    const hit = hitOnStep(buildings, from, position, drone.altitudeM - drone.groundM);
+    if (!hit) return 'flying';
+    drone.position = hit;
+    goDown(droneId, drone, 'destroyed', 'collision');
+    return 'down';
+  }
+
+  /**
+   * A strike's result on the unit: destroyed leaves the map for good (the drones attacking it lose it on their
+   * next step); damaged stays on the map, marked; unharmed changes nothing.
+   */
+  function hitUnit(unit: ForceUnit, droneId: string, outcome: HitOutcome) {
+    serverLog('unit hit', { droneId, unitId: unit.id, outcome });
+    if (outcome === 'destroyed') {
+      forces.splice(forces.indexOf(unit), 1);
+      known.delete(unit.id);
+    } else if (outcome === 'damaged') {
+      unit.damaged = true;
+      const view = known.get(unit.id);
+      if (view) known.set(unit.id, { ...view, damaged: true });
+    }
+    broadcast({ type: 'unit_hit', unitId: unit.id, droneId, outcome });
   }
 
   /**
@@ -496,6 +722,7 @@ export function createMissionController(
     online.forEach((id, i) => {
       const drone = drones.get(id)!;
       takeOff(drone);
+      drone.engagement = null;
       // A drone flying a course has no tasks to append to: the point becomes its only task.
       const current = append && drone.course === null ? tasksOf(drone) : [];
       if (current.length >= MAX_TASKS) return;
@@ -512,6 +739,7 @@ export function createMissionController(
     const drone = commandable(droneId);
     if (!drone) return;
     takeOff(drone);
+    drone.engagement = null;
     setTasks(droneId, drone, points);
   }
 
@@ -549,7 +777,10 @@ export function createMissionController(
     serverLog('hold', { droneIds });
     for (const id of droneIds) {
       const drone = commandable(id);
-      if (drone) setTasks(id, drone, []);
+      if (drone) {
+        drone.engagement = null;
+        setTasks(id, drone, []);
+      }
     }
   }
 
@@ -559,6 +790,7 @@ export function createMissionController(
       const drone = commandable(id);
       if (drone) {
         takeOff(drone);
+        drone.engagement = null;
         drone.course = headingDeg;
         drone.target = null;
         drone.route = [];
@@ -575,7 +807,18 @@ export function createMissionController(
   function deployForces(missionArea: MissionArea, startPoints: LatLng[]) {
     area = missionArea;
     starts = startPoints;
-    forces = placeForces(missionArea, startPoints, water.isWater);
+    try {
+      forces = placeForces(missionArea, startPoints, water.isWater, odds, composition);
+    } catch (error) {
+      if (!(error instanceof PlacementError)) throw error;
+      // A hand-placed unit breaks the rules: the mission does not start.
+      serverLog('placement refused', { side: error.placed.side, kind: error.placed.kind });
+      broadcast({ type: 'mission_error', reason: 'bad_placement' });
+      stop();
+      return;
+    }
+    enemyNo = forces.filter((u) => u.side === 'enemy').length;
+    allyNo = forces.filter((u) => u.side === 'ally').length;
     for (const unit of forces) {
       if (unit.intel) known.set(unit.id, unitView(unit, 'intel', null, unit.side === 'ally'));
     }
@@ -585,7 +828,7 @@ export function createMissionController(
     if (known.size > 0) broadcast({ type: 'units', units: [...known.values()] });
   }
 
-  function start(area: MissionArea, layout: StartLayout, count: number) {
+  function start(area: MissionArea, layout: StartLayout, count: number, missionOdds: MissionOdds, missionComposition: Composition) {
     if (running) {
       broadcast({ type: 'mission_error', reason: 'already_running' });
       return;
@@ -596,6 +839,9 @@ export function createMissionController(
       return;
     }
     running = true;
+    clock.start(now());
+    odds = missionOdds;
+    composition = missionComposition;
     const no = ++missionNo;
     droneCount = count;
     reconGrid = { origin: area.center, cellM: RECON_CELL_M };
@@ -625,6 +871,12 @@ export function createMissionController(
     starts = [];
     forces = [];
     known.clear();
+    occupied.clear();
+    enemyNo = 0;
+    allyNo = 0;
+    odds = DEFAULT_ODDS;
+    composition = {};
+    clock.stop();
     running = false;
     droneCount = 0;
   }
@@ -665,7 +917,8 @@ export function createMissionController(
     handle(message) {
       serverLog('client message', message.type);
       if (message.type === 'wind') wind = { speedMs: message.speedMs, fromDeg: message.fromDeg };
-      else if (message.type === 'mission_start') start(message.area, message.layout, message.droneCount);
+      else if (message.type === 'set_clock') setClock(message.speed, message.paused);
+      else if (message.type === 'mission_start') start(message.area, message.layout, message.droneCount, message.odds ?? DEFAULT_ODDS, message.composition ?? {});
       else if (message.type === 'mission_reset') {
         stop();
         broadcast({ type: 'mission_reset' });
@@ -677,6 +930,7 @@ export function createMissionController(
       else if (running && message.type === 'land') land(message.droneIds);
       else if (running && message.type === 'set_flight') setFlight(message.droneIds, message.altitudeAglM, message.cruiseSpeedMs);
       else if (running && message.type === 'route') setRoute(message.droneId, message.points);
+      else if (running && message.type === 'engage') engage(message.droneId, message.targetId, message.mode);
       // A command can start or stop a drone (idle <-> moving, landing): its new status goes out now.
       for (const [id, drone] of drones) syncStatus(id, drone);
     },

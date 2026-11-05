@@ -8,6 +8,33 @@ describe('parseClientMessage', () => {
     expect(parseClientMessage({ type: 'mission_reset' })).toEqual({ type: 'mission_reset' });
   });
 
+  it('accepts mission_start with valid odds, and refuses odds that are out of range', () => {
+    const area = { center: { lat: 50, lng: 30 }, widthKm: 10, heightKm: 10 };
+    const layout = { kind: 'single' as const, point: { lat: 50, lng: 30 } };
+    const odds = { vehicle: { destroyed: 0.4, damaged: 0.5 }, infantry: { destroyed: 0.3, damaged: 0.4 }, infantryShootsDown: 0.2, movingShare: 0.5, knownShare: 0.3 };
+    expect(parseClientMessage({ type: 'mission_start', area, layout, droneCount: 3, odds })).toEqual({ type: 'mission_start', area, layout, droneCount: 3, odds });
+    expect(parseClientMessage({ type: 'mission_start', area, layout, droneCount: 3, odds: { ...odds, knownShare: 2 } })).toBeNull();
+    expect(parseClientMessage({ type: 'mission_start', area, layout, droneCount: 3, odds: { ...odds, vehicle: { destroyed: 0.8, damaged: 0.5 } } })).toBeNull();
+  });
+
+  it('accepts mission_start with a composition, and refuses one with unknown kinds', () => {
+    const area = { center: { lat: 50, lng: 30 }, widthKm: 10, heightKm: 10 };
+    const layout = { kind: 'single' as const, point: { lat: 50, lng: 30 } };
+    const composition = { enemy: { vehicle: 5 }, placed: [{ side: 'enemy' as const, kind: 'vehicle' as const, position: { lat: 50.1, lng: 30 } }] };
+    expect(parseClientMessage({ type: 'mission_start', area, layout, droneCount: 3, composition })).toEqual({ type: 'mission_start', area, layout, droneCount: 3, composition });
+    expect(parseClientMessage({ type: 'mission_start', area, layout, droneCount: 3, composition: { enemy: { tank: 2 } } })).toBeNull();
+  });
+
+  it('accepts the clock settings: a speed, a pause, or both; refuses speeds nobody can choose', () => {
+    expect(parseClientMessage({ type: 'set_clock', speed: 5 })).toEqual({ type: 'set_clock', speed: 5 });
+    expect(parseClientMessage({ type: 'set_clock', paused: true })).toEqual({ type: 'set_clock', paused: true });
+    expect(parseClientMessage({ type: 'set_clock', speed: 2, paused: false })).toEqual({ type: 'set_clock', speed: 2, paused: false });
+    expect(parseClientMessage({ type: 'set_clock' })).toBeNull();
+    expect(parseClientMessage({ type: 'set_clock', speed: 7 })).toBeNull();
+    expect(parseClientMessage({ type: 'set_clock', speed: 0 })).toBeNull();
+    expect(parseClientMessage({ type: 'set_clock', paused: 'yes' })).toBeNull();
+  });
+
   it('accepts mission_start with each start layout', () => {
     const single = { kind: 'single', point: { lat: 50, lng: 30 } };
     const cluster = { kind: 'cluster', center: { lat: 50, lng: 30 }, radiusM: 500 };

@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import type { Building, Buildings } from '../buildings/buildings';
 import type { MissionArea } from '../../../shared/protocol';
 import { isInsideArea, offsetLatLng, toMetersFrom } from '../../../shared/mission/area';
 import { ENEMY_MIN_DISTANCE_M } from '../../../shared/mission/units';
-import { ENEMY_ECHELONS, frontBearing, generateForces, MIN_SPACING_M, MOBILE_KINDS, moveUnit, nearestStartM, SPEED_MS, type ForceUnit } from './forces';
+import { ENEMY_ECHELONS, frontBearing, generateForces, MIN_SPACING_M, MOBILE_KINDS, moveUnit, nearestStartM, PlacementError, type ForceUnit } from './forces';
+import { SPEED_RANGE_MS } from '../../../shared/mission/units';
 import { UNIT_KINDS } from '../../../shared/mission/units';
 import { bearingTo } from './kinematics';
+import { DEFAULT_ENEMY_COUNTS } from '../../../shared/mission/composition';
 
 /** A repeatable random sequence (mulberry32), so a failing case can be replayed. */
 function seeded(seed: number) {
@@ -71,7 +74,9 @@ describe('generateForces', () => {
     // Only infantry and vehicles move, on both sides, at their speed; the others stand.
     for (const unit of units.filter((u) => u.speedMs > 0)) {
       expect(MOBILE_KINDS).toContain(unit.kind);
-      expect(unit.speedMs).toBe(SPEED_MS[unit.kind]);
+      const [lo, hi] = SPEED_RANGE_MS[unit.kind as 'infantry' | 'vehicle'].offRoad;
+      expect(unit.speedMs).toBeGreaterThanOrEqual(lo);
+      expect(unit.speedMs).toBeLessThanOrEqual(hi);
     }
     expect(units.filter((u) => !MOBILE_KINDS.includes(u.kind)).every((u) => u.speedMs === 0)).toBe(true);
     const movers = (seed: number) => generateForces(area, separate, seeded(seed)).filter((u) => u.speedMs > 0);
@@ -90,7 +95,9 @@ describe('generateForces', () => {
     const start = [offsetLatLng(area.center, 0, -5000)];
     for (let seed = 1; seed <= 5; seed++) {
       const units = enemies(generateForces(small, start, seeded(seed)));
-      expect(new Set(units.map((u) => u.kind))).toEqual(new Set(UNIT_KINDS));
+      // Every kind that has a default count is placed; depots and bases have none by default.
+      const kinds = UNIT_KINDS.filter((kind) => DEFAULT_ENEMY_COUNTS[kind] > 0);
+      expect(new Set(units.map((u) => u.kind))).toEqual(new Set(kinds));
       for (const unit of units) {
         expect(nearestStartM(unit.position, start)).toBeGreaterThanOrEqual(ENEMY_MIN_DISTANCE_M);
         expect(isInsideArea(unit.position, small)).toBe(true);
@@ -143,6 +150,42 @@ describe('frontBearing', () => {
 });
 
 describe('moveUnit', () => {
+  it('draws a new speed within the range of the kind for each new leg', () => {
+    const [lo, hi] = SPEED_RANGE_MS.vehicle.offRoad;
+    const truck = { id: 'enemy-9', side: 'enemy' as const, kind: 'vehicle' as const, position: offsetLatLng(south[0], 0, 0), headingDeg: 0, speedMs: lo, intel: true, band: [0, 100_000] as [number, number], waypoint: null };
+    const speeds = new Set<number>();
+    for (let i = 0; i < 20; i++) {
+      moveUnit(truck, area, south, 10, seeded(i + 1));
+      expect(truck.speedMs).toBeGreaterThanOrEqual(lo);
+      expect(truck.speedMs).toBeLessThanOrEqual(hi);
+      speeds.add(truck.speedMs);
+      truck.waypoint = null;
+    }
+    expect(speeds.size).toBeGreaterThan(1);
+  });
+
+  // A block of houses 150–250 m east of the start: 40 m tall, nothing else.
+  const houses: Buildings = {
+    at: (p) => {
+      const { east } = toMetersFrom(south[0], p);
+      return east > 150 && east < 250 ? ({ rings: [], heightM: 40, south: 0, north: 0, west: 0, east: 0 } as Building) : null;
+    },
+  };
+
+  it('does not drive a vehicle into a building: it waits and takes another leg', () => {
+    // Heading east at 6 m/s: a 60 m step from 100 m reaches the houses at 150 m.
+    const truck = { id: 'enemy-9', side: 'enemy' as const, kind: 'vehicle' as const, position: offsetLatLng(south[0], 100, 0), headingDeg: 90, speedMs: 6, intel: true, band: [0, 100_000] as [number, number], waypoint: offsetLatLng(south[0], 400, 0) };
+    expect(moveUnit(truck, area, south, 10, Math.random, () => false, houses)).toBe(false);
+    expect(truck.position).toEqual(offsetLatLng(south[0], 100, 0));
+    expect(truck.waypoint).toBeNull();
+  });
+
+  it('lets infantry walk into a building', () => {
+    const foot = { id: 'enemy-9', side: 'enemy' as const, kind: 'infantry' as const, position: offsetLatLng(south[0], 145, 0), headingDeg: 90, speedMs: 1.5, intel: true, band: [0, 100_000] as [number, number], waypoint: offsetLatLng(south[0], 400, 0) };
+    expect(moveUnit(foot, area, south, 10, Math.random, () => false, houses)).toBe(true);
+    expect(houses.at(foot.position)).not.toBeNull();
+  });
+
   it('drives a moving vehicle at its speed and points its heading the way it goes, never into the 3 km ring', () => {
     const vehicle = generateForces(area, south, seeded(11)).find((u) => u.speedMs > 0)!;
     const random = seeded(12);
@@ -163,3 +206,46 @@ describe('moveUnit', () => {
     expect(post.position).toBe(at);
   });
 });
+
+describe('composition', () => {
+  it('places the count of each kind the composition asks for, and the defaults for the kinds it leaves out', () => {
+    const units = generateForces(area, south, seeded(21), undefined, undefined, { enemy: { vehicle: 3 } });
+    const count = (kind: string) => enemies(units).filter((u) => u.kind === kind).length;
+    expect(count('vehicle')).toBe(3);
+    expect(count('infantry')).toBe(DEFAULT_ENEMY_COUNTS.infantry);
+  });
+
+  it('places a unit by hand where the operator put it, and counts it toward its kind', () => {
+    const spot = offsetLatLng(south[0], 0, 6000); // 6 km north of the start: a vehicle's band
+    const units = generateForces(area, south, seeded(22), undefined, undefined, {
+      enemy: { vehicle: 4 },
+      placed: [{ side: 'enemy', kind: 'vehicle', position: spot }],
+    });
+    expect(enemies(units).filter((u) => u.kind === 'vehicle')).toHaveLength(4);
+    expect(units.some((u) => u.side === 'enemy' && u.kind === 'vehicle' && u.position === spot)).toBe(true);
+  });
+
+  it('refuses a placed unit that breaks the placement rules: too close to the start for its kind', () => {
+    const tooClose = offsetLatLng(south[0], 0, 1000); // a vehicle stands 5 to 11 km from the start
+    expect(() => generateForces(area, south, seeded(23), undefined, undefined, { placed: [{ side: 'enemy', kind: 'vehicle', position: tooClose }] })).toThrow(PlacementError);
+  });
+
+  it('places an allied unit by hand inside its band', () => {
+    const spot = offsetLatLng(south[0], 0, 1500); // allied infantry band: 0.5 to 2.5 km from the start
+    const units = generateForces(area, south, seeded(24), undefined, undefined, { ally: { infantry: 1 }, placed: [{ side: 'ally', kind: 'infantry', position: spot }] });
+    expect(units.filter((u) => u.side === 'ally' && u.kind === 'infantry')).toHaveLength(1);
+    expect(units.find((u) => u.side === 'ally')!.position).toEqual(spot);
+  });
+});
+
+describe('depots and bases', () => {
+  it('a depot or a base placed by hand stands where the operator put it, and is not moved', () => {
+    const spot = offsetLatLng(south[0], 0, 6000);
+    const units = generateForces(area, south, seeded(31), undefined, undefined, { enemy: { depot: 1 }, placed: [{ side: 'enemy', kind: 'depot', position: spot }] });
+    const depot = units.find((u) => u.kind === 'depot')!;
+    expect(depot.position).toEqual(spot);
+    expect(depot.speedMs).toBe(0);
+    expect(MOBILE_KINDS).not.toContain('depot');
+  });
+});
+

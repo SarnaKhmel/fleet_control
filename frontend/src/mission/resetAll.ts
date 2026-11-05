@@ -1,6 +1,8 @@
 import { DEFAULT_DRONE_COUNT, MISSION_DEFAULT_AREA_KM } from '../../../shared/protocol';
+import { DEFAULT_ODDS } from '../../../shared/mission/odds';
+import { DEFAULT_ENEMY_COUNTS } from '../../../shared/mission/composition';
 import { sendClientMessage } from './missionSocket';
-import { useMissionStore } from './missionStore';
+import { defaultAllyCounts, useMissionStore } from './missionStore';
 import { useSelectionStore } from './selection';
 
 /**
@@ -19,6 +21,12 @@ export function resetEverything(): void {
     clusterRadiusM: 500,
     droneCount: DEFAULT_DRONE_COUNT,
     picking: false,
+    placing: null,
+    odds: DEFAULT_ODDS,
+    enemyCounts: { ...DEFAULT_ENEMY_COUNTS },
+    allyCounts: defaultAllyCounts(),
+    placed: [],
+    clock: { startedAt: null, simulatedS: 0, speed: 1, paused: false },
     drawing: false,
     drawAnchor: null,
     drawCursor: null,

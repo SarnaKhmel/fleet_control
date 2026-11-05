@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { layoutFrom, startProblem, useMissionStore } from './missionStore';
+import { DEFAULT_ODDS } from '../../../shared/mission/odds';
 
 const p = (lat: number, lng: number) => ({ lat, lng });
 const store = () => useMissionStore.getState();
@@ -178,6 +179,16 @@ describe('mission store', () => {
     expect(store().units).toEqual({});
   });
 
+
+  it('removes a unit a strike destroyed, and marks one it damaged', () => {
+    const enemy = { id: 'enemy-1', side: 'enemy' as const, kind: 'vehicle' as const, position: { lat: 50.1, lng: 30 }, headingDeg: null, speedMs: 0, source: 'drone' as const, detectedByDroneId: 'drone-1', inSight: true };
+    const other = { ...enemy, id: 'enemy-2' };
+    store().apply({ type: 'units', units: [enemy, other] });
+    store().apply({ type: 'unit_hit', unitId: 'enemy-1', droneId: 'drone-1', outcome: 'destroyed' });
+    store().apply({ type: 'unit_hit', unitId: 'enemy-2', droneId: 'drone-1', outcome: 'damaged' });
+    expect(Object.keys(store().units)).toEqual(['enemy-2']);
+    expect(store().units['enemy-2'].damaged).toBe(true);
+  });
   it('treats missing or malformed task lists from the server as empty', () => {
     store().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
     store().apply({ type: 'drone_tasks', droneId: 'drone-1', trail: 'x', tasks: [{ lat: 'a' }] } as never);
@@ -217,3 +228,45 @@ describe('mission store', () => {
     expect(store().droneCount).toBe(5); // the operator's choice is kept when no mission runs
   });
 });
+
+describe('battle settings in the store', () => {
+  beforeEach(() => useMissionStore.setState({ phase: 'idle', placed: [], placing: null, enemyCounts: { infantry: 12, position: 8, vehicle: 10, artillery: 6, air_defense: 4, ew: 4, radar: 2, depot: 0, base: 0 } }));
+
+  it('a count is never below the units placed by hand, and a placement beyond it raises it', () => {
+    const { setCount, setPlacing, addPlaced } = useMissionStore.getState();
+    setPlacing({ side: 'enemy', kind: 'vehicle' });
+    addPlaced({ lat: 50.1, lng: 30 });
+    addPlaced({ lat: 50.11, lng: 30 });
+    expect(useMissionStore.getState().placed).toHaveLength(2);
+    setCount('enemy', 'vehicle', 1);
+    expect(useMissionStore.getState().enemyCounts.vehicle).toBe(2);
+    setCount('enemy', 'vehicle', 40);
+    expect(useMissionStore.getState().enemyCounts.vehicle).toBe(40);
+    // Placing beyond a count of 10 raises it by one.
+    useMissionStore.setState({ enemyCounts: { ...useMissionStore.getState().enemyCounts, vehicle: 2 } });
+    addPlaced({ lat: 50.12, lng: 30 });
+    expect(useMissionStore.getState().enemyCounts.vehicle).toBe(3);
+  });
+
+  it('places nothing while placing is off, and removes a unit by its place in the list', () => {
+    const { addPlaced, setPlacing, removePlaced } = useMissionStore.getState();
+    addPlaced({ lat: 50.1, lng: 30 });
+    expect(useMissionStore.getState().placed).toEqual([]);
+    setPlacing({ side: 'ally', kind: 'infantry' });
+    addPlaced({ lat: 50.1, lng: 30 });
+    addPlaced({ lat: 50.2, lng: 30 });
+    removePlaced(0);
+    expect(useMissionStore.getState().placed).toEqual([{ side: 'ally', kind: 'infantry', position: { lat: 50.2, lng: 30 } }]);
+  });
+
+  it('is fixed while the mission runs: no change, and the placing mode ends with the start', () => {
+    const { setPlacing, setOdds } = useMissionStore.getState();
+    setPlacing({ side: 'enemy', kind: 'radar' });
+    useMissionStore.getState().markStarting();
+    expect(useMissionStore.getState().placing).toBeNull();
+    useMissionStore.getState().setCount('enemy', 'radar', 9);
+    setOdds(DEFAULT_ODDS);
+    expect(useMissionStore.getState().enemyCounts.radar).toBe(2);
+  });
+});
+

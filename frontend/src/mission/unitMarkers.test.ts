@@ -16,6 +16,13 @@ describe('unit markers', () => {
     expect(unitLabel(ally, callsign)).toBe('Ally: infantry · known from intelligence');
   });
 
+  it('marks a unit a strike damaged: in its label, and with a ring on the marker', () => {
+    const hurt = { ...vehicle, damaged: true };
+    expect(unitLabel(hurt, callsign)).toBe('Enemy: armoured vehicles · found by BA-02 · moving 22 km/h, course 90° · damaged');
+    expect(unitElement(hurt, 'x').classList.contains('is-damaged')).toBe(true);
+    expect(unitElement(vehicle, 'x').classList.contains('is-damaged')).toBe(false);
+  });
+
   it('shows a unit out of sight as last seen, faded, and keeps its course on the marker', () => {
     const lost = { ...vehicle, inSight: false };
     expect(unitLabel(lost, callsign)).toMatch(/last seen here/);

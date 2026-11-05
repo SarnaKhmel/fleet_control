@@ -36,12 +36,15 @@ const UNIT_FUNCTION: Record<UnitKind, string> = {
   air_defense: 'UCD---',
   ew: 'UUMSE-',
   radar: 'ESR---',
+  // A depot is supply; a base is a fixed installation. Both are dug in: the modifier in unitSidc marks them so.
+  depot: 'USS---',
+  base: 'IBA---',
 };
 
 /** Ground unit: hostile for the enemy, friendly for allies. */
 export function unitSidc(side: UnitSide, kind: UnitKind): string {
   const affiliation = side === 'enemy' ? 'H' : 'F';
-  const modifier = kind === 'position' ? 'H-' : '--';
+  const modifier = kind === 'position' || kind === 'base' || kind === 'depot' ? 'H-' : '--';
   return `S${affiliation}GP${UNIT_FUNCTION[kind]}${modifier}---`;
 }
 

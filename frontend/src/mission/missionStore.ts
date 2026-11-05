@@ -17,7 +17,11 @@ import {
 } from '../../../shared/protocol';
 import { areaFromCorners, areaRing, isInsideArea } from '../../../shared/mission/area';
 import type { ReconCell, ReconGrid } from '../../../shared/mission/recon';
-import type { MissionUnit } from '../../../shared/mission/units';
+import type { MissionUnit, UnitKind, UnitSide } from '../../../shared/mission/units';
+import { UNIT_KINDS } from '../../../shared/mission/units';
+import { DEFAULT_ODDS, type MissionOdds } from '../../../shared/mission/odds';
+import type { MissionClockView } from '../../../shared/mission/clock';
+import { DEFAULT_ALLY_COUNTS, DEFAULT_ENEMY_COUNTS, MAX_PLACED_UNITS, MAX_UNITS_PER_KIND, type PlacedUnit } from '../../../shared/mission/composition';
 import { DEFAULT_CENTER } from '../map/mapStyles';
 import { useLocationStore } from '../location/locationStore';
 
@@ -80,7 +84,23 @@ export interface MissionState {
   reconCells: ReconCell[];
   /** Enemy and allied units known so far, by id; an enemy out of sight stays where it was last seen. */
   units: Record<string, MissionUnit>;
+  /** The mission clock: when it started, simulated seconds since, speed and pause, as the server sends them. */
+  clock: MissionClockView;
   error: MissionErrorReason | null;
+  /** Battle settings, set before the start: the odds, how many units of each kind each side has, and the units placed by hand. */
+  odds: MissionOdds;
+  enemyCounts: Record<UnitKind, number>;
+  allyCounts: Record<UnitKind, number>;
+  placed: PlacedUnit[];
+  /** The side and kind the next map click places; null when placing is off. */
+  placing: { side: UnitSide; kind: UnitKind } | null;
+  setOdds: (odds: MissionOdds) => void;
+  /** How many units of a kind a side has. Never fewer than the ones placed by hand. */
+  setCount: (side: UnitSide, kind: UnitKind, count: number) => void;
+  setPlacing: (placing: { side: UnitSide; kind: UnitKind } | null) => void;
+  /** Map click while placing: a unit of the chosen side and kind at this point. */
+  addPlaced: (point: LatLng) => void;
+  removePlaced: (index: number) => void;
   setCenter: (center: LatLng | null) => void;
   setSize: (widthKm: number, heightKm: number) => void;
   setLayoutKind: (kind: LayoutKind) => void;
@@ -105,6 +125,16 @@ export interface MissionState {
  */
 function pointList(value: unknown): LatLng[] {
   return Array.isArray(value) && value.every(isLatLng) ? value : [];
+}
+
+/** Allied counts for every kind (a kind with no allied units is 0). */
+export function defaultAllyCounts(): Record<UnitKind, number> {
+  return Object.fromEntries(UNIT_KINDS.map((kind) => [kind, DEFAULT_ALLY_COUNTS[kind] ?? 0])) as Record<UnitKind, number>;
+}
+
+/** Units of one side and kind placed by hand. */
+export function placedOf(placed: PlacedUnit[], side: UnitSide, kind: UnitKind): number {
+  return placed.filter((u) => u.side === side && u.kind === kind).length;
 }
 
 /** Zone center: the chosen center, else the selected location, else the default city. */
@@ -154,7 +184,32 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   reconGrid: null,
   reconCells: [],
   units: {},
+  clock: { startedAt: null, simulatedS: 0, speed: 1, paused: false },
   error: null,
+  odds: DEFAULT_ODDS,
+  enemyCounts: { ...DEFAULT_ENEMY_COUNTS },
+  allyCounts: defaultAllyCounts(),
+  placed: [],
+  placing: null,
+  setOdds: (odds) => (locked(get) ? undefined : set({ odds })),
+  setCount: (side, kind, count) => {
+    if (locked(get) || !Number.isFinite(count)) return;
+    const key = side === 'enemy' ? 'enemyCounts' : 'allyCounts';
+    const floor = placedOf(get().placed, side, kind);
+    const value = Math.min(MAX_UNITS_PER_KIND, Math.max(floor, Math.round(count)));
+    set({ [key]: { ...get()[key], [kind]: value } } as Partial<MissionState>);
+  },
+  setPlacing: (placing) => (locked(get) && placing ? undefined : set({ placing })),
+  addPlaced: (point) => {
+    const { placing, placed } = get();
+    if (locked(get) || !placing || placed.length >= MAX_PLACED_UNITS) return;
+    const { side, kind } = placing;
+    const key = side === 'enemy' ? 'enemyCounts' : 'allyCounts';
+    // A unit placed beyond the count raises it: the count is the whole of that kind.
+    const count = Math.max(get()[key][kind], placedOf(placed, side, kind) + 1);
+    set({ placed: [...placed, { side, kind, position: point }], [key]: { ...get()[key], [kind]: Math.min(MAX_UNITS_PER_KIND, count) } } as Partial<MissionState>);
+  },
+  removePlaced: (index) => (locked(get) ? undefined : set({ placed: get().placed.filter((_, i) => i !== index) })),
   setCenter: (center) => (locked(get) ? undefined : set({ center, zoneChosen: true })),
   setSize: (widthKm, heightKm) => (locked(get) ? undefined : set({ widthKm, heightKm, zoneChosen: true })),
   setLayoutKind: (layoutKind) => (locked(get) ? undefined : set({ layoutKind, points: [] })),
@@ -188,7 +243,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   },
   clearPoints: () => (locked(get) ? undefined : set({ points: [] })),
   // Setup modes end with the start: their buttons lock, and a left-on mode would swallow every map click.
-  markStarting: () => set({ phase: 'running', drones: {}, reconGrid: null, reconCells: [], units: {}, error: null, picking: false, drawing: false, drawAnchor: null, drawCursor: null }),
+  markStarting: () => set({ phase: 'running', drones: {}, reconGrid: null, reconCells: [], units: {}, error: null, picking: false, placing: null, drawing: false, drawAnchor: null, drawCursor: null }),
   apply: (message) => {
     switch (message.type) {
       case 'drone_boot': {
@@ -302,6 +357,15 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
         set({ units });
         return;
       }
+      case 'unit_hit': {
+        const units = { ...get().units };
+        const unit = units[message.unitId];
+        if (message.outcome === 'destroyed') delete units[message.unitId];
+        else if (message.outcome === 'damaged' && unit) units[message.unitId] = { ...unit, damaged: true };
+        else return;
+        set({ units });
+        return;
+      }
       case 'recon_cells':
         set({ reconGrid: message.grid, reconCells: [...get().reconCells, ...message.cells] });
         return;
@@ -343,7 +407,10 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
         set({ phase: 'idle', error: message.reason });
         return;
       case 'mission_reset':
-        set({ phase: 'idle', drones: {}, reconGrid: null, reconCells: [], units: {}, error: null });
+        set({ phase: 'idle', drones: {}, reconGrid: null, reconCells: [], units: {}, error: null, clock: { ...get().clock, startedAt: null, simulatedS: 0 } });
+        return;
+      case 'clock':
+        set({ clock: { startedAt: message.startedAt, simulatedS: message.simulatedS, speed: message.speed, paused: message.paused } });
         return;
     }
   },

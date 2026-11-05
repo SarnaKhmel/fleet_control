@@ -11,7 +11,7 @@ import { addTerrain, groundElevationAt, TERRAIN_SOURCE_ID } from './terrain';
 import { addBordersLayer, BORDERS_LAYER_ID, BORDER_COLORS } from './borders';
 import { useMapScaleStore } from './mapScaleStore';
 import { metersPerPixel } from './scale';
-import { useMapIssueStore } from './mapIssue';
+import { terrainIssue, useMapIssueStore } from './mapIssue';
 import { syncFrontLine } from '../frontline/frontLine';
 import { syncMissionArea } from '../mission/missionLayer';
 import { effectiveCenter, useMissionStore } from '../mission/missionStore';
@@ -24,6 +24,9 @@ import { addReconLayer, syncRecon } from '../mission/reconLayer';
 import { useWindStore } from '../wind/windStore';
 import { syncTaskMarkers } from '../mission/taskMarkers';
 import { syncUnitMarkers } from '../mission/unitMarkers';
+import { placedAsUnits } from '../mission/placement';
+import { TargetPopup } from '../mission/TargetPopup';
+import { useTargetPickStore } from '../mission/targetPickStore';
 import { headOnlineDronesToward, moveOnlineDrones } from '../mission/missionSocket';
 import { dronesInScreenBox, useSelectionStore, type ScreenPoint } from '../mission/selection';
 import { boxesOverlap, boxOf, registerZoneFitter, zoneBoxOf } from '../mission/zoneView';
@@ -105,8 +108,15 @@ export function MapView() {
     map.on('error', (event) => {
       // MapLibre reports the failing source; errors without one come from the style itself.
       const sourceId = (event as { sourceId?: string }).sourceId;
-      if (sourceId === TERRAIN_SOURCE_ID) useMapIssueStore.getState().setIssue('terrain');
-      else if (!sourceId) useMapIssueStore.getState().setIssue('style');
+      if (!sourceId) useMapIssueStore.getState().setIssue('style');
+      else useMapIssueStore.getState().setIssue(terrainIssue(useMapIssueStore.getState().issue, event as never, TERRAIN_SOURCE_ID));
+    });
+    // Terrain that loads again clears its own issue (the tiles come and go as the map moves).
+    map.on('sourcedata', (event) => {
+      if (event.sourceId !== TERRAIN_SOURCE_ID) return;
+      const { issue, setIssue } = useMapIssueStore.getState();
+      const next = terrainIssue(issue, event, TERRAIN_SOURCE_ID);
+      if (next !== issue) setIssue(next);
     });
     // Shift+drag selects drones in a box, so MapLibre's own Shift+drag zoom is turned off.
     map.boxZoom.disable();
@@ -154,6 +164,7 @@ export function MapView() {
       // it itself; as a map click it would send the just-selected drone to its own position.
       const target = event.originalEvent?.target;
       if (target instanceof Element && target.closest('.maplibregl-marker')) return;
+      useTargetPickStore.getState().close();
       const point = { lat: event.lngLat.lat, lng: event.lngLat.lng };
       // A click adds the point to the end of the selected drones' tasks; Ctrl+click (Cmd+click on a Mac)
       // starts their tasks over with just this point.
@@ -167,6 +178,7 @@ export function MapView() {
       });
       // Mode clicks take priority: zone drawing, then start points, else the location.
       if (mission.drawing) mission.drawClick(point);
+      else if (mission.placing) mission.addPlaced(point);
       else if (mission.picking) mission.addPoint(point);
       // Shift+click with drones selected sets their course toward the clicked point.
       else if (event.originalEvent?.shiftKey && useSelectionStore.getState().selectedIds.length > 0) headOnlineDronesToward(point);
@@ -254,8 +266,10 @@ export function MapView() {
     };
     // Known enemy and allied units: they change only when one is found or one in sight moves.
     const syncUnits = () => {
-      const { units, drones } = useMissionStore.getState();
-      syncUnitMarkers(map, units, (droneId) => drones[droneId]?.callsign ?? droneId);
+      const { units, drones, placed, phase } = useMissionStore.getState();
+      // Units placed by hand show before the start; once it runs, only the server's units.
+      const shown = phase === 'idle' ? { ...placedAsUnits(placed), ...units } : units;
+      syncUnitMarkers(map, shown, (droneId) => drones[droneId]?.callsign ?? droneId);
     };
     sync();
     syncUnits();
@@ -264,7 +278,7 @@ export function MapView() {
         if (state.drones !== previous.drones) sync();
       }),
       useMissionStore.subscribe((state, previous) => {
-        if (state.units !== previous.units) syncUnits();
+        if (state.units !== previous.units || state.placed !== previous.placed || state.phase !== previous.phase) syncUnits();
       }),
       useSelectionStore.subscribe((state, previous) => {
         if (state.selectedIds !== previous.selectedIds) sync();
@@ -359,5 +373,10 @@ export function MapView() {
     }
   }, [selected]);
 
-  return <div ref={containerRef} className="map" role="region" aria-label={t('map.label')} />;
+  return (
+    <>
+      <div ref={containerRef} className="map" role="region" aria-label={t('map.label')} />
+      <TargetPopup />
+    </>
+  );
 }
