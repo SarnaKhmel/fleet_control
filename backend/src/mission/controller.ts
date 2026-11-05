@@ -283,9 +283,9 @@ export function createMissionController(
   }
 
   /**
-   * Enemies in sight: in a drone camera's view this tick, or in the ground an ally watches. One seen for the
-   * first time becomes known; a known one on the move is reported where it is now. Out of sight, the
-   * dashboard keeps it where it was last seen.
+   * Enemies in sight: in a drone camera's view this tick, or within 2 km of an ally. One seen for the first
+   * time becomes known; a known one in sight is reported where it is now (a standing one only once). When it
+   * leaves sight it is reported once more, not in sight, where it was last seen: it does not move on the map.
    */
   function detect(inView: Map<string, string>) {
     if (!reconGrid) return;
@@ -294,28 +294,34 @@ export function createMissionController(
       if (unit.side === 'ally') {
         // Our own units on the move: the dashboard follows them.
         if (unit.speedMs > 0) {
-          const view = unitView(unit, 'intel', null);
+          const view = unitView(unit, 'intel', null, true);
           known.set(unit.id, view);
           changed.push(view);
         }
         continue;
       }
-      const key = cellKey(cellOf(reconGrid, unit.position));
-      const droneId = inView.get(key) ?? null;
-      if (!droneId && !allyCovers(unit.position)) continue;
       const was = known.get(unit.id);
-      if (was && unit.speedMs === 0) continue;
+      const droneId = inView.get(cellKey(cellOf(reconGrid, unit.position))) ?? null;
+      if (!droneId && !allyCovers(unit.position)) {
+        if (was?.inSight) {
+          const view = { ...was, inSight: false };
+          known.set(unit.id, view);
+          changed.push(view);
+        }
+        continue;
+      }
+      if (was?.inSight && unit.speedMs === 0) continue;
       if (!was) serverLog('enemy found', { id: unit.id, kind: unit.kind, by: droneId ?? 'ally' });
-      const view = unitView(unit, was?.source ?? (droneId ? 'drone' : 'ally'), was ? was.detectedByDroneId : droneId);
+      const view = unitView(unit, was?.source ?? (droneId ? 'drone' : 'ally'), was ? was.detectedByDroneId : droneId, true);
       known.set(unit.id, view);
       changed.push(view);
     }
     if (changed.length > 0) broadcast({ type: 'units', units: changed });
   }
 
-  function unitView(unit: ForceUnit, source: UnitSource, detectedByDroneId: string | null): MissionUnit {
+  function unitView(unit: ForceUnit, source: UnitSource, detectedByDroneId: string | null, inSight: boolean): MissionUnit {
     const { id, side, kind, position, headingDeg, speedMs } = unit;
-    return { id, side, kind, position, headingDeg, speedMs, source, detectedByDroneId };
+    return { id, side, kind, position, headingDeg, speedMs, source, detectedByDroneId, inSight };
   }
 
   function cellKey(cell: ReconCell): string {
@@ -571,7 +577,7 @@ export function createMissionController(
     starts = startPoints;
     forces = placeForces(missionArea, startPoints, water.isWater);
     for (const unit of forces) {
-      if (unit.intel) known.set(unit.id, unitView(unit, 'intel', null));
+      if (unit.intel) known.set(unit.id, unitView(unit, 'intel', null, unit.side === 'ally'));
     }
     serverLog('forces', { enemies: forces.filter((u) => u.side === 'enemy').length, allies: forces.filter((u) => u.side === 'ally').length, known: known.size });
     const fresh = watchByAllies(forces.filter((unit) => unit.side === 'ally'));

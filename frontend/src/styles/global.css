@@ -1455,3 +1455,7 @@ body,
 .flight-settings button {
   grid-column: 1 / -1;
 }
+
+.unit-marker.is-last-seen {
+  opacity: 0.45;
+}

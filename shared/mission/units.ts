@@ -30,6 +30,11 @@ export interface MissionUnit {
   source: UnitSource;
   /** The drone that found it, for source `drone`. */
   detectedByDroneId: string | null;
+  /**
+   * In sight of one of ours now. Out of sight, the unit stays where it was last seen with the course and speed
+   * it had then, and does not move on the map.
+   */
+  inSight: boolean;
 }
 
 /** Radius around an allied unit that it watches: the ground there counts as reconnoitred. */

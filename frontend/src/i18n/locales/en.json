@@ -217,6 +217,7 @@
       "drone": "found by {{callsign}}",
       "ally": "seen by allies"
     },
-    "moving": "moving {{speed}} km/h, course {{heading}}°"
+    "moving": "moving {{speed}} km/h, course {{heading}}°",
+    "lastSeen": "last seen here, not in sight now"
   }
 }

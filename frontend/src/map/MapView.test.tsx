@@ -147,7 +147,7 @@ describe('MapView', () => {
       </Profiler>,
     );
     const before = renders;
-    const enemy = { id: 'enemy-1', side: 'enemy' as const, kind: 'vehicle' as const, position: { lat: 50.2, lng: 30.1 }, headingDeg: 0, speedMs: 6, source: 'ally' as const, detectedByDroneId: null };
+    const enemy = { id: 'enemy-1', side: 'enemy' as const, kind: 'vehicle' as const, position: { lat: 50.2, lng: 30.1 }, headingDeg: 0, speedMs: 6, source: 'ally' as const, detectedByDroneId: null, inSight: true };
     act(() => useMissionStore.getState().apply({ type: 'units', units: [enemy] }));
     const marker = markerInstances.at(-1)!;
     expect(marker.element?.getAttribute('aria-label')).toMatch(/^Enemy: armoured vehicles/);

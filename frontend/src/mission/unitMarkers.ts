@@ -32,12 +32,13 @@ export function unitLabel(unit: MissionUnit, callsignOf: (droneId: string) => st
   const how = i18n.t(`unit.source.${unit.source}`, { callsign: unit.detectedByDroneId ? callsignOf(unit.detectedByDroneId) : '' });
   const heading = shownHeading(unit);
   const moving = heading === null ? '' : ` · ${i18n.t('unit.moving', { speed: Math.round(unit.speedMs * 3.6), heading })}`;
-  return `${what} · ${how}${moving}`;
+  const seen = unit.inSight ? '' : ` · ${i18n.t('unit.lastSeen')}`;
+  return `${what} · ${how}${moving}${seen}`;
 }
 
 export function unitElement(unit: MissionUnit, label: string): HTMLElement {
   const el = natoElement(unitSidc(unit.side, unit.kind), SIZE, shownHeading(unit) ?? undefined);
-  el.classList.add('unit-marker', `is-${unit.side}`);
+  el.classList.add('unit-marker', `is-${unit.side}`, ...(unit.inSight ? [] : ['is-last-seen']));
   el.setAttribute('aria-label', label);
   el.title = label;
   return el;
@@ -48,7 +49,7 @@ export function syncUnitMarkers(map: MapLibreMap, units: Record<string, MissionU
   const markers: MapLibreMarkerType[] = [];
   for (const [id, unit] of Object.entries(units)) {
     const label = unitLabel(unit, callsignOf);
-    const signature = `${unit.side}|${unit.kind}|${shownHeading(unit)}|${label}`;
+    const signature = `${unit.side}|${unit.kind}|${shownHeading(unit)}|${unit.inSight}|${label}`;
     const lngLat: [number, number] = [unit.position.lng, unit.position.lat];
     const entry = entries.get(id);
     if (entry && entry.map === map && entry.signature === signature) {

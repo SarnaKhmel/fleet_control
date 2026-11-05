@@ -537,7 +537,7 @@ describe('mission controller', () => {
       const mission = await online([known, hidden, ally]);
       expect(unitMessages()).toHaveLength(1);
       expect(sentUnits().map((u) => [u.id, u.source])).toEqual([['enemy-1', 'intel'], ['ally-1', 'intel']]);
-      expect(sentUnits()[0]).toEqual({ id: 'enemy-1', side: 'enemy', kind: 'artillery', position: known.position, headingDeg: null, speedMs: 0, source: 'intel', detectedByDroneId: null });
+      expect(sentUnits()[0]).toEqual({ id: 'enemy-1', side: 'enemy', kind: 'artillery', position: known.position, headingDeg: null, speedMs: 0, source: 'intel', detectedByDroneId: null, inSight: false });
       const snap = mission.snapshot();
       expect(snap.type === 'mission_snapshot' && snap.units?.map((u) => u.id)).toEqual(['enemy-1', 'ally-1']);
       mission.handle({ type: 'mission_reset' });
@@ -592,6 +592,28 @@ describe('mission controller', () => {
       expect(cells.some(([x]) => x > 40)).toBe(true);
       const last = sentUnits().filter((u) => u.id === 'ally-1').at(-1)!;
       expect(toMetersFrom(start, last.position).east).toBeGreaterThan(3000);
+      mission.dispose();
+    });
+
+    it('stops an enemy that leaves sight where it was last seen, with its course, and keeps it there', async () => {
+      const allyAt = offsetLatLng(area.center, 0, -20_000);
+      const mission = await online([
+        force({ id: 'ally-1', side: 'ally', position: allyAt, intel: true }),
+        // Moving east out of the ally's 2 km after about 10 ticks: at 60 m a tick it leaves the sight at 2 km.
+        force({ id: 'enemy-1', kind: 'vehicle', position: offsetLatLng(allyAt, 1500, 0), speedMs: 6, headingDeg: 90, waypoint: offsetLatLng(allyAt, 20_000, 0) }),
+      ]);
+      vi.advanceTimersByTime(60_000);
+      const lastSeen = sentUnits().filter((u) => u.id === 'enemy-1').at(-1)!;
+      expect(lastSeen.inSight).toBe(false);
+      const snap = () => (mission.snapshot() as Extract<ServerMessage, { type: 'mission_snapshot' }>).units!.find((u) => u.id === 'enemy-1')!;
+      expect(snap()).toEqual(lastSeen);
+      // It keeps driving out there, but the dashboard is not told: its place on the map does not change.
+      const reports = sentUnits().filter((u) => u.id === 'enemy-1').length;
+      vi.advanceTimersByTime(60_000);
+      expect(sentUnits().filter((u) => u.id === 'enemy-1')).toHaveLength(reports);
+      expect(snap().position).toEqual(lastSeen.position);
+      expect(snap().headingDeg).toBeCloseTo(90, 0);
+      expect(toMetersFrom(allyAt, lastSeen.position).east).toBeLessThan(2050);
       mission.dispose();
     });
 

@@ -163,8 +163,8 @@ describe('mission store', () => {
   });
 
   it('keeps the known units by id: a newer report replaces one, a snapshot replaces all, a reset or new start clears them', () => {
-    const enemy = { id: 'enemy-1', side: 'enemy' as const, kind: 'vehicle' as const, position: { lat: 50.1, lng: 30 }, headingDeg: 90, speedMs: 6, source: 'drone' as const, detectedByDroneId: 'drone-1' };
-    const ally = { ...enemy, id: 'ally-1', side: 'ally' as const, kind: 'infantry' as const, headingDeg: null, speedMs: 0, source: 'intel' as const, detectedByDroneId: null };
+    const enemy = { id: 'enemy-1', side: 'enemy' as const, kind: 'vehicle' as const, position: { lat: 50.1, lng: 30 }, headingDeg: 90, speedMs: 6, source: 'drone' as const, detectedByDroneId: 'drone-1', inSight: true };
+    const ally = { ...enemy, id: 'ally-1', side: 'ally' as const, kind: 'infantry' as const, headingDeg: null, speedMs: 0, source: 'intel' as const, detectedByDroneId: null, inSight: true };
     store().apply({ type: 'units', units: [enemy, ally] });
     store().apply({ type: 'units', units: [{ ...enemy, position: { lat: 50.2, lng: 30 } }] });
     expect(Object.keys(store().units)).toEqual(['enemy-1', 'ally-1']);

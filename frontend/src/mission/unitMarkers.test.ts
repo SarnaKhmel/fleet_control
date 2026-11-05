@@ -5,8 +5,8 @@ import { syncUnitMarkers, unitElement, unitLabel } from './unitMarkers';
 
 vi.mock('maplibre-gl', () => import('../test/maplibreMock'));
 
-const vehicle: MissionUnit = { id: 'enemy-1', side: 'enemy', kind: 'vehicle', position: { lat: 50.1, lng: 30 }, headingDeg: 92, speedMs: 6, source: 'drone', detectedByDroneId: 'drone-2' };
-const ally: MissionUnit = { id: 'ally-1', side: 'ally', kind: 'infantry', position: { lat: 49.9, lng: 30 }, headingDeg: null, speedMs: 0, source: 'intel', detectedByDroneId: null };
+const vehicle: MissionUnit = { id: 'enemy-1', side: 'enemy', kind: 'vehicle', position: { lat: 50.1, lng: 30 }, headingDeg: 92, speedMs: 6, source: 'drone', detectedByDroneId: 'drone-2', inSight: true };
+const ally: MissionUnit = { id: 'ally-1', side: 'ally', kind: 'infantry', position: { lat: 49.9, lng: 30 }, headingDeg: null, speedMs: 0, source: 'intel', detectedByDroneId: null, inSight: true };
 const callsign = (id: string) => (id === 'drone-2' ? 'BA-02' : id);
 type FakeMarker = { element: HTMLElement; lngLat: number[]; added: boolean };
 
@@ -14,6 +14,16 @@ describe('unit markers', () => {
   it('names the unit, how it was found and where it is heading', () => {
     expect(unitLabel(vehicle, callsign)).toBe('Enemy: armoured vehicles · found by BA-02 · moving 22 km/h, course 90°');
     expect(unitLabel(ally, callsign)).toBe('Ally: infantry · known from intelligence');
+  });
+
+  it('shows a unit out of sight as last seen, faded, and keeps its course on the marker', () => {
+    const lost = { ...vehicle, inSight: false };
+    expect(unitLabel(lost, callsign)).toMatch(/last seen here/);
+    const el = unitElement(lost, 'x');
+    expect(el.classList.contains('is-last-seen')).toBe(true);
+    expect(el.innerHTML).toBe(unitElement({ ...vehicle, inSight: false }, 'x').innerHTML);
+    expect(el.innerHTML).not.toBe(unitElement({ ...lost, headingDeg: null, speedMs: 0 }, 'x').innerHTML);
+    expect(unitElement(vehicle, 'x').classList.contains('is-last-seen')).toBe(false);
   });
 
   it('draws the enemy hostile and allies friendly, as NATO symbols', () => {
