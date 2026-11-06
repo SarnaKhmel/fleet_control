@@ -1,0 +1,31 @@
+# Render Blueprint: two free services from this repo.
+#   fleet-backend  Docker web service, the WebSocket simulator (sleeps after 15 min without traffic)
+#   fleet-control  static site, the frontend (does not sleep)
+# Setup: Render dashboard -> New -> Blueprint -> pick this repo and branch.
+services:
+  - type: web
+    name: fleet-backend
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      # The server listens on 8080 (backend/src/server.ts); Render must look at the same port.
+      - key: PORT
+        value: 8080
+
+  - type: web
+    name: fleet-control
+    runtime: static
+    plan: free
+    buildCommand: npm ci && npx nx run frontend:build
+    staticPublishPath: ./frontend/dist
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      # Built into the frontend: where the WebSocket server lives.
+      - key: VITE_WS_HOST
+        fromService:
+          type: web
+          name: fleet-backend
+          property: host
