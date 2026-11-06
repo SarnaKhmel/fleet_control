@@ -1,0 +1,9 @@
+**/node_modules
+**/dist
+.nx
+.git
+.github
+.idea
+.claude
+tasks
+CLAUDE.md
