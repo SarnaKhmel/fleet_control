@@ -23,9 +23,16 @@ export function parseServerMessage(raw: unknown): ServerMessage | null {
   return data as ServerMessage;
 }
 
-export function missionSocketUrl(): string {
-  const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
-  return `${scheme}://${location.host}/ws`;
+/**
+ * The server's WebSocket URL. `host` (VITE_WS_HOST) points at a server hosted apart from this page;
+ * without it the page's own host is used, which the dev proxy and the same-origin deploy both serve.
+ */
+export function missionSocketUrl(
+  host: string | undefined = import.meta.env.VITE_WS_HOST,
+  page: Pick<Location, 'protocol' | 'host'> = location,
+): string {
+  const scheme = page.protocol === 'https:' ? 'wss' : 'ws';
+  return `${scheme}://${host || page.host}/ws`;
 }
 
 let socket: WebSocket | null = null;
