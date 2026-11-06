@@ -1,5 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { landableSelected, parseServerMessage } from './missionSocket';
+import { landableSelected, missionSocketUrl, parseServerMessage } from './missionSocket';
+
+describe('missionSocketUrl', () => {
+  const httpsPage = { protocol: 'https:', host: 'fleet.example' };
+  const httpPage = { protocol: 'http:', host: 'localhost:5173' };
+
+  it('uses the page host when no server host is set (dev proxy, same origin)', () => {
+    expect(missionSocketUrl(undefined, httpPage)).toBe('ws://localhost:5173/ws');
+    expect(missionSocketUrl(undefined, httpsPage)).toBe('wss://fleet.example/ws');
+  });
+
+  it('connects to a separately hosted server, over wss when the page is https', () => {
+    expect(missionSocketUrl('fleet-backend.onrender.com', httpsPage)).toBe('wss://fleet-backend.onrender.com/ws');
+    expect(missionSocketUrl('fleet-backend.onrender.com', httpPage)).toBe('ws://fleet-backend.onrender.com/ws');
+  });
+
+  it('treats an empty server host as not set', () => {
+    expect(missionSocketUrl('', httpPage)).toBe('ws://localhost:5173/ws');
+  });
+});
 
 describe('parseServerMessage', () => {
   it('accepts known server messages', () => {
