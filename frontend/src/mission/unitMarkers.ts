@@ -55,8 +55,9 @@ export function unitElement(unit: MissionUnit, label: string): HTMLElement {
 export function syncUnitMarkers(map: MapLibreMap, units: Record<string, MissionUnit>, callsignOf: (droneId: string) => string): MapLibreMarkerType[] {
   const markers: MapLibreMarkerType[] = [];
   for (const [id, unit] of Object.entries(units)) {
-    const label = unitLabel(unit, callsignOf);
-    const signature = `${unit.side}|${unit.kind}|${shownHeading(unit)}|${unit.inSight}|${label}`;
+    // The signature is built from the raw fields: the translated label is made only when the marker is rebuilt.
+    const callsign = unit.detectedByDroneId ? callsignOf(unit.detectedByDroneId) : '';
+    const signature = [unit.side, unit.kind, shownHeading(unit), Math.round(unit.speedMs * 3.6), unit.inSight, unit.damaged ?? false, unit.source, callsign, i18n.language].join('|');
     const lngLat: [number, number] = [unit.position.lng, unit.position.lat];
     const entry = entries.get(id);
     if (entry && entry.map === map && entry.signature === signature) {
@@ -65,6 +66,7 @@ export function syncUnitMarkers(map: MapLibreMap, units: Record<string, MissionU
       continue;
     }
     entry?.marker.remove();
+    const label = unitLabel(unit, callsignOf);
     const marker = new Marker({ element: unitElement(unit, label), anchor: 'center' }).setLngLat(lngLat).addTo(map);
     entries.set(id, { map, marker, signature });
     markers.push(marker);

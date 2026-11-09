@@ -22,6 +22,8 @@ vi.mock('../mission/missionSocket', async (importOriginal) => ({
   moveOnlineDrones: vi.fn(),
 }));
 
+const nextFrame = () => act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+
 describe('MapView', () => {
   beforeEach(() => {
     mapInstances.length = 0;
@@ -90,7 +92,7 @@ describe('MapView', () => {
     useMissionStore.setState({ phase: 'idle' });
   });
 
-  it('moves a drone marker on a position update without re-rendering the map component', () => {
+  it('moves a drone marker on a position update without re-rendering the map component', async () => {
     useMissionStore.setState({ phase: 'running', drones: {} });
     let renders = 0;
     render(
@@ -101,12 +103,14 @@ describe('MapView', () => {
     act(() => {
       useMissionStore.getState().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30, altitude_amsl_m: 150 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
     });
+    await nextFrame();
     const marker = markerInstances.at(-1)!;
     expect(marker.lngLat).toEqual([30, 50]);
     const before = renders;
     act(() => {
       useMissionStore.getState().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50.1, lng: 30.1 }, heading: 0, speedMs: 10, altitudeM: 210, groundM: 150, batteryPct: 99, crabDeg: 0 });
     });
+    await nextFrame();
     expect(marker.lngLat).toEqual([30.1, 50.1]);
     expect(renders).toBe(before);
     useMissionStore.setState({ phase: 'idle', drones: {} });
@@ -158,7 +162,29 @@ describe('MapView', () => {
     expect(marker.added).toBe(false);
   });
 
-  it('updates drone paths while map tiles are still loading', () => {
+  it('redraws the drone layers once for a burst of position updates', async () => {
+    useMissionStore.setState({ phase: 'running', drones: {} });
+    render(<MapView />);
+    const map = mapInstances[0];
+    const setData = vi.fn();
+    map.sources[WAYPOINT_SOURCE_ID] = { setData };
+    map.layers['drone-waypoints-line'] = { id: 'drone-waypoints-line' };
+    act(() => {
+      useMissionStore.getState().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30, altitude_amsl_m: 150 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
+    });
+    await nextFrame();
+    setData.mockClear();
+    act(() => {
+      for (let i = 1; i <= 5; i++) {
+        useMissionStore.getState().apply({ type: 'position', droneId: 'drone-1', position: { lat: 50 + i / 100, lng: 30 }, heading: 0, speedMs: 10, altitudeM: 210, groundM: 150, batteryPct: 99, crabDeg: 0 });
+      }
+    });
+    await nextFrame();
+    expect(setData).toHaveBeenCalledTimes(1);
+    useMissionStore.setState({ phase: 'idle', drones: {} });
+  });
+
+  it('updates drone paths while map tiles are still loading', async () => {
     useMissionStore.setState({ phase: 'running', drones: {} });
     render(<MapView />);
     const map = mapInstances[0];
@@ -170,6 +196,7 @@ describe('MapView', () => {
     act(() => {
       useMissionStore.getState().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30, altitude_amsl_m: 150 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
     });
+    await nextFrame();
     expect(setData).toHaveBeenCalled();
     useMissionStore.setState({ phase: 'idle', drones: {} });
   });
