@@ -371,12 +371,6 @@ body,
   color: var(--accent);
 }
 
-/* Dark theme: the blue-grey "fiord" basemap is darkened a bit more. Markers and borders are HTML/vector
-   overlays on top of the canvas and keep their own colors. */
-:root[data-theme='dark'] .map-area .maplibregl-canvas {
-  filter: brightness(0.7) contrast(1.05);
-}
-
 /* Compass and scale bar, side by side in the bottom-right corner of the map. */
 .map-scale-group {
   position: absolute;
@@ -796,8 +790,6 @@ body,
   padding: 0;
   gap: 0;
   background: color-mix(in srgb, var(--panel) 94%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   border-right: 1px solid var(--border);
   font-size: 0.8125rem;
   line-height: 1.4;
@@ -1051,8 +1043,6 @@ body,
   display: flex;
   flex-direction: column;
   background: color-mix(in srgb, var(--panel) 96%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   color: var(--fg);
   border-right: 1px solid var(--border);
   box-shadow: 4px 0 16px rgba(0, 0, 0, 0.3);
