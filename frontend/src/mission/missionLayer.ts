@@ -9,6 +9,9 @@ import { removeZoneLabels, syncZoneLabels } from './zoneLabels';
 export const MISSION_SOURCE_ID = 'mission-area';
 export const MISSION_LINE_ID = 'mission-area-line';
 export const MISSION_FILL_ID = 'mission-area-fill';
+// A wider, translucent line under the zone's line: it keeps the edge readable on any map color.
+export const MISSION_CASING_ID = 'mission-area-casing';
+export const MISSION_CASING_COLORS: Record<Theme, string> = { dark: '#000000', light: '#ffffff', tactical: '#000000' };
 export const MISSION_COLORS: Record<Theme, string> = { dark: '#7ee787', light: '#1a7f37', tactical: '#7ee787' };
 
 /** Rectangle to draw: the live preview while drawing, else the committed zone. */
@@ -24,6 +27,7 @@ export function missionRing(state: MissionState) {
 /** Removes the zone rectangle from the map. */
 export function removeMissionArea(map: MapLibreMap): void {
   if (map.getLayer(MISSION_LINE_ID)) map.removeLayer(MISSION_LINE_ID);
+  if (map.getLayer(MISSION_CASING_ID)) map.removeLayer(MISSION_CASING_ID);
   if (map.getLayer(MISSION_FILL_ID)) map.removeLayer(MISSION_FILL_ID);
   if (map.getSource(MISSION_SOURCE_ID)) map.removeSource(MISSION_SOURCE_ID);
   removeZoneLabels();
@@ -50,15 +54,17 @@ export function syncMissionArea(map: MapLibreMap, state: MissionState, theme: Th
   } else {
     map.addSource(MISSION_SOURCE_ID, { type: 'geojson', data: data as never });
     // A faint fill keeps the zone visible even when its edges lie beyond the screen.
-    map.addLayer({ id: MISSION_FILL_ID, type: 'fill', source: MISSION_SOURCE_ID, paint: { 'fill-color': MISSION_COLORS[theme], 'fill-opacity': 0.08 } });
+    map.addLayer({ id: MISSION_FILL_ID, type: 'fill', source: MISSION_SOURCE_ID, paint: { 'fill-color': MISSION_COLORS[theme], 'fill-opacity': 0.12 } });
+    map.addLayer({ id: MISSION_CASING_ID, type: 'line', source: MISSION_SOURCE_ID, paint: { 'line-color': MISSION_CASING_COLORS[theme], 'line-width': 7, 'line-opacity': 0.45, 'line-blur': 1 } });
     map.addLayer({
       id: MISSION_LINE_ID,
       type: 'line',
       source: MISSION_SOURCE_ID,
-      paint: { 'line-color': MISSION_COLORS[theme], 'line-width': 2, 'line-dasharray': [4, 3] },
+      paint: { 'line-color': MISSION_COLORS[theme], 'line-width': 3.5, 'line-dasharray': [3, 2] },
     });
   }
   map.setPaintProperty(MISSION_LINE_ID, 'line-color', MISSION_COLORS[theme]);
+  map.setPaintProperty(MISSION_CASING_ID, 'line-color', MISSION_CASING_COLORS[theme]);
   map.setPaintProperty(MISSION_FILL_ID, 'fill-color', MISSION_COLORS[theme]);
 }
 

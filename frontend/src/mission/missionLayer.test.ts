@@ -25,4 +25,17 @@ describe('zone visibility on the map', () => {
     syncMissionArea(map as never, { ...state, zoneChosen: false, phase: 'running' } as never, 'dark');
     expect(map.getLayer(MISSION_LINE_ID)).toBeTruthy();
   });
+
+  it('draws the zone line over a casing, and removes both with the zone', async () => {
+    const { FakeMap } = await import('../test/maplibreMock');
+    const { syncMissionArea, removeMissionArea, MISSION_LINE_ID, MISSION_CASING_ID } = await import('./missionLayer');
+    const map = new FakeMap({ style: 'x' });
+    const state = { ...useMissionStore.getState(), zoneChosen: true };
+    syncMissionArea(map as never, state as never, 'dark');
+    expect(map.getLayer(MISSION_CASING_ID)).toBeTruthy();
+    expect(map.getLayer(MISSION_LINE_ID)).toBeTruthy();
+    removeMissionArea(map as never);
+    expect(map.getLayer(MISSION_CASING_ID)).toBeUndefined();
+    expect(map.getLayer(MISSION_LINE_ID)).toBeUndefined();
+  });
 });
