@@ -396,9 +396,8 @@ export function createMissionController(
   }
 
   /** True when an ally is near enough to the point to watch it (its 2 km around its place now). */
-  function allyCovers(point: LatLng): boolean {
-    return forces.some((unit) => {
-      if (unit.side !== 'ally') return false;
+  function allyCovers(point: LatLng, allies: ForceUnit[]): boolean {
+    return allies.some((unit) => {
       const { east, north } = toMetersFrom(unit.position, point);
       return Math.hypot(east, north) <= ALLY_RECON_RADIUS_M;
     });
@@ -412,6 +411,8 @@ export function createMissionController(
   function detect(inView: Map<string, string>) {
     if (!reconGrid) return;
     const changed: MissionUnit[] = [];
+    // Once per tick, not once per enemy.
+    const allies = forces.filter((unit) => unit.side === 'ally');
     for (const unit of forces) {
       if (unit.side === 'ally') {
         // Our own units on the move: the dashboard follows them.
@@ -424,7 +425,7 @@ export function createMissionController(
       }
       const was = known.get(unit.id);
       const droneId = inView.get(cellKey(cellOf(reconGrid, unit.position))) ?? null;
-      if (!droneId && !allyCovers(unit.position)) {
+      if (!droneId && !allyCovers(unit.position, allies)) {
         if (was?.inSight) {
           const view = { ...was, inSight: false };
           known.set(unit.id, view);

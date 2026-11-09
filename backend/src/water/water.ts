@@ -2,7 +2,7 @@ import { VectorTile } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
 import type { LatLng } from '../../../shared/protocol.js';
 import { toMetersFrom } from '../../../shared/mission/area.js';
-import { boxOf, isInside, type Outline } from '../outline.js';
+import { boxOf, indexCache, isInside, type Outline } from '../outline.js';
 import { createTileCache, pixelToLatLng, type Fetcher } from '../vectorTiles.js';
 
 // Water for the simulator: lakes, seas and wide rivers (polygons of the OpenFreeMap "water" layer) and
@@ -71,11 +71,21 @@ export function isOnShape(point: LatLng, shape: WaterShape): boolean {
   return false;
 }
 
+/** The box around a shape; a river's is widened by its half width (0.0006° is over 15 m even in longitude at 70° latitude). */
+function shapeBox(shape: WaterShape) {
+  if (shape.kind === 'area') return shape.outline;
+  const pad = 0.0006;
+  const box = boxOf([shape.line]);
+  return { south: box.south - pad, north: box.north + pad, west: box.west - pad, east: box.east + pad };
+}
+
 export function createWater(fetcher?: Fetcher, zoom = WATER_ZOOM): Water {
   const tiles = createTileCache('water', parseWaterTile, zoom, fetcher);
+  const indexOf = indexCache<WaterShape>(shapeBox);
   return {
     isWater(point) {
-      return (tiles.itemsAt(point) ?? []).some((shape) => isOnShape(point, shape));
+      const shapes = tiles.itemsAt(point);
+      return !!shapes && indexOf(shapes).near(point).some((shape) => isOnShape(point, shape));
     },
     loaded(points) {
       return Promise.all(points.map((point) => tiles.loaded(point))).then(() => undefined);
