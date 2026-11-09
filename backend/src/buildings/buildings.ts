@@ -2,7 +2,7 @@ import type { LatLng } from '../../../shared/protocol.js';
 import { VectorTile } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
 import { createTileCache, pixelToLatLng, type Fetcher } from '../vectorTiles.js';
-import { boxOf, isInside, type Outline } from '../outline.js';
+import { boxOf, indexCache, isInside, type Outline } from '../outline.js';
 
 export { isInside };
 
@@ -45,10 +45,13 @@ export function parseBuildingTile(data: Uint8Array, x: number, y: number, zoom: 
 
 export function createBuildings(fetcher?: Fetcher, zoom = BUILDINGS_ZOOM): Buildings {
   const tiles = createTileCache('buildings', parseBuildingTile, zoom, fetcher);
+  const indexOf = indexCache<Building>((building) => building);
   return {
     at(point) {
+      const items = tiles.itemsAt(point);
+      if (!items) return null;
       let tallest: Building | null = null;
-      for (const building of tiles.itemsAt(point) ?? []) {
+      for (const building of indexOf(items).near(point)) {
         if ((!tallest || building.heightM > tallest.heightM) && isInside(point, building)) tallest = building;
       }
       return tallest;

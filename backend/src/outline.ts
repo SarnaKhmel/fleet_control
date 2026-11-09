@@ -26,13 +26,76 @@ export function isInside(point: LatLng, outline: Outline): boolean {
   return inside;
 }
 
-/** The outline's box, from its rings. */
+/** The outline's box, from its rings. A loop, not `Math.min(...)`: a big outline has more points than a call can take. */
 export function boxOf(rings: LatLng[][]): Omit<Outline, 'rings'> {
-  const points = rings.flat();
+  let south = Infinity;
+  let north = -Infinity;
+  let west = Infinity;
+  let east = -Infinity;
+  for (const ring of rings) {
+    for (const p of ring) {
+      if (p.lat < south) south = p.lat;
+      if (p.lat > north) north = p.lat;
+      if (p.lng < west) west = p.lng;
+      if (p.lng > east) east = p.lng;
+    }
+  }
+  return { south, north, west, east };
+}
+
+type Box = Omit<Outline, 'rings'>;
+
+/** Items of a tile bucketed by a grid over their boxes, so a point lookup reads a few items, not the whole tile. */
+export interface GridIndex<T> {
+  /** The items whose box may hold the point, in their original order. */
+  near(point: LatLng): readonly T[];
+}
+
+const NONE: readonly never[] = [];
+
+export function createGridIndex<T>(items: readonly T[], box: (item: T) => Box, cells = 32): GridIndex<T> {
+  const boxes = items.map(box);
+  let south = Infinity;
+  let north = -Infinity;
+  let west = Infinity;
+  let east = -Infinity;
+  for (const b of boxes) {
+    south = Math.min(south, b.south);
+    north = Math.max(north, b.north);
+    west = Math.min(west, b.west);
+    east = Math.max(east, b.east);
+  }
+  const stepLat = (north - south) / cells || 1;
+  const stepLng = (east - west) / cells || 1;
+  const clamp = (n: number) => Math.max(0, Math.min(cells - 1, n));
+  const buckets: T[][] = Array.from({ length: cells * cells }, () => []);
+  items.forEach((item, i) => {
+    const b = boxes[i];
+    for (let row = clamp(Math.floor((b.south - south) / stepLat)); row <= clamp(Math.floor((b.north - south) / stepLat)); row++) {
+      for (let col = clamp(Math.floor((b.west - west) / stepLng)); col <= clamp(Math.floor((b.east - west) / stepLng)); col++) {
+        buckets[row * cells + col].push(item);
+      }
+    }
+  });
   return {
-    south: Math.min(...points.map((p) => p.lat)),
-    north: Math.max(...points.map((p) => p.lat)),
-    west: Math.min(...points.map((p) => p.lng)),
-    east: Math.max(...points.map((p) => p.lng)),
+    near(point) {
+      if (point.lat < south || point.lat > north || point.lng < west || point.lng > east) return NONE;
+      const row = clamp(Math.floor((point.lat - south) / stepLat));
+      const col = clamp(Math.floor((point.lng - west) / stepLng));
+      return buckets[row * cells + col];
+    },
+  };
+}
+
+/** Builds the index of a tile's items once: the tile cache returns the same array for a tile every time. */
+export function indexCache<T>(box: (item: T) => Box): (items: readonly T[]) => GridIndex<T> {
+  const indexes = new WeakMap<readonly T[], GridIndex<T>>();
+  return (items) => {
+    let index = indexes.get(items);
+    if (!index) {
+      index = createGridIndex(items, box);
+      indexes.set(items, index);
+    }
+    return index;
   };
 }
