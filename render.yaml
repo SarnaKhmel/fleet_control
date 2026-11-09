@@ -13,6 +13,11 @@ services:
       # The server listens on 8080 (backend/src/server.ts); Render must look at the same port.
       - key: PORT
         value: 8080
+      # Only pages from this host may open a WebSocket (Origin header), e.g. fleet-control.onrender.com.
+      # Asked for when the Blueprint is created. Not fromService: the frontend already reads the
+      # backend host, and a cycle between the two services is risky.
+      - key: ALLOWED_ORIGIN_HOSTS
+        sync: false
 
   - type: web
     name: fleet-control
