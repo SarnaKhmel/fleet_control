@@ -93,11 +93,18 @@ export function MapView() {
       applyBuildingVisibility(map, useMapViewStore.getState().buildings3d);
     });
     // Scale bar follows the map center's latitude and zoom.
-    const updateScale = () => useMapScaleStore.getState().setMetersPerPx(metersPerPixel(map.getCenter().lat, map.getZoom()));
+    const updateScale = () => {
+      const scale = useMapScaleStore.getState();
+      const next = metersPerPixel(map.getCenter().lat, map.getZoom());
+      if (next !== scale.metersPerPx) scale.setMetersPerPx(next);
+    };
     updateScale();
     map.on('move', updateScale);
     // The compass follows the map's bearing; it changes only while the map is being rotated.
-    map.on('rotate', () => useMapScaleStore.getState().setBearing(map.getBearing()));
+    map.on('rotate', () => {
+      const bearing = map.getBearing();
+      if (bearing !== useMapScaleStore.getState().bearing) useMapScaleStore.getState().setBearing(bearing);
+    });
     registerNorthUp(() => map.easeTo({ bearing: 0, duration: 500 }));
 
     // Elevation is re-read after every idle, so it follows the map once tiles arrive.
@@ -192,7 +199,8 @@ export function MapView() {
       const b = map.getBounds();
       const view = { west: b.getWest(), east: b.getEast(), south: b.getSouth(), north: b.getNorth() };
       const zone = zoneBoxOf(effectiveCenter(mission), mission.widthKm, mission.heightKm);
-      mission.setZoneVisible(boxesOverlap(view, zone));
+      const visible = boxesOverlap(view, zone);
+      if (visible !== mission.zoneVisible) mission.setZoneVisible(visible);
     };
     map.on('move', updateZoneVisibility);
     registerZoneFitter(() => {
@@ -271,11 +279,22 @@ export function MapView() {
       const shown = phase === 'idle' ? { ...placedAsUnits(placed), ...units } : units;
       syncUnitMarkers(map, shown, (droneId) => drones[droneId]?.callsign ?? droneId);
     };
+    // The server sends one position per drone each tick, so a burst of updates arrives together. Redrawing
+    // the layers for each would repeat the same work N times: do it once per frame instead.
+    let frame = 0;
+    const syncSoon = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        sync();
+      });
+    };
     sync();
     syncUnits();
     const unsubscribe = [
+      () => cancelAnimationFrame(frame),
       useMissionStore.subscribe((state, previous) => {
-        if (state.drones !== previous.drones) sync();
+        if (state.drones !== previous.drones) syncSoon();
       }),
       useMissionStore.subscribe((state, previous) => {
         if (state.units !== previous.units || state.placed !== previous.placed || state.phase !== previous.phase) syncUnits();
