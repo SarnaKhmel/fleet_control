@@ -209,6 +209,7 @@
   },
   "drone": {
     "panelTitle": "Дрони",
+    "readout": "{{altitude}} м · {{speed}} м/с",
     "status": "Стан",
     "altitude": "Висота над землею",
     "heading": "Напрям",

@@ -209,6 +209,7 @@
   },
   "drone": {
     "panelTitle": "Drones",
+    "readout": "{{altitude}} m · {{speed}} m/s",
     "status": "Status",
     "altitude": "Height above ground",
     "heading": "Heading",
