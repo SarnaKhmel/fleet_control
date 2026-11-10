@@ -168,6 +168,8 @@ export interface SnapshotDrone {
   cause?: DownCause;
   /** A building ahead that it will hit, if any. */
   warning?: CollisionWarning | null;
+  /** The enemy unit an engaging drone is after. */
+  targetId?: string;
   progress: number;
   position: LatLng | null;
   heading: number | null;
@@ -205,13 +207,14 @@ export type ServerMessage =
   /** The height above ground and cruise speed the drone keeps. Sent when it comes online and on a change. */
   | { type: 'drone_settings'; droneId: string; altitudeAglM: number; cruiseSpeedMs: number }
   /** An online drone's state changed (see FlightStatus). Sent only on a change; `cause` says why it went down. */
-  | { type: 'drone_status'; droneId: string; status: FlightStatus; cause?: DownCause }
+  /** `targetId`: the enemy unit an engaging drone is after. */
+  | { type: 'drone_status'; droneId: string; status: FlightStatus; cause?: DownCause; targetId?: string }
   /**
    * A building ahead on the drone's path at or above its height: sent every tick while it lasts, then
    * once with `warning: null` when the path is clear again.
    */
   | { type: 'drone_warning'; droneId: string; warning: CollisionWarning | null }
-  /** The result of a drone's strike on a unit: destroyed units leave the map, damaged ones stay marked. */
+  /** The result of a drone's strike on a unit: destroyed and damaged units stay on the map, marked. */
   | { type: 'unit_hit'; unitId: string; droneId: string; outcome: HitOutcome }
   /** The mission clock: wall time it started, simulated seconds since, speed, and whether it is paused. */
   | ({ type: 'clock' } & MissionClockView)

@@ -1,6 +1,6 @@
 import type { LatLng, MissionArea } from '../../../shared/protocol.js';
 import { isInsideArea, offsetLatLng, toMetersFrom } from '../../../shared/mission/area.js';
-import { ENEMY_MIN_DISTANCE_M, SPEED_RANGE_MS, UNIT_KINDS, type UnitKind, type UnitSide } from '../../../shared/mission/units.js';
+import { ENEMY_MIN_DISTANCE_M, SPEED_RANGE_MS, UNIT_KINDS, type HeldBuilding, type UnitKind, type UnitSide } from '../../../shared/mission/units.js';
 import { DEFAULT_ALLY_COUNTS, DEFAULT_ENEMY_COUNTS, type Composition, type PlacedUnit } from '../../../shared/mission/composition.js';
 import { bearingTo, stepToward } from './kinematics.js';
 import { DEFAULT_ODDS, type MissionOdds } from '../../../shared/mission/odds.js';
@@ -112,6 +112,10 @@ export interface ForceUnit {
   waypoint: LatLng | null;
   /** Hit by a strike and not destroyed. */
   damaged?: boolean;
+  /** Destroyed by a strike: it stays where it is, still. */
+  destroyed?: boolean;
+  /** The building a position holds, when it took one. */
+  building?: HeldBuilding;
 }
 
 function distanceM(a: LatLng, b: LatLng): number {
