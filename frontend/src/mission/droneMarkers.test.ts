@@ -6,8 +6,8 @@ import { useSelectionStore } from './selection';
 
 vi.mock('maplibre-gl', () => import('../test/maplibreMock'));
 
-const online: DroneView = { callsign: 'BA-01', status: 'idle', cause: null, warning: null, progress: 100, position: { lat: 50, lng: 30 }, heading: 45, altitudeM: 150, groundM: 150, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] };
-const booting: DroneView = { callsign: 'drone-2', status: 'booting', cause: null, warning: null, progress: 40, position: null, heading: null, altitudeM: null, groundM: null, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] };
+const online: DroneView = { callsign: 'BA-01', status: 'idle', cause: null, warning: null, targetId: null, progress: 100, position: { lat: 50, lng: 30 }, heading: 45, altitudeM: 150, groundM: 150, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] };
+const booting: DroneView = { callsign: 'drone-2', status: 'booting', cause: null, warning: null, targetId: null, progress: 40, position: null, heading: null, altitudeM: null, groundM: null, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] };
 
 describe('drone markers', () => {
   it('draws NATO drones as symbols', () => {

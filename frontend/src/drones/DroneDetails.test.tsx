@@ -11,6 +11,7 @@ const drone: DroneView = {
   status: 'idle',
   cause: null,
   warning: null,
+  targetId: null,
   progress: 100,
   position: { lat: 50.1, lng: 30.2 },
   heading: 92,

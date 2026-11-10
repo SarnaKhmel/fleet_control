@@ -3,7 +3,7 @@ import { FakeMap } from '../test/maplibreMock';
 import type { DroneView } from './missionStore';
 import { addWaypointLayer, syncWaypoints, waypointFeatures, WAYPOINT_LINE_ID, WAYPOINT_SOURCE_ID } from './waypointLayer';
 
-const base: DroneView = { callsign: 'BA-01', status: 'idle', cause: null, warning: null, progress: 100, position: { lat: 50.1, lng: 30.1 }, heading: 0, altitudeM: 210, groundM: 150, speedMs: 10, batteryPct: 90, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] };
+const base: DroneView = { callsign: 'BA-01', status: 'idle', cause: null, warning: null, targetId: null, progress: 100, position: { lat: 50.1, lng: 30.1 }, heading: 0, altitudeM: 210, groundM: 150, speedMs: 10, batteryPct: 90, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] };
 const flying: DroneView = { ...base, trail: [{ lat: 50, lng: 30 }], tasks: [{ lat: 50.2, lng: 30.2 }, { lat: 50.3, lng: 30.3 }] };
 
 describe('drone paths', () => {
