@@ -36,6 +36,8 @@ export interface DroneView {
   cause: DownCause | null;
   /** A building ahead that it will hit at its height, while there is one. */
   warning: CollisionWarning | null;
+  /** The enemy unit it is attacking while it engages; otherwise null. */
+  targetId: string | null;
   progress: number;
   /** Known once the drone is online; null while it is still booting. */
   position: LatLng | null;
@@ -84,6 +86,8 @@ export interface MissionState {
   reconCells: ReconCell[];
   /** Enemy and allied units known so far, by id; an enemy out of sight stays where it was last seen. */
   units: Record<string, MissionUnit>;
+  /** The latest strike that hurt a unit, for the hit effect on the map; `n` makes every strike a new value. */
+  lastHit: { unitId: string; outcome: 'destroyed' | 'damaged'; n: number } | null;
   /** The mission clock: when it started, simulated seconds since, speed and pause, as the server sends them. */
   clock: MissionClockView;
   error: MissionErrorReason | null;
@@ -184,6 +188,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   reconGrid: null,
   reconCells: [],
   units: {},
+  lastHit: null,
   clock: { startedAt: null, simulatedS: 0, speed: 1, paused: false },
   error: null,
   odds: DEFAULT_ODDS,
@@ -243,7 +248,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
   },
   clearPoints: () => (locked(get) ? undefined : set({ points: [] })),
   // Setup modes end with the start: their buttons lock, and a left-on mode would swallow every map click.
-  markStarting: () => set({ phase: 'running', drones: {}, reconGrid: null, reconCells: [], units: {}, error: null, picking: false, placing: null, drawing: false, drawAnchor: null, drawCursor: null }),
+  markStarting: () => set({ phase: 'running', drones: {}, reconGrid: null, reconCells: [], units: {}, lastHit: null, error: null, picking: false, placing: null, drawing: false, drawAnchor: null, drawCursor: null }),
   apply: (message) => {
     switch (message.type) {
       case 'drone_boot': {
@@ -256,6 +261,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
               status: message.status,
               cause: null,
               warning: null,
+              targetId: null,
               progress: message.progress,
               position: null,
               heading: null,
@@ -282,6 +288,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
               status: 'idle',
               cause: null,
               warning: null,
+              targetId: null,
               progress: 100,
               position: {
                 lat: message.telemetry.position_and_kinematics.gps.latitude,
@@ -348,7 +355,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
       case 'drone_status': {
         const drone = get().drones[message.droneId];
         if (!drone) return;
-        set({ drones: { ...get().drones, [message.droneId]: { ...drone, status: message.status, cause: message.cause ?? null } } });
+        set({ drones: { ...get().drones, [message.droneId]: { ...drone, status: message.status, cause: message.cause ?? null, targetId: message.targetId ?? null } } });
         return;
       }
       case 'units': {
@@ -360,10 +367,11 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
       case 'unit_hit': {
         const units = { ...get().units };
         const unit = units[message.unitId];
-        if (message.outcome === 'destroyed') delete units[message.unitId];
-        else if (message.outcome === 'damaged' && unit) units[message.unitId] = { ...unit, damaged: true };
-        else return;
-        set({ units });
+        if (!unit || message.outcome === 'unharmed') return;
+        // Destroyed or damaged, the unit stays on the map; a destroyed one stands still.
+        units[message.unitId] =
+          message.outcome === 'destroyed' ? { ...unit, destroyed: true, speedMs: 0, headingDeg: null } : { ...unit, damaged: true };
+        set({ units, lastHit: { unitId: message.unitId, outcome: message.outcome, n: (get().lastHit?.n ?? 0) + 1 } });
         return;
       }
       case 'recon_cells':
@@ -377,6 +385,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
             status: d.status,
             cause: d.cause ?? null,
             warning: d.warning ?? null,
+            targetId: d.targetId ?? null,
             progress: d.progress,
             position: d.position,
             heading: d.heading,
@@ -407,7 +416,7 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
         set({ phase: 'idle', error: message.reason });
         return;
       case 'mission_reset':
-        set({ phase: 'idle', drones: {}, reconGrid: null, reconCells: [], units: {}, error: null, clock: { ...get().clock, startedAt: null, simulatedS: 0 } });
+        set({ phase: 'idle', drones: {}, reconGrid: null, reconCells: [], units: {}, lastHit: null, error: null, clock: { ...get().clock, startedAt: null, simulatedS: 0 } });
         return;
       case 'clock':
         set({ clock: { startedAt: message.startedAt, simulatedS: message.simulatedS, speed: message.speed, paused: message.paused } });
