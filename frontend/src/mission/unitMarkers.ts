@@ -7,7 +7,7 @@ import { useTargetPickStore } from './targetPickStore';
 
 // Enemy and allied units the dashboard knows about, as NATO symbols: hostile (red diamond) for the enemy,
 // friendly (blue rectangle) for allies. A unit on the move carries the NATO direction-of-movement arrow.
-// An enemy out of sight stays where it was last seen.
+// An enemy out of sight stays where it was last seen. A destroyed one stays where it was hit, crossed out.
 
 // 15 % smaller than the first size (26).
 const SIZE = 22;
@@ -34,18 +34,18 @@ export function unitLabel(unit: MissionUnit, callsignOf: (droneId: string) => st
   const how = i18n.t(`unit.source.${unit.source}`, { callsign: unit.detectedByDroneId ? callsignOf(unit.detectedByDroneId) : '' });
   const heading = shownHeading(unit);
   const moving = heading === null ? '' : ` · ${i18n.t('unit.moving', { speed: Math.round(unit.speedMs * 3.6), heading })}`;
-  const damage = unit.damaged ? ` · ${i18n.t('unit.damaged')}` : '';
+  const damage = unit.destroyed ? ` · ${i18n.t('unit.destroyed')}` : unit.damaged ? ` · ${i18n.t('unit.damaged')}` : '';
   const seen = unit.inSight ? '' : ` · ${i18n.t('unit.lastSeen')}`;
   return `${what} · ${how}${moving}${damage}${seen}`;
 }
 
 export function unitElement(unit: MissionUnit, label: string): HTMLElement {
   const el = natoElement(unitSidc(unit.side, unit.kind), SIZE, shownHeading(unit) ?? undefined);
-  el.classList.add('unit-marker', `is-${unit.side}`, ...(unit.inSight ? [] : ['is-last-seen']), ...(unit.damaged ? ['is-damaged'] : []));
+  el.classList.add('unit-marker', `is-${unit.side}`, ...(unit.inSight ? [] : ['is-last-seen']), ...(unit.destroyed ? ['is-destroyed'] : unit.damaged ? ['is-damaged'] : []));
   el.setAttribute('aria-label', label);
   el.title = label;
-  // A click on an enemy opens the pop-up to strike or pursue it (see TargetPopup).
-  if (unit.side === 'enemy') {
+  // A click on an enemy opens the pop-up to strike or pursue it (see TargetPopup); a destroyed one is past that.
+  if (unit.side === 'enemy' && !unit.destroyed) {
     el.addEventListener('click', (event) => useTargetPickStore.getState().open(unit.id, event.clientX, event.clientY));
   }
   return el;
@@ -57,7 +57,7 @@ export function syncUnitMarkers(map: MapLibreMap, units: Record<string, MissionU
   for (const [id, unit] of Object.entries(units)) {
     // The signature is built from the raw fields: the translated label is made only when the marker is rebuilt.
     const callsign = unit.detectedByDroneId ? callsignOf(unit.detectedByDroneId) : '';
-    const signature = [unit.side, unit.kind, shownHeading(unit), Math.round(unit.speedMs * 3.6), unit.inSight, unit.damaged ?? false, unit.source, callsign, i18n.language].join('|');
+    const signature = [unit.side, unit.kind, shownHeading(unit), Math.round(unit.speedMs * 3.6), unit.inSight, unit.damaged ?? false, unit.destroyed ?? false, unit.source, callsign, i18n.language].join('|');
     const lngLat: [number, number] = [unit.position.lng, unit.position.lat];
     const entry = entries.get(id);
     if (entry && entry.map === map && entry.signature === signature) {

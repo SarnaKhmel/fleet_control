@@ -24,6 +24,7 @@ import { addReconLayer, syncRecon } from '../mission/reconLayer';
 import { useWindStore } from '../wind/windStore';
 import { syncTaskMarkers } from '../mission/taskMarkers';
 import { syncUnitMarkers } from '../mission/unitMarkers';
+import { playHitEffect } from '../mission/hitEffect';
 import { placedAsUnits } from '../mission/placement';
 import { TargetPopup } from '../mission/TargetPopup';
 import { useTargetPickStore } from '../mission/targetPickStore';
@@ -306,6 +307,13 @@ export function MapView() {
       useThemeStore.subscribe(sync),
       useWindStore.subscribe((state, previous) => {
         if (state.wind !== previous.wind) sync();
+      }),
+      // A strike that hurt a unit: a flash and ring where it stands.
+      useMissionStore.subscribe((state, previous) => {
+        const hit = state.lastHit;
+        if (!hit || hit === previous.lastHit) return;
+        const unit = state.units[hit.unitId];
+        if (unit) playHitEffect(map, unit.position, hit.outcome);
       }),
       // The seen ground changes about once a second while drones fly; it has its own layer and update.
       useMissionStore.subscribe((state, previous) => {

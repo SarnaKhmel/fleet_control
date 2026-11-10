@@ -265,6 +265,7 @@
     },
     "moving": "moving {{speed}} km/h, course {{heading}}°",
     "lastSeen": "last seen here, not in sight now",
-    "damaged": "damaged"
+    "damaged": "damaged",
+    "destroyed": "destroyed"
   }
 }

@@ -1488,6 +1488,56 @@ body,
   border-radius: 3px;
 }
 
+/* A unit a strike destroyed: it stays where it was hit, grey and crossed out. */
+.unit-marker.is-destroyed {
+  opacity: 0.6;
+  filter: grayscale(1);
+  position: relative;
+}
+
+.unit-marker.is-destroyed::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to top right, transparent calc(50% - 1.5px), var(--danger) calc(50% - 1.5px), var(--danger) calc(50% + 1.5px), transparent calc(50% + 1.5px)),
+    linear-gradient(to bottom right, transparent calc(50% - 1.5px), var(--danger) calc(50% - 1.5px), var(--danger) calc(50% + 1.5px), transparent calc(50% + 1.5px));
+}
+
+/* The flash and ring where a strike hit a unit: red for a kill, amber for damage. Removed by hitEffect.ts. */
+.hit-effect {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 3px solid var(--danger);
+  background: var(--danger);
+  pointer-events: none;
+  animation: hit-burst 0.9s ease-out forwards;
+}
+
+.hit-effect.is-damaged {
+  border-color: var(--warning);
+  background: var(--warning);
+}
+
+@keyframes hit-burst {
+  0% {
+    transform: scale(0.3);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(3.2);
+    opacity: 0;
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hit-effect {
+    animation-duration: 0.01s;
+  }
+}
+
 .zone-label {
   background: var(--panel);
   color: var(--fg);
