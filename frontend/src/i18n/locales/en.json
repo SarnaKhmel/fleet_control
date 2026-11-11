@@ -209,6 +209,7 @@
   },
   "drone": {
     "panelTitle": "Drones",
+    "readout": "{{altitude}} m · {{speed}} m/s",
     "status": "Status",
     "altitude": "Height above ground",
     "heading": "Heading",
@@ -265,6 +266,7 @@
     },
     "moving": "moving {{speed}} km/h, course {{heading}}°",
     "lastSeen": "last seen here, not in sight now",
-    "damaged": "damaged"
+    "damaged": "damaged",
+    "destroyed": "destroyed"
   }
 }

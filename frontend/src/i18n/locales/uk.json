@@ -209,6 +209,7 @@
   },
   "drone": {
     "panelTitle": "Дрони",
+    "readout": "{{altitude}} м · {{speed}} м/с",
     "status": "Стан",
     "altitude": "Висота над землею",
     "heading": "Напрям",
@@ -265,6 +266,7 @@
     },
     "moving": "рухається {{speed}} км/год, курс {{heading}}°",
     "lastSeen": "востаннє бачили тут, зараз не видно",
-    "damaged": "пошкоджено"
+    "damaged": "пошкоджено",
+    "destroyed": "знищено"
   }
 }

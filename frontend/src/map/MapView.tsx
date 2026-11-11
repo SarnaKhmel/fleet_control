@@ -24,6 +24,9 @@ import { addReconLayer, syncRecon } from '../mission/reconLayer';
 import { useWindStore } from '../wind/windStore';
 import { syncTaskMarkers } from '../mission/taskMarkers';
 import { syncUnitMarkers } from '../mission/unitMarkers';
+import { playHitEffect } from '../mission/hitEffect';
+import { addEngageLayer, syncEngage } from '../mission/engageLayer';
+import { addHeldBuildingsLayer, syncHeldBuildings } from '../mission/heldBuildingsLayer';
 import { placedAsUnits } from '../mission/placement';
 import { TargetPopup } from '../mission/TargetPopup';
 import { useTargetPickStore } from '../mission/targetPickStore';
@@ -87,6 +90,10 @@ export function MapView() {
       syncRange(map, drones, selectedIds, useWindStore.getState().wind, current);
       addWaypointLayer(map, current);
       syncWaypoints(map, drones, selectedIds, current);
+      addEngageLayer(map, current);
+      syncEngage(map, drones, useMissionStore.getState().units, selectedIds, current);
+      addHeldBuildingsLayer(map);
+      syncHeldBuildings(map, useMissionStore.getState().units, current);
       const front = useFrontLineStore.getState();
       syncFrontLine(map, { enabled: front.enabled, zones: front.zones, theme: current });
       map.setPitch(useMapViewStore.getState().buildings3d ? TILT_3D_PITCH : 0);
@@ -263,10 +270,11 @@ export function MapView() {
     const map = mapRef.current;
     if (!map) return;
     const sync = () => {
-      const { drones } = useMissionStore.getState();
+      const { drones, units } = useMissionStore.getState();
       const { selectedIds } = useSelectionStore.getState();
       syncDroneMarkers(map, drones, useSymbolStyleStore.getState().style);
       const theme = useThemeStore.getState().theme;
+      syncEngage(map, drones, units, selectedIds, theme);
       syncCamera(map, drones, selectedIds, theme);
       syncRange(map, drones, selectedIds, useWindStore.getState().wind, theme);
       syncWaypoints(map, drones, selectedIds, theme);
@@ -278,6 +286,10 @@ export function MapView() {
       // Units placed by hand show before the start; once it runs, only the server's units.
       const shown = phase === 'idle' ? { ...placedAsUnits(placed), ...units } : units;
       syncUnitMarkers(map, shown, (droneId) => drones[droneId]?.callsign ?? droneId);
+      // The line to a target follows the unit; the held buildings change only with the units (and the theme).
+      const theme = useThemeStore.getState().theme;
+      syncEngage(map, drones, shown, useSelectionStore.getState().selectedIds, theme);
+      syncHeldBuildings(map, shown, theme);
     };
     // The server sends one position per drone each tick, so a burst of updates arrives together. Redrawing
     // the layers for each would repeat the same work N times: do it once per frame instead.
@@ -304,8 +316,16 @@ export function MapView() {
       }),
       useSymbolStyleStore.subscribe(sync),
       useThemeStore.subscribe(sync),
+      useThemeStore.subscribe(syncUnits),
       useWindStore.subscribe((state, previous) => {
         if (state.wind !== previous.wind) sync();
+      }),
+      // A strike that hurt a unit: a flash and ring where it stands.
+      useMissionStore.subscribe((state, previous) => {
+        const hit = state.lastHit;
+        if (!hit || hit === previous.lastHit) return;
+        const unit = state.units[hit.unitId];
+        if (unit) playHitEffect(map, unit.position, hit.outcome);
       }),
       // The seen ground changes about once a second while drones fly; it has its own layer and update.
       useMissionStore.subscribe((state, previous) => {

@@ -4,7 +4,7 @@ import { DroneControls } from './DroneControls';
 import { useMissionStore, type DroneView } from './missionStore';
 import { useSelectionStore } from './selection';
 
-const online: DroneView = { callsign: 'BA-01', status: 'idle', cause: null, warning: null, progress: 100, position: { lat: 50, lng: 30 }, heading: 0, altitudeM: 210, groundM: 150, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] };
+const online: DroneView = { callsign: 'BA-01', status: 'idle', cause: null, warning: null, targetId: null, progress: 100, position: { lat: 50, lng: 30 }, heading: 0, altitudeM: 210, groundM: 150, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] };
 const position = (lat: number, altitudeM: number) => ({ type: 'position' as const, droneId: 'drone-1', position: { lat, lng: 30 }, heading: 0, speedMs: 10, altitudeM, groundM: 150, batteryPct: 99, crabDeg: 0 });
 
 describe('DroneControls', () => {
