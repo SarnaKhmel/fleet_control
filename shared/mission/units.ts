@@ -46,6 +46,16 @@ export interface MissionUnit {
   inSight: boolean;
   /** Hit by a strike and not destroyed: it stays on the map. Absent while it is whole. */
   damaged?: boolean;
+  /** Destroyed by a strike: it stays on the map where it was hit, stands still and is marked. Absent while it is whole. */
+  destroyed?: boolean;
+  /** For a position that holds a building: the building's outline and height, so the map can color it. */
+  building?: HeldBuilding;
+}
+
+/** A building a side holds: footprint rings (outer ring first, then holes) and the height of its top, meters. */
+export interface HeldBuilding {
+  rings: LatLng[][];
+  heightM: number;
 }
 
 /** Km/h to m/s. */

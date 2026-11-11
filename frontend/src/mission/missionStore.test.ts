@@ -7,7 +7,7 @@ const store = () => useMissionStore.getState();
 
 describe('mission store', () => {
   beforeEach(() => {
-    useMissionStore.setState({ center: null, widthKm: 200, heightKm: 200, layoutKind: 'single', points: [], phase: 'idle', drones: {}, error: null, picking: false, drawing: false, drawAnchor: null, drawCursor: null, droneCount: 3 });
+    useMissionStore.setState({ center: null, widthKm: 200, heightKm: 200, layoutKind: 'single', points: [], phase: 'idle', drones: {}, units: {}, lastHit: null, error: null, picking: false, drawing: false, drawAnchor: null, drawCursor: null, droneCount: 3 });
   });
 
   it('single layout keeps one point and replaces it on click', () => {
@@ -58,7 +58,7 @@ describe('mission store', () => {
 
   it('applies boot messages to the roster without a position', () => {
     store().apply({ type: 'drone_boot', droneId: 'drone-1', status: 'booting', progress: 40 });
-    expect(store().drones['drone-1']).toEqual({ callsign: 'drone-1', status: 'booting', cause: null, warning: null, progress: 40, position: null, heading: null, altitudeM: null, groundM: null, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] });
+    expect(store().drones['drone-1']).toEqual({ callsign: 'drone-1', status: 'booting', cause: null, warning: null, targetId: null, progress: 40, position: null, heading: null, altitudeM: null, groundM: null, speedMs: 0, batteryPct: 100, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] });
   });
 
   it('takes the position and heading from the first telemetry', () => {
@@ -186,8 +186,29 @@ describe('mission store', () => {
     store().apply({ type: 'units', units: [enemy, other] });
     store().apply({ type: 'unit_hit', unitId: 'enemy-1', droneId: 'drone-1', outcome: 'destroyed' });
     store().apply({ type: 'unit_hit', unitId: 'enemy-2', droneId: 'drone-1', outcome: 'damaged' });
-    expect(Object.keys(store().units)).toEqual(['enemy-2']);
+    // Both stay on the map: the destroyed one stands still and is marked.
+    expect(Object.keys(store().units)).toEqual(['enemy-1', 'enemy-2']);
+    expect(store().units['enemy-1']).toMatchObject({ destroyed: true, speedMs: 0, headingDeg: null });
+    expect(store().units['enemy-1'].damaged).toBeUndefined();
     expect(store().units['enemy-2'].damaged).toBe(true);
+    expect(store().lastHit).toEqual({ unitId: 'enemy-2', outcome: 'damaged', n: 2 });
+  });
+  it('an unharmed strike changes nothing', () => {
+    const enemy = { id: 'enemy-1', side: 'enemy' as const, kind: 'vehicle' as const, position: { lat: 50.1, lng: 30 }, headingDeg: null, speedMs: 0, source: 'drone' as const, detectedByDroneId: 'drone-1', inSight: true };
+    store().apply({ type: 'units', units: [enemy] });
+    const before = store().units;
+    store().apply({ type: 'unit_hit', unitId: 'enemy-1', droneId: 'drone-1', outcome: 'unharmed' });
+    expect(store().units).toBe(before);
+    expect(store().lastHit).toBeNull();
+  });
+  it('remembers the target of an engaging drone, and drops it when the engagement ends', () => {
+    store().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);
+    store().apply({ type: 'drone_status', droneId: 'drone-1', status: 'engaging', targetId: 'enemy-3' });
+    expect(store().drones['drone-1'].targetId).toBe('enemy-3');
+    store().apply({ type: 'drone_status', droneId: 'drone-1', status: 'idle' });
+    expect(store().drones['drone-1'].targetId).toBeNull();
+    store().apply({ type: 'mission_snapshot', running: true, drones: [{ droneId: 'drone-2', callsign: 'BA-02', status: 'engaging', targetId: 'enemy-4', progress: 100, position: null, heading: null, altitudeM: null, groundM: null, speedMs: 0, batteryPct: 100, crabDeg: 0 }] } as never);
+    expect(store().drones['drone-2'].targetId).toBe('enemy-4');
   });
   it('treats missing or malformed task lists from the server as empty', () => {
     store().apply({ type: 'drone_online', telemetry: { meta: { drone_id: 'drone-1', callsign: 'BA-01' }, position_and_kinematics: { gps: { latitude: 50, longitude: 30 }, heading_deg: 0 }, power_system: { battery_remaining_pct: 100 } } } as never);

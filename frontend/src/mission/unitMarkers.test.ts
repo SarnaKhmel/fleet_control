@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FakeMap } from '../test/maplibreMock';
 import type { MissionUnit } from '../../../shared/mission/units';
+import { useTargetPickStore } from './targetPickStore';
 import { syncUnitMarkers, unitElement, unitLabel } from './unitMarkers';
 
 vi.mock('maplibre-gl', () => import('../test/maplibreMock'));
@@ -21,6 +22,20 @@ describe('unit markers', () => {
     expect(unitLabel(hurt, callsign)).toBe('Enemy: armoured vehicles · found by BA-02 · moving 22 km/h, course 90° · damaged');
     expect(unitElement(hurt, 'x').classList.contains('is-damaged')).toBe(true);
     expect(unitElement(vehicle, 'x').classList.contains('is-damaged')).toBe(false);
+  });
+
+  it('marks a destroyed unit: crossed out, labelled, no strike pop-up on click', () => {
+    const wreck = { ...vehicle, destroyed: true, speedMs: 0, headingDeg: null };
+    expect(unitLabel(wreck, callsign)).toBe('Enemy: armoured vehicles · found by BA-02 · destroyed');
+    const el = unitElement(wreck, 'x');
+    expect(el.classList.contains('is-destroyed')).toBe(true);
+    expect(el.classList.contains('is-damaged')).toBe(false);
+    useTargetPickStore.getState().close();
+    el.click();
+    expect(useTargetPickStore.getState().pick).toBeNull();
+    unitElement(vehicle, 'x').click();
+    expect(useTargetPickStore.getState().pick?.unitId).toBe('enemy-1');
+    useTargetPickStore.getState().close();
   });
 
   it('shows a unit out of sight as last seen, faded, and keeps its course on the marker', () => {

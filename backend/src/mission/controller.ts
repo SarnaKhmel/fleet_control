@@ -64,6 +64,8 @@ interface DroneState {
   warning: CollisionWarning | null;
   /** The enemy unit it is attacking, while it is. */
   engagement: Engagement | null;
+  /** The target last reported to clients in a `drone_status`. */
+  reportedTargetId: string | null;
 }
 
 interface Engagement {
@@ -184,6 +186,7 @@ export function createMissionController(
         cause: null,
         warning: null,
         engagement: null,
+        reportedTargetId: null,
       };
       drones.set(entry.droneId, drone);
       broadcast({ type: 'drone_online', telemetry: buildTelemetry(entry, now(), groundM) });
@@ -197,13 +200,15 @@ export function createMissionController(
     return drone && drone.phase !== 'lost_link' && drone.phase !== 'destroyed' ? drone : undefined;
   }
 
-  /** Sends the drone's status if it changed since the last one sent. */
+  /** Sends the drone's status if it, or the unit it is after, changed since the last one sent. */
   function syncStatus(droneId: string, drone: DroneState) {
     const status = statusOf(drone);
-    if (status === drone.status) return;
+    const targetId = drone.engagement?.targetId ?? null;
+    if (status === drone.status && targetId === drone.reportedTargetId) return;
     drone.status = status;
-    serverLog('status', { droneId, status, cause: drone.cause });
-    broadcast({ type: 'drone_status', droneId, status, ...(drone.cause ? { cause: drone.cause } : {}) });
+    drone.reportedTargetId = targetId;
+    serverLog('status', { droneId, status, cause: drone.cause, targetId });
+    broadcast({ type: 'drone_status', droneId, status, ...(drone.cause ? { cause: drone.cause } : {}), ...(targetId ? { targetId } : {}) });
   }
 
   /** A grounded or landing drone that is given somewhere to go takes off again. */
@@ -378,7 +383,7 @@ export function createMissionController(
     const ours = unit.side === 'ally';
     const id = ours ? `ally-${++allyNo}` : `enemy-${++enemyNo}`;
     serverLog('building taken', { id, by: unit.id });
-    const position: ForceUnit = { id, side: unit.side, kind: 'position', position: unit.position, headingDeg: null, speedMs: 0, intel: ours, band: [0, 0], waypoint: null };
+    const position: ForceUnit = { id, side: unit.side, kind: 'position', position: unit.position, headingDeg: null, speedMs: 0, intel: ours, band: [0, 0], waypoint: null, building: { rings: building.rings, heightM: building.heightM } };
     forces.push(position);
     if (ours) {
       const view = unitView(position, 'intel', null, true);
@@ -423,6 +428,8 @@ export function createMissionController(
         }
         continue;
       }
+      // A destroyed enemy stays as the strike left it: it neither moves nor is found or lost from sight again.
+      if (unit.destroyed) continue;
       const was = known.get(unit.id);
       const droneId = inView.get(cellKey(cellOf(reconGrid, unit.position))) ?? null;
       if (!droneId && !allyCovers(unit.position, allies)) {
@@ -444,7 +451,12 @@ export function createMissionController(
 
   function unitView(unit: ForceUnit, source: UnitSource, detectedByDroneId: string | null, inSight: boolean): MissionUnit {
     const { id, side, kind, position, headingDeg, speedMs } = unit;
-    return { id, side, kind, position, headingDeg, speedMs, source, detectedByDroneId, inSight, ...(unit.damaged ? { damaged: true } : {}) };
+    return {
+      id, side, kind, position, headingDeg, speedMs, source, detectedByDroneId, inSight,
+      ...(unit.damaged ? { damaged: true } : {}),
+      ...(unit.destroyed ? { destroyed: true } : {}),
+      ...(unit.building ? { building: unit.building } : {}),
+    };
   }
 
   function cellKey(cell: ReconCell): string {
@@ -527,7 +539,7 @@ export function createMissionController(
   /** Starts an engagement: the drone drops its tasks and flies at the unit. Refused unless the unit is known. */
   function engage(droneId: string, targetId: string, mode: EngageMode) {
     const drone = commandable(droneId);
-    const unit = forces.find((u) => u.id === targetId && u.side === 'enemy');
+    const unit = forces.find((u) => u.id === targetId && u.side === 'enemy' && !u.destroyed);
     const inRange = !!drone && !!unit && (mode === 'strike' || distanceM(drone.position, unit.position) <= CAMERA_RANGE_M);
     if (!drone || !unit || !known.has(targetId) || !inRange) {
       serverLog('engage refused', { droneId, targetId, mode });
@@ -546,7 +558,7 @@ export function createMissionController(
   function engageStep(droneId: string, drone: DroneState, dtS: number): 'down' | 'flying' {
     const engagement = drone.engagement!;
     const unit = forces.find((u) => u.id === engagement.targetId);
-    if (!unit || (engagement.mode === 'pursuit' && distanceM(drone.position, unit.position) > CAMERA_RANGE_M)) {
+    if (!unit || unit.destroyed || (engagement.mode === 'pursuit' && distanceM(drone.position, unit.position) > CAMERA_RANGE_M)) {
       serverLog('engagement over', { droneId, targetId: engagement.targetId });
       drone.engagement = null;
       return 'flying';
@@ -612,14 +624,18 @@ export function createMissionController(
   }
 
   /**
-   * A strike's result on the unit: destroyed leaves the map for good (the drones attacking it lose it on their
-   * next step); damaged stays on the map, marked; unharmed changes nothing.
+   * A strike's result on the unit: destroyed stays on the map where it was hit, stands still and is marked (the
+   * drones attacking it lose it on their next step); damaged stays on the map, marked; unharmed changes nothing.
    */
   function hitUnit(unit: ForceUnit, droneId: string, outcome: HitOutcome) {
     serverLog('unit hit', { droneId, unitId: unit.id, outcome });
     if (outcome === 'destroyed') {
-      forces.splice(forces.indexOf(unit), 1);
-      known.delete(unit.id);
+      unit.destroyed = true;
+      unit.speedMs = 0;
+      unit.headingDeg = null;
+      unit.waypoint = null;
+      const view = known.get(unit.id);
+      if (view) known.set(unit.id, { ...view, destroyed: true, speedMs: 0, headingDeg: null });
     } else if (outcome === 'damaged') {
       unit.damaged = true;
       const view = known.get(unit.id);
@@ -895,6 +911,7 @@ export function createMissionController(
         callsign: entry.callsign,
         status: live ? live.status : (state.status as 'booting' | 'connecting' | 'idle'),
         ...(live?.cause ? { cause: live.cause } : {}),
+        ...(live?.engagement ? { targetId: live.engagement.targetId } : {}),
         warning: live?.warning ?? null,
         progress: state.progress,
         position: live?.position ?? null,

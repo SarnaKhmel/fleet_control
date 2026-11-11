@@ -884,7 +884,7 @@ describe('mission controller', () => {
       mission.dispose();
     });
 
-    it('a strike on a vehicle that is destroyed takes the unit off the map, and the drone is spent', async () => {
+    it('a strike on a vehicle that is destroyed leaves the unit on the map, destroyed and still, and the drone is spent', async () => {
       const mission = await online([force({ position: offsetLatLng(area.center, 1000, 0) })], () => 0.1);
       mission.handle({ type: 'engage', droneId: 'drone-1', targetId: 'enemy-1', mode: 'strike' });
       vi.advanceTimersByTime(30_000);
@@ -892,7 +892,30 @@ describe('mission controller', () => {
       expect(sent.filter((m) => m.type === 'drone_status').at(-1)).toEqual({ type: 'drone_status', droneId: 'drone-1', status: 'destroyed', cause: 'collision' });
       expect(sent).toContainEqual({ type: 'unit_hit', unitId: 'enemy-1', droneId: 'drone-1', outcome: 'destroyed' });
       const snap = mission.snapshot();
-      expect(snap.type === 'mission_snapshot' && snap.units?.map((u) => u.id)).toEqual([]);
+      expect(snap.type === 'mission_snapshot' && snap.units).toEqual([expect.objectContaining({ id: 'enemy-1', destroyed: true, speedMs: 0, headingDeg: null })]);
+      mission.dispose();
+    });
+
+    it('a destroyed unit does not move again', async () => {
+      const wreck = offsetLatLng(area.center, 1000, 0);
+      const mission = await online([force({ position: wreck, speedMs: 1.5, headingDeg: 0, waypoint: offsetLatLng(area.center, 5000, 0) })], () => 0.1);
+      mission.handle({ type: 'engage', droneId: 'drone-1', targetId: 'enemy-1', mode: 'strike' });
+      vi.advanceTimersByTime(120_000);
+      expect(sent).toContainEqual({ type: 'unit_hit', unitId: 'enemy-1', droneId: 'drone-1', outcome: 'destroyed' });
+      const after = (mission.snapshot() as Extract<ServerMessage, { type: 'mission_snapshot' }>).units![0].position;
+      sent = [];
+      vi.advanceTimersByTime(60_000);
+      expect((mission.snapshot() as Extract<ServerMessage, { type: 'mission_snapshot' }>).units![0].position).toEqual(after);
+      expect(sent.filter((m) => m.type === 'units')).toEqual([]);
+      mission.dispose();
+    });
+
+    it('drone_status names the target of an engaging drone, and the snapshot does too', async () => {
+      const mission = await online([force({ position: offsetLatLng(area.center, 2000, 0) })]);
+      mission.handle({ type: 'engage', droneId: 'drone-1', targetId: 'enemy-1', mode: 'strike' });
+      vi.advanceTimersByTime(1000);
+      expect(sent.find((m) => m.type === 'drone_status')).toEqual({ type: 'drone_status', droneId: 'drone-1', status: 'engaging', targetId: 'enemy-1' });
+      expect((mission.snapshot() as Extract<ServerMessage, { type: 'mission_snapshot' }>).drones[0]).toMatchObject({ status: 'engaging', targetId: 'enemy-1' });
       mission.dispose();
     });
 
@@ -944,7 +967,7 @@ describe('mission controller', () => {
   describe('occupied buildings', () => {
     // Houses 150–250 m east of the start.
     // One house object, as the tiles hand out the same building each time.
-    const house = { rings: [], heightM: 40, south: 0, north: 0, west: 0, east: 0 } as Building;
+    const house = { rings: [[{ lat: 50, lng: 30 }, { lat: 50, lng: 30.001 }, { lat: 50.001, lng: 30 }]], heightM: 40, south: 0, north: 0, west: 0, east: 0 } as Building;
     const houses: Buildings = {
       at: (p) => {
         const { east } = toMetersFrom(area.center, p);
@@ -965,7 +988,7 @@ describe('mission controller', () => {
       for (let i = 0; i < 10; i++) await Promise.resolve();
       vi.advanceTimersByTime(60_000);
       // The ally watches 800 m around it, so the new position is seen at once.
-      expect(newEnemies()).toEqual([expect.objectContaining({ id: 'enemy-2', kind: 'position', source: 'ally' })]);
+      expect(newEnemies()).toEqual([expect.objectContaining({ id: 'enemy-2', kind: 'position', source: 'ally', building: { rings: house.rings, heightM: 40 } })]);
       mission.dispose();
     });
 
@@ -1041,7 +1064,7 @@ describe('mission controller', () => {
     it('infantry that does not shoot the drone down can be destroyed', async () => {
       const mission = await strike('infantry', () => 0.25);
       expect(hits()).toEqual([{ type: 'unit_hit', unitId: 'enemy-1', droneId: 'drone-1', outcome: 'destroyed' }]);
-      expect(enemyInSnapshot(mission)).toBeUndefined();
+      expect(enemyInSnapshot(mission)).toMatchObject({ destroyed: true, speedMs: 0 });
       mission.dispose();
     });
   });

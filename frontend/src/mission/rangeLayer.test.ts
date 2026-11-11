@@ -5,7 +5,7 @@ import type { DroneView } from './missionStore';
 import { addRangeLayer, rangeFeatures, syncRange, RANGE_LINE_ID, RANGE_SOURCE_ID } from './rangeLayer';
 import { WAYPOINT_COLORS } from './waypointLayer';
 
-const drone: DroneView = { callsign: 'BA-01', status: 'moving', cause: null, warning: null, progress: 100, position: { lat: 50, lng: 30 }, heading: 0, altitudeM: 210, groundM: 150, speedMs: 10, batteryPct: 50, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] };
+const drone: DroneView = { callsign: 'BA-01', status: 'moving', cause: null, warning: null, targetId: null, progress: 100, position: { lat: 50, lng: 30 }, heading: 0, altitudeM: 210, groundM: 150, speedMs: 10, batteryPct: 50, crabDeg: 0, altitudeAglM: 60, cruiseSpeedMs: 10, trail: [], tasks: [] };
 const calm = { speedMs: 0, fromDeg: 0 };
 
 describe('range layer', () => {
